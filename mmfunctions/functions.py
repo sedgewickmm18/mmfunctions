@@ -1,3 +1,5 @@
+# Singlevalued expression => base aggregators ==> built on group.agg
+# Multivalued expression => complex aggregators ==> built on group.apply
 import datetime as dt
 import logging
 import json
@@ -5,7 +7,7 @@ import pandas as pd
 import numpy as np
 from scipy import stats
 from sqlalchemy import Column, Integer, String, Float, DateTime, Boolean, func
-from iotfunctions.base import BaseTransformer,BaseSimpleAggregator
+from iotfunctions.base import BaseTransformer,BaseSimpleAggregator,BaseComplexAggregator
 from iotfunctions.metadata import EntityType
 from iotfunctions.db import Database
 from iotfunctions import bif
@@ -97,25 +99,50 @@ Since the multiplication of two input data items produces a single
 output item (not an array of multiple data items), we use the 
 UIFunctionOutSingle class.
 
+       if not self._agg_dict is None and self._agg_dict:
+            gf = group.agg(self._agg_dict)
+            gfs.append(gf)
+        for s in self._complex_aggregators:
+            gf = group.apply(s.execute)
+            gfs.append(gf)
+        df = pd.concat(gfs,axis=1)
+
+
 '''
 
-class AggregateItemStats(BaseSimpleAggregator):
+class AggregateItemStats(BaseComplexAggregator):
     '''
     Compute the pearson coefficient of two variables
     '''
     
-    def __init__(self,input_items,aggregation_function,output_items=None):
+    def __init__(self,input_items,agg_dict,output_items,complex_aggregators=None):
         
         super().__init__()
         
         self.input_items = input_items
-        self.aggregation_function = aggregation_function
+        self._agg_dict = agg_dict
+
+        if complex_aggregators is None:
+            complex_aggregators = [self.dataframe_return_self, self.dataframe_correlation_pearson]
+
+        self._complex_aggregators = complex_aggregators
+        self.input_items = input_items
+        self.output_items = output_items
         
-        if output_items is None:
-            output_items = ['%s_%s' %(x,aggregation_function) for x in self.input_items]
+        #if output_items is None:
+        #    output_items = ['%s_%s' %(x,aggregation_function) for x in self.input_items]
         
         #self.output_items = output_items
         self.output_items = ['correlation coefficient']
+
+    @classmethod
+    def dataframe_return_self(x):
+        return x
+
+    @classmethod
+    def dataframe_correlation_pearson(x):
+        return x.corr(gf, method=pearson)
+        
         
     def get_aggregation_method(self):
         
@@ -157,13 +184,23 @@ class AggregateItemStats(BaseSimpleAggregator):
     def get_available_methods(cls):
         
         return {
-                'pearson' : 'stats.pearsonr'
+                #'pearson' : 'stats.pearsonr'
+                'pearson' : 'pearsonr'
                 }
+
+    #https://stackoverflow.com/questions/49925718/parallel-calculation-of-distance-correlation-dcor-from-dataframe
+
+'''
+CAVEAT: using pearson on two different time series data sets with potentially differing time stamp
+event for speed and torque come at different times
+
+Do I have to merge, resp outer join the data before I can apply pearson ?
+( https://stackoverflow.com/questions/32215024/merging-time-series-data-by-timestamp-using-numpy-pandas )
+'''
 
 
 
 '''
-
 This python file is a script as it is executable. Each time AS runs the
 MultiplyTwoItems function, it will not be executing this script.
 Instead it will be importing the MultiplyTwoItems class from a python module

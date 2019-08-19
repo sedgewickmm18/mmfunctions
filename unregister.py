@@ -15,7 +15,7 @@ from iotfunctions.enginelog import EngineLogging
 from mmfunctions import functions
 
 print ("Instantiate")
-ais = functions.AggregateItemStats('blah',None,[])
+ais = functions.AggregateItemStats('blah',stats.pearsonr)
 print (*ais.output_items, sep = "\n")
 print ("Instantiated")
 
@@ -52,24 +52,5 @@ Use the credentials to build an AS Database connection.
 
 db = Database(credentials=credentials)
 
-
-#fn = AggregateItemStats(
-#        input_item_1='x1',
-#        input_item_2='x2',
-#        output_item='y')
-
-#df = fn.execute_local_test(generate_days=1,to_csv=True)
-#print(df)
-
-
-#cols = [
-#    Column('string_1', String(255))
-#        ]
-
-#df = fn.execute_local_test(generate_days = 1,to_csv=True,
-#                           columns = cols)
-
-db.register_functions([functions.AggregateItemStats])
-
-#db.register_module(mmfunctions)
+db.unregister_functions(["AggregateItemStats"])
 
