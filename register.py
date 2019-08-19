@@ -10,8 +10,10 @@ from iotfunctions.metadata import EntityType
 from iotfunctions.db import Database
 from iotfunctions import bif
 from iotfunctions import ui
-from iotfunctions.ui import UIMultiItem, UISingle ,UISingleItem, UIFunctionOutSingle, UIFunctionOutMulti
 from iotfunctions.enginelog import EngineLogging
+from mmfunctions import functions
+
+functions.AggregateItemStats('blah',stats.pearsonr)
 
 EngineLogging.configure_console_logging(logging.DEBUG)
 
@@ -99,70 +101,6 @@ UIFunctionOutSingle class.
 
 '''
 
-class AggregateItemStats(BaseSimpleAggregator):
-    '''
-    Compute the pearson coefficient of two variables
-    '''
-    
-    def __init__(self,input_items,aggregation_function,output_items=None):
-        
-        super().__init__()
-        
-        self.input_items = input_items
-        self.aggregation_function = aggregation_function
-        
-        if output_items is None:
-            output_items = ['%s_%s' %(x,aggregation_function) for x in self.input_items]
-        
-        self.output_items = output_items
-        
-    def get_aggregation_method(self):
-        
-        out = self.get_available_methods().get(self.aggregation_function,None)
-        if out is None:
-            raise ValueError('Invalid aggregation function specified: %s'
-                             %self.aggregation_function)
-        
-        return out 
-        
-    @classmethod
-    def build_ui(cls):
-        
-        inputs = []
-        outputs = []
-        inputs.append(UIMultiItem(name = 'input_items',
-                                  datatype= None,
-                                  description = ('Choose the data items'
-                                                 ' that you would like to'
-                                                 ' aggregate'),
-                                  output_item = 'output_items',
-                                  is_output_datatype_derived = True
-                                          ))
-                                  
-        aggregate_names = list(cls.get_available_methods().keys())
-                                  
-        inputs.append(UISingle(name = 'aggregation_function',
-                               description = 'Choose aggregation function',
-                               values = aggregate_names))
-
-        outputs.append(UISingle(name = 'aggregated factor', datatype=float))
-        
-        return (inputs,outputs)
-    
-    @classmethod
-    def count_distinct(cls,series):
-        
-        return len(series.dropna().unique())                                  
-        
-    @classmethod
-    def get_available_methods(cls):
-        
-        return {
-                'pearson' : 'stats.pearsonr'
-                }
-
-
-
 '''
 
 This python file is a script as it is executable. Each time AS runs the
@@ -179,7 +117,6 @@ version of it - the one that exists in the sample.py.
 
 '''
 
-#from iotfunctions.sample import AggregateItemStats
 
 '''
 
@@ -234,7 +171,9 @@ you can use them. To register a function:
     
 '''
 
-db.register_functions([AggregateItemStats])
+db.register_functions([functions.AggregateItemStats])
+
+#db.register_module(mmfunctions)
 
 '''
 After registration has completed successfully the function is available for
