@@ -17,17 +17,17 @@ EngineLogging.configure_console_logging(logging.DEBUG)
 
 PACKAGE_URL= "https://github.com/sedgewickmm18/mmfunctions"
 
-credentials = {
-  "tenantId": "AnalyticsServiceDev",
-  "db2": {
-    "username": "bluadmin",
-    "password": "ZmM5MmE5NmZkZGZl",
-    "databaseName": "BLUDB",
-    "port": 50000,
-    "httpsUrl": "https://dashdb-enterprise-yp-dal13-74.services.dal.bluemix.net:50000",
-    "host": "dashdb-enterprise-yp-dal13-74.services.dal.bluemix.net"
-  }
-}
+#credentials = {
+#  "tenantId": "AnalyticsServiceDev",
+#  "db2": {
+#    "username": "bluadmin",
+#    "password": "ZmM5MmE5NmZkZGZl",
+#    "databaseName": "BLUDB",
+#    "port": 50000,
+#    "httpsUrl": "https://dashdb-enterprise-yp-dal13-74.services.dal.bluemix.net:50000",
+#    "host": "dashdb-enterprise-yp-dal13-74.services.dal.bluemix.net"
+#  }
+#}
 
 #with open('credentials_as_dev.json', encoding='utf-8') as F:
 #    credentials = json.loads(F.read())
@@ -37,14 +37,14 @@ The db_schema is the db2_schema name for your client database. If
 you are using the default schema of your user, there is no need to
 provide a schema.
 '''
-db_schema = None
+#db_schema = None
 
 
 '''
 Use the credentials to build an AS Database connection.
 '''
 
-db = Database(credentials=credentials)
+#db = Database(credentials=credentials)
 
 '''
 
@@ -233,7 +233,7 @@ you can use them. To register a function:
     
 '''
 
-db.register_functions([AggregateItemStats])
+#db.register_functions([AggregateItemStats])
 
 '''
 After registration has completed successfully the function is available for
