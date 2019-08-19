@@ -112,7 +112,8 @@ class AggregateItemStats(BaseSimpleAggregator):
         self.aggregation_function = aggregation_function
         
         if output_items is None:
-            output_items = ['%s_%s' %(x,aggregation_function) for x in self.input_items]
+            output_items = ['correlation coefficient']
+        #    output_items = ['%s_%s' %(x,aggregation_function) for x in self.input_items]
         
         self.output_items = output_items
         
@@ -145,8 +146,6 @@ class AggregateItemStats(BaseSimpleAggregator):
                                description = 'Choose aggregation function',
                                values = aggregate_names))
 
-        outputs.append(UISingle(name = 'aggregated factor', datatype=float))
-        
         return (inputs,outputs)
     
     @classmethod
