@@ -1,3 +1,4 @@
+#!/usr/bin/python3
 import datetime as dt
 import logging
 import json
@@ -13,7 +14,10 @@ from iotfunctions import ui
 from iotfunctions.enginelog import EngineLogging
 from mmfunctions import functions
 
-functions.AggregateItemStats('blah',stats.pearsonr)
+print ("Instantiate")
+ais = functions.AggregateItemStats('blah',stats.pearsonr)
+print (*ais.output_items, sep = "\n")
+print ("Instantiated")
 
 EngineLogging.configure_console_logging(logging.DEBUG)
 

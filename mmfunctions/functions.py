@@ -112,10 +112,10 @@ class AggregateItemStats(BaseSimpleAggregator):
         self.aggregation_function = aggregation_function
         
         if output_items is None:
-            output_items = ['correlation coefficient']
-        #    output_items = ['%s_%s' %(x,aggregation_function) for x in self.input_items]
+            output_items = ['%s_%s' %(x,aggregation_function) for x in self.input_items]
         
-        self.output_items = output_items
+        #self.output_items = output_items
+        self.output_items = ['correlation coefficient']
         
     def get_aggregation_method(self):
         
