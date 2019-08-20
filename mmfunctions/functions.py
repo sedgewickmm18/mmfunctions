@@ -156,7 +156,7 @@ class AggregateItemStatsT(BaseTransformer):
 
 class AggregateItemStats(BaseComplexAggregator):
     '''
-    Compute the pearson coefficient of two variables
+    DO NOT USE - Compute the pearson coefficient of two variables
     '''
     
     def __init__(self,input_items,agg_dict,output_items=None):
