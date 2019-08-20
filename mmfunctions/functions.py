@@ -122,8 +122,11 @@ class AggregateItemStatsT(BaseTransformer):
 
     def execute(self, df):
         df = df.copy()
-        #df[self.output_item] = df[self.input_item_1].corr(df[self.input_item_2])
-        df[self.output_item] = df[self.input_item_1] * df[self.input_item_2]
+        sca = df[self.input_item_1].corr(df[self.input_item_2])
+        df[self.output_item] = sca
+        #df[self.output_item] = df[self.input_item_1] * df[self.input_item_2]
+        msg = 'AggregateItemStatsT found correlation to be: %d. ' %sca
+        self.trace_append(msg)
         return df
 
     @classmethod

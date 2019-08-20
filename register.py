@@ -19,14 +19,23 @@ print ("Instantiate 1")
 ais = functions.AggregateItemStats('blah',None,[])
 print (*ais.output_items, sep = "\n")
 print ("Instantiate 2")
-ais = functions.AggregateItemStatsT('blah','blah2','blah3')
-print (sys.argv)
-print ("Instantiated")
+ais = functions.AggregateItemStatsT('col1','col2','col3')
 
+# if in test mode call execute() and exit
 if (len(sys.argv) > 1) and (sys.argv[1] == 'test'):
+    np.random.seed([3,1415])
+    df = pd.DataFrame(dict(
+           col1 = np.random.randint(400,500,40),
+           col2 = np.random.randint(400,500,40)
+        ))
+    print (df)
+    ais.set_entity_type(ais._build_entity_type())
+    df = ais.execute(df)
+    print (df)
+    print ("Instantiated - done")
     sys.exit()
 
-print (sys.argv)
+print ("Instantiated")
 
 EngineLogging.configure_console_logging(logging.DEBUG)
 
