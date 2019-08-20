@@ -112,7 +112,7 @@ UIFunctionOutSingle class.
 '''
 class AggregateItemStatsT(BaseTransformer):
     '''
-    Fills a new column with the pearson correlator
+    Fills a new column with the pearson correlation coefficient of the two input columns
     '''
     def __init__(self, input_item_1, input_item_2, output_item ):
         self.input_item_1 = input_item_1
@@ -122,7 +122,8 @@ class AggregateItemStatsT(BaseTransformer):
 
     def execute(self, df):
         df = df.copy()
-        df[self.output_item] = df[self.input_item_1].corr(df[self.input_item_2])
+        #df[self.output_item] = df[self.input_item_1].corr(df[self.input_item_2])
+        df[self.output_item] = df[self.input_item_1] * df[self.input_item_2]
         return df
 
     @classmethod
