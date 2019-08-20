@@ -15,23 +15,34 @@ from iotfunctions import ui
 from iotfunctions.enginelog import EngineLogging
 from mmfunctions import functions
 
+# if in test mode call execute()
+if (len(sys.argv) > 1) and (sys.argv[1] == 'test'):
+    np.random.seed([3,1415])
+    df = pd.DataFrame(dict(
+           col1 = np.random.randint(400,500,40),
+           col2 = np.random.randint(400,500,40),
+           #col2 = np.random.laplace(400,50,40)
+        ))
+    print (df)
+
 print ("Instantiate 1")
-ais = functions.AggregateItemStats('blah',None,[])
+ais = functions.AggregateItemStats(['col1','col2'],None)
 print (*ais.output_items, sep = "\n")
+
+# if in test mode call execute() and exit
+if (len(sys.argv) > 1) and (sys.argv[1] == 'test'):
+    ais.set_entity_type(ais._build_entity_type())
+    dff = ais.execute(df)
+    print (dff)
+
 print ("Instantiate 2")
 ais = functions.AggregateItemStatsT('col1','col2','col3')
 
 # if in test mode call execute() and exit
 if (len(sys.argv) > 1) and (sys.argv[1] == 'test'):
-    np.random.seed([3,1415])
-    df = pd.DataFrame(dict(
-           col1 = np.random.randint(400,500,40),
-           col2 = np.random.randint(400,500,40)
-        ))
-    print (df)
     ais.set_entity_type(ais._build_entity_type())
-    df = ais.execute(df)
-    print (df)
+    dff = ais.execute(df)
+    print (dff)
     print ("Instantiated - done")
     sys.exit()
 

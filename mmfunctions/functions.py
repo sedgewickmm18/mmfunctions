@@ -165,7 +165,6 @@ class AggregateItemStats(BaseComplexAggregator):
         
         self.input_items = input_items
         self._agg_dict = agg_dict
-        self.first_argument = None
 
         #if complex_aggregators is None:
         #    complex_aggregators = [self.dataframe_return_self, self.dataframe_correlation_pearson]
@@ -191,15 +190,11 @@ class AggregateItemStats(BaseComplexAggregator):
 
     def execute(self, df):
 
-        if df.empty:
-            return np.nan
-
-        if self.first_argument is None:
-            self.first_argument = df
+        if len(self.input_items) < 1:
             return np.nan
         else:
-            return self.first_argument.corrwith(df)
-        
+            return df[self.input_items[0]].corr(df[self.input_items[1]])
+
         
     @classmethod
     def build_ui(cls):
