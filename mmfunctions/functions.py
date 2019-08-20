@@ -1,5 +1,6 @@
 # Singlevalued expression => base aggregators ==> built on group.agg
 # Multivalued expression => complex aggregators ==> built on group.apply
+#   not well supported by AS pipeline, deprecated, not supported for jobcontrol
 import datetime as dt
 import logging
 import json
@@ -115,17 +116,18 @@ class AggregateItemStats(BaseComplexAggregator):
     Compute the pearson coefficient of two variables
     '''
     
-    def __init__(self,input_items,agg_dict,output_items,complex_aggregators=None):
+    def __init__(self,input_items,agg_dict,output_items=None):
         
         super().__init__()
         
         self.input_items = input_items
         self._agg_dict = agg_dict
+        self.first_argument = None
 
-        if complex_aggregators is None:
-            complex_aggregators = [self.dataframe_return_self, self.dataframe_correlation_pearson]
+        #if complex_aggregators is None:
+        #    complex_aggregators = [self.dataframe_return_self, self.dataframe_correlation_pearson]
 
-        self._complex_aggregators = complex_aggregators
+        #self._complex_aggregators = complex_aggregators
         self.input_items = input_items
         self.output_items = output_items
         
@@ -135,15 +137,6 @@ class AggregateItemStats(BaseComplexAggregator):
         #self.output_items = output_items
         self.output_items = ['correlation coefficient']
 
-    @classmethod
-    def dataframe_return_self(x):
-        return x
-
-    @classmethod
-    def dataframe_correlation_pearson(x):
-        return x.corr(gf, method=pearson)
-        
-        
     def get_aggregation_method(self):
         
         out = self.get_available_methods().get(self.aggregation_function,None)
@@ -152,6 +145,18 @@ class AggregateItemStats(BaseComplexAggregator):
                              %self.aggregation_function)
         
         return out 
+
+    def execute(self, df):
+
+        if df.empty:
+            return np.nan
+
+        if self.first_argument is None:
+            self.first_argument = df
+            return np.nan
+        else:
+            return self.first_argument.corrwith(df)
+        
         
     @classmethod
     def build_ui(cls):
@@ -185,7 +190,7 @@ class AggregateItemStats(BaseComplexAggregator):
         
         return {
                 #'pearson' : 'stats.pearsonr'
-                'pearson' : 'pearsonr'
+                'pearson' : 'pearson'
                 }
 
     #https://stackoverflow.com/questions/49925718/parallel-calculation-of-distance-correlation-dcor-from-dataframe
