@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 import datetime as dt
+import sys
 import logging
 import json
 import pandas as pd
@@ -14,10 +15,18 @@ from iotfunctions import ui
 from iotfunctions.enginelog import EngineLogging
 from mmfunctions import functions
 
-print ("Instantiate")
+print ("Instantiate 1")
 ais = functions.AggregateItemStats('blah',None,[])
 print (*ais.output_items, sep = "\n")
+print ("Instantiate 2")
+ais = functions.AggregateItemStatsT('blah','blah2','blah3')
+print (sys.argv)
 print ("Instantiated")
+
+if (len(sys.argv) > 1) and (sys.argv[1] == 'test'):
+    sys.exit()
+
+print (sys.argv)
 
 EngineLogging.configure_console_logging(logging.DEBUG)
 
@@ -69,7 +78,7 @@ db = Database(credentials=credentials)
 #df = fn.execute_local_test(generate_days = 1,to_csv=True,
 #                           columns = cols)
 
-db.register_functions([functions.AggregateItemStats])
+#db.register_functions([functions.AggregateItemStats])
 
-#db.register_module(mmfunctions)
+db.register_module(functions)
 

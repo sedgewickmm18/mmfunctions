@@ -110,6 +110,45 @@ UIFunctionOutSingle class.
 
 
 '''
+class AggregateItemStatsT(BaseTransformer):
+    '''
+    Fills a new column with the pearson correlator
+    '''
+    def __init__(self, input_item_1, input_item_2, output_item ):
+        self.input_item_1 = input_item_1
+        self.input_item_2 = input_item_2
+        self.output_item = output_item
+        super().__init__()
+
+    def execute(self, df):
+        df = df.copy()
+        df[self.output_item] = df[self.input_item_1].corr(df[self.input_item_2])
+        return df
+
+    @classmethod
+    def build_ui(cls):
+        #define arguments that behave as function inputs
+        inputs = []
+        inputs.append(ui.UISingleItem(
+                name = 'input_item_1',
+                datatype=float,
+                description = 'First column for correlation'
+                                              ))
+        inputs.append(ui.UISingleItem(
+                name = 'input_item_2',
+                datatype=float,
+                description = 'Second column for correlation'
+                                              ))
+        #define arguments that behave as function outputs
+        outputs = []
+        outputs.append(ui.UIFunctionOutSingle(
+                name = 'output_item',
+                datatype=float,
+                description='Column with the (scalar) coefficient'
+                ))
+        return (inputs,outputs)
+
+
 
 class AggregateItemStats(BaseComplexAggregator):
     '''
