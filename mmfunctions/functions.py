@@ -115,10 +115,10 @@ class AggregateItemStatsT(BaseTransformer):
     Fills a new column with the pearson correlation coefficient of the two input columns
     '''
     def __init__(self, input_item_1, input_item_2, output_item ):
+        super().__init__()
         self.input_item_1 = input_item_1
         self.input_item_2 = input_item_2
         self.output_item = output_item
-        super().__init__()
 
     def execute(self, df):
         #df = df.copy()
@@ -161,6 +161,8 @@ class AggregateItemStats(BaseComplexAggregator):
     
     def __init__(self,input_items,agg_dict,output_items=None):
         
+        super().__init__()
+
         self.input_items = input_items
         self._agg_dict = agg_dict
 
@@ -176,8 +178,6 @@ class AggregateItemStats(BaseComplexAggregator):
         
         #self.output_items = output_items
         self.output_items = ['correlation coefficient']
-
-        super().__init__()
 
     def get_aggregation_method(self):
         
@@ -240,6 +240,42 @@ event for speed and torque come at different times
 Do I have to merge, resp outer join the data before I can apply pearson ?
 ( https://stackoverflow.com/questions/32215024/merging-time-series-data-by-timestamp-using-numpy-pandas )
 '''
+
+
+class RandomNormalMM(BaseTransformer):
+    """
+    Generate a normally distributed random number. MM Test
+    """
+    
+    def __init__ (self, mean, standard_deviation, output_item = 'output_item'):
+        
+        super().__init__()
+        self.mean = mean
+        self.standard_deviation = standard_deviation
+        self.output_item = output_item
+        
+    def execute(self,df):
+        
+        df[self.output_item] = np.random.normal(self.mean,self.standard_deviation,len(df.index))
+        
+        return df
+    
+    @classmethod
+    def build_ui(cls):
+        #define arguments that behave as function inputs
+        inputs = []
+        inputs.append(UISingle(name='mean',datatype=float))
+        inputs.append(UISingle(name='standard_deviation',datatype=float))
+        #define arguments that behave as function outputs
+        outputs = []
+        outputs.append(UIFunctionOutSingle(name = 'output_item',
+                                             datatype=float,
+                                             description='Random output'
+                                             ))
+    
+        return (inputs,outputs)  
+                 
+
 
 
 
