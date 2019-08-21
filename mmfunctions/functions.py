@@ -121,7 +121,7 @@ class AggregateItemStatsT(BaseTransformer):
         super().__init__()
 
     def execute(self, df):
-        df = df.copy()
+        #df = df.copy()
         sca = df[self.input_item_1].corr(df[self.input_item_2])
         df[self.output_item] = sca
         #df[self.output_item] = df[self.input_item_1] * df[self.input_item_2]
@@ -161,8 +161,6 @@ class AggregateItemStats(BaseComplexAggregator):
     
     def __init__(self,input_items,agg_dict,output_items=None):
         
-        super().__init__()
-        
         self.input_items = input_items
         self._agg_dict = agg_dict
 
@@ -178,6 +176,8 @@ class AggregateItemStats(BaseComplexAggregator):
         
         #self.output_items = output_items
         self.output_items = ['correlation coefficient']
+
+        super().__init__()
 
     def get_aggregation_method(self):
         
