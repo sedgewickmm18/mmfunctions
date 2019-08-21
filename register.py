@@ -15,6 +15,8 @@ from iotfunctions import ui
 from iotfunctions.enginelog import EngineLogging
 from mmfunctions import functions
 
+EngineLogging.configure_console_logging(logging.DEBUG)
+
 # if in test mode call execute()
 if (len(sys.argv) > 1) and (sys.argv[1] == 'test'):
     np.random.seed([3,1415])
@@ -31,9 +33,10 @@ print (*ais.output_items, sep = "\n")
 
 # if in test mode call execute() and exit
 if (len(sys.argv) > 1) and (sys.argv[1] == 'test'):
-    ais.set_entity_type(ais._build_entity_type())
-    dff = ais.execute(df)
-    print (dff)
+    ent = ais._build_entity_type()
+    ais.set_entity_type(ent)
+    scal = ais.execute(df)
+    print (scal)
 
 print ("Instantiate 2")
 ais = functions.AggregateItemStatsT('col1','col2','col3')
