@@ -18,7 +18,7 @@ from iotfunctions.enginelog import EngineLogging
 
 EngineLogging.configure_console_logging(logging.DEBUG)
 
-PACKAGE_URL= "https://github.com/sedgewickmm18/mmfunctions@"
+PACKAGE_URL= "git+https://github.com/sedgewickmm18/mmfunctions@"
 
 #credentials = {
 #  "tenantId": "AnalyticsServiceDev",
