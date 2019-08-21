@@ -8,7 +8,7 @@ setup(
     packages=find_packages(),
     install_requires=[
         'dill==0.2.5',
-        'urllib3>=1.24.2',
+        'urllib3==1.22',
         'sqlalchemy==1.3.5',
         'numpy==1.14.5',
         'pandas==0.24.0',

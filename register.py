@@ -15,6 +15,8 @@ from iotfunctions import ui
 from iotfunctions.enginelog import EngineLogging
 from mmfunctions import functions
 
+PACKAGE_URL= "https://github.com/sedgewickmm18/mmfunctions"
+
 EngineLogging.configure_console_logging(logging.DEBUG)
 
 # if in test mode call execute()
