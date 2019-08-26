@@ -161,8 +161,6 @@ class AggregateItemStats(BaseComplexAggregator):
     
     def __init__(self,input_items,agg_dict,output_items=None):
         
-        super().__init__()
-
         self.input_items = input_items
         self._agg_dict = agg_dict
 
@@ -178,15 +176,18 @@ class AggregateItemStats(BaseComplexAggregator):
         
         #self.output_items = output_items
         self.output_items = ['correlation coefficient']
+        self.aggregation_function = aggregate
+
+        super().__init__()
 
     def get_aggregation_method(self):
         
-        out = self.get_available_methods().get(self.aggregation_function,None)
-        if out is None:
-            raise ValueError('Invalid aggregation function specified: %s'
-                             %self.aggregation_function)
+        #out = self.get_available_methods().get(self.aggregation_function,None)
+        #if out is None:
+        #    raise ValueError('Invalid aggregation function specified: %s'
+        #                     %self.aggregation_function)
         
-        return out 
+        return aggregate
 
     def execute(self, df):
 
@@ -195,6 +196,12 @@ class AggregateItemStats(BaseComplexAggregator):
         else:
             return df[self.input_items[0]].corr(df[self.input_items[1]])
 
+    def aggregate(self, df):
+
+        if len(self.input_items) < 1:
+            return np.nan
+        else:
+            return df[self.input_items[0]].corr(df[self.input_items[1]])
         
     @classmethod
     def build_ui(cls):
