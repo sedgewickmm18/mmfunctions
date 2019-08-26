@@ -8,7 +8,8 @@ import pandas as pd
 import numpy as np
 from scipy import stats
 from sqlalchemy import Column, Integer, String, Float, DateTime, Boolean, func
-from iotfunctions.base import BaseTransformer,BaseSimpleAggregator,BaseComplexAggregator
+from iotfunctions.base import BaseTransformer,BaseSimpleAggregator,BaseComplexAggregator, BaseRegressor
+#from iotfunctions.estimator import SimpleAnomaly
 from iotfunctions.metadata import EntityType
 from iotfunctions.db import Database
 from iotfunctions import bif
@@ -176,7 +177,7 @@ class AggregateItemStats(BaseComplexAggregator):
         
         #self.output_items = output_items
         self.output_items = ['correlation coefficient']
-        self.aggregation_function = aggregate
+        self.aggregation_function = self.aggregate
 
         super().__init__()
 
@@ -248,113 +249,60 @@ Do I have to merge, resp outer join the data before I can apply pearson ?
 ( https://stackoverflow.com/questions/32215024/merging-time-series-data-by-timestamp-using-numpy-pandas )
 '''
 
+class AnomalyTest(BaseRegressor):
 
-class RandomNormalMM(BaseTransformer):
-    """
-    Generate a normally distributed random number. MM Test
-    """
+    def __init__(self, features, targets, difference,
+                     predictions=None, alerts = None):
+        super().__init__(features=features, targets = targets, predictions = None)
+        self.feature = features
+        self.target = targets
+        self.difference = difference
     
-    def __init__ (self, mean, standard_deviation, output_item = 'output_item'):
-        
-        super().__init__()
-        self.mean = mean
-        self.standard_deviation = standard_deviation
-        self.output_item = output_item
-        
+    # fake - real life implementation expects model somewhere on Cloud Object Store
+    #  see  BaseRegressor implementation in iotfunctions
     def execute(self,df):
+            
+        #df = super().execute(df)
+        #for i,t in enumerate(self.targets):
+        #    target = self.targets[i]
+        #    print (i,t)
+        #    df[self.output_items[i]] = (df[t] - df[target]).abs()
+        df[self.difference] = (df[self.feature] - df[self.target]).abs()
+
+            #alert = AlertHighValue(input_item = '_diff_',
+            #                          upper_threshold = self.threshold,
+            #                          alert_name = self.alerts[i])
+            #alert.set_entity_type(self.get_entity_type())
+            #df = alert.execute(df)
         
-        df[self.output_item] = np.random.normal(self.mean,self.standard_deviation,len(df.index))
-        
+            #msg = 'AggregateItemStatsT found correlation to be: %d. ' %sca
+            #self.trace_append(msg)
         return df
-    
+        
     @classmethod
     def build_ui(cls):
         #define arguments that behave as function inputs
         inputs = []
-        inputs.append(UISingle(name='mean',datatype=float))
-        inputs.append(UISingle(name='standard_deviation',datatype=float))
+        inputs.append(UIMultiItem(name='feature',
+                                  datatype=float,
+                                  output_item='feature',
+                                  required=True
+                                          ))        
+        inputs.append(UISingleItem(name='target',
+                                  datatype=float,
+                                  required=True,
+                                  output_item='target',
+                                  is_output_datatype_derived=True
+                                          ))
         #define arguments that behave as function outputs
         outputs = []
-        outputs.append(UIFunctionOutSingle(name = 'output_item',
-                                             datatype=float,
-                                             description='Random output'
-                                             ))
-    
-        return (inputs,outputs)  
-                 
-
-
-
-
-'''
-This python file is a script as it is executable. Each time AS runs the
-MultiplyTwoItems function, it will not be executing this script.
-Instead it will be importing the MultiplyTwoItems class from a python module
-inside a python package. To include functions in the AS catalog, you 
-will need to build a python package and include this class in module of that
-package.
-
-I defined the above class in this script just for so that I could use it to 
-show the structure of an AS function. To actually test this class, we will not
-use the version of it that I copied into the script, we will use the official
-version of it - the one that exists in the sample.py. 
-
-'''
-
-#from iotfunctions.sample import AggregateItemStats
-
-'''
-
-We have just replaced the MultiplyToItems class with the official version
-from the sample package. To understand the structure and content of the
-sample package look at sample.py
-
-To test MultiplyTowItems you will need to create an instance of it and
-indicate for this instance, which two items will it multiply and what
-will the result data item be called.
-
-'''
-
-#fn = AggregateItemStats(
-#        input_item_1='x1',
-#        input_item_2='x2',
-#        output_item='y')
-
-#df = fn.execute_local_test(generate_days=1,to_csv=True)
-#print(df)
-
-'''
-
-This automated local test builds a client side entity type,
-adds the function to the entity type, generates data items that match
-the function arguments, generates a dataframe containing the columns
-referenced in these arguments, executes the function on this data and
-writes the execution results to a file.
-
-Note: Not all functions can be tested locally like this as some require
-a real entity type with real tables and a real connection to the AS service
-
-'''
-
-''' 
-
-The automated test assumes that data items are numeric. You can also
-specify datatypes by passing a list of SQL Alchemy column objects.
-
-'''
-
-#cols = [
-#    Column('string_1', String(255))
-#        ]
-
-#df = fn.execute_local_test(generate_days = 1,to_csv=True,
-#                           columns = cols)
-
-'''
-Custom functions must be registered in the AS function catalog before
-you can use them. To register a function:
-    
-'''
+        outputs.append(UISingletem(name = 'difference',
+                                   datatype = float,
+                                  output_item='difference',
+                                   is_datatype_derived = True,
+                                          ))
+            
+        return (inputs,outputs)    
 
 #db.register_functions([AggregateItemStats])
 
