@@ -157,7 +157,7 @@ class AggregateItemStatsT(BaseTransformer):
 
 class KMeans2D(BaseTransformer):
     '''
-    Fills a new column with the pearson correlation coefficient of the two input columns
+    Fills a new column with the labels with K-Means centroids for the two input columns
     '''
     def __init__(self, nr_centroids, input_item_1, input_item_2, label):
         super().__init__()
@@ -170,6 +170,8 @@ class KMeans2D(BaseTransformer):
         dff = df[[self.input_item_1, self.input_item_2]]
         
         k_means = KMeans(init='k-means++', n_clusters = self.nr_centroids)
+
+        dff.fillna(0)
 
         k_means.fit(dff)
         df[self.label] = k_means.labels_
