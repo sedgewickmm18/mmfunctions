@@ -16,6 +16,7 @@ from iotfunctions import bif
 from iotfunctions import ui
 from iotfunctions.ui import UIMultiItem, UISingle ,UISingleItem, UIFunctionOutSingle, UIFunctionOutMulti
 from iotfunctions.enginelog import EngineLogging
+from sklearn.cluster import KMeans
 
 EngineLogging.configure_console_logging(logging.DEBUG)
 
@@ -154,6 +155,57 @@ class AggregateItemStatsT(BaseTransformer):
         return (inputs,outputs)
 
 
+class KMeans2D(BaseTransformer):
+    '''
+    Fills a new column with the pearson correlation coefficient of the two input columns
+    '''
+    def __init__(self, nr_centroids, input_item_1, input_item_2, label):
+        super().__init__()
+        self.nr_centroids = nr_centroids
+        self.input_item_1 = input_item_1
+        self.input_item_2 = input_item_2
+        self.label = label 
+
+    def execute(self, df):
+        dff = df[[self.input_item_1, self.input_item_2]]
+        
+        k_means = KMeans(init='k-means++', n_clusters = self.nr_centroids)
+
+        k_means.fit(dff)
+        df[self.label] = k_means.labels_
+
+        msg = 'KMeans20'
+        self.trace_append(msg)
+        return df
+
+    @classmethod
+    def build_ui(cls):
+        #define arguments that behave as function inputs
+        inputs = []
+        inputs.append(ui.UISingle(
+                name = 'nr_centroids',
+                datatype=int,
+                description = 'Number of centroids'
+                                              ))
+        inputs.append(ui.UISingleItem(
+                name = 'input_item_1',
+                datatype=float,
+                description = 'First column for correlation'
+                                              ))
+        inputs.append(ui.UISingleItem(
+                name = 'input_item_2',
+                datatype=float,
+                description = 'Second column for correlation'
+                                              ))
+        #define arguments that behave as function outputs
+        outputs = []
+        outputs.append(ui.UIFunctionOutSingle(
+                name = 'label',
+                datatype=int,
+                description='K-Means label'
+                ))
+        return (inputs,outputs)
+
 
 class AggregateItemStats(BaseComplexAggregator):
     '''
@@ -253,10 +305,10 @@ class AnomalyTest(BaseRegressor):
 
     def __init__(self, features, targets, difference,
                      predictions=None, alerts = None):
-        super().__init__(features=features, targets = targets, predictions = None)
         self.feature = features
         self.target = targets
         self.difference = difference
+        super().__init__(features=features, targets = targets, predictions = None)
     
     # fake - real life implementation expects model somewhere on Cloud Object Store
     #  see  BaseRegressor implementation in iotfunctions

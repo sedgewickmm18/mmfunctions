@@ -22,7 +22,7 @@ EngineLogging.configure_console_logging(logging.DEBUG)
 
 # if in test mode call execute()
 if (len(sys.argv) > 1) and (sys.argv[1] == 'test'):
-    np.random.seed([3,1415])
+    np.random.seed([3,14323])
     df = pd.DataFrame(dict(
            col1 = np.random.randint(400,500,40),
            col2 = np.random.randint(400,500,40),
@@ -53,7 +53,17 @@ if (len(sys.argv) > 1) and (sys.argv[1] == 'test'):
     print ("Instantiated - done")
 
 print ("Instantiate 3")
-ais = functions.AnomalyTest('col1','col2','col4')
+ais = functions.KMeans2D(10, 'col1','col2','col4')
+
+# if in test mode call execute()
+if (len(sys.argv) > 1) and (sys.argv[1] == 'test'):
+    ais.set_entity_type(ais._build_entity_type())
+    dff = ais.execute(df)
+    print (dff)
+    print ("Instantiated - done")
+
+print ("Instantiate 4")
+ais = functions.AnomalyTest('col1','col2','col5')
 
 # if in test mode call execute()
 if (len(sys.argv) > 1) and (sys.argv[1] == 'test'):
@@ -64,8 +74,8 @@ if (len(sys.argv) > 1) and (sys.argv[1] == 'test'):
 
 print ("Instantiated")
 
-# if in test mode, exit
-if (len(sys.argv) > 1) and (sys.argv[1] == 'test'):
+# if there is a 2nd argument do not register but exit
+if (len(sys.argv) > 1):
     sys.exit()
 
 EngineLogging.configure_console_logging(logging.DEBUG)
