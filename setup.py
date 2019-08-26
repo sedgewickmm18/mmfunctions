@@ -12,7 +12,7 @@ setup(
         'sqlalchemy==1.3.5',
         'numpy==1.14.5',
         'pandas==0.24.0',
-        'requests>=2.20.0',
+        'requests==2.18.4',
         'lxml==4.3.4',
         'ibm_db==3.0.1',
         'ibm_db_sa==0.3.3',
