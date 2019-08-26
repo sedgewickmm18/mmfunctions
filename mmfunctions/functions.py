@@ -285,21 +285,17 @@ class AnomalyTest(BaseRegressor):
         inputs = []
         inputs.append(UIMultiItem(name='feature',
                                   datatype=float,
-                                  output_item='feature',
                                   required=True
                                           ))        
         inputs.append(UISingleItem(name='target',
                                   datatype=float,
-                                  required=True,
-                                  output_item='target',
-                                  is_output_datatype_derived=True
+                                  required=True
                                           ))
         #define arguments that behave as function outputs
         outputs = []
-        outputs.append(UISingletem(name = 'difference',
+        outputs.append(UISingleItem(name = 'difference',
                                    datatype = float,
-                                  output_item='difference',
-                                   is_datatype_derived = True,
+                                   required=True
                                           ))
             
         return (inputs,outputs)    
