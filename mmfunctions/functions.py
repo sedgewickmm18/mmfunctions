@@ -171,8 +171,8 @@ class KMeans2D(BaseTransformer):
         
         k_means = KMeans(init='k-means++', n_clusters = self.nr_centroids)
 
-        dff.fillna(0)
-        print (dff)
+        dff = dff.fillna(0)
+        #print (dff)
 
         k_means.fit(dff)
         df[self.label] = k_means.labels_
