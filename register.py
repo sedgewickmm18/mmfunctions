@@ -80,10 +80,11 @@ if (len(sys.argv) > 1):
 
 EngineLogging.configure_console_logging(logging.DEBUG)
 
-PACKAGE_URL= "https://github.com/sedgewickmm18/mmfunctions"
-
 credentials = {
   "tenantId": "AnalyticsServiceDev",
+  "as_api_host": "https://api-dev.connectedproducts.internetofthings.ibmcloud.com",
+  "as_api_key": "a-69xgm4-8bdgtvnsv4",
+  "as_api_token": "9X_tMKdupOiJ!mzaPV",
   "db2": {
     "username": "bluadmin",
     "password": "ZmM5MmE5NmZkZGZl",
