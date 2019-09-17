@@ -8,7 +8,7 @@ import pandas as pd
 import numpy as np
 from scipy import stats
 from sqlalchemy import Column, Integer, String, Float, DateTime, Boolean, func
-from iotfunctions.base import BaseTransformer,BaseSimpleAggregator,BaseComplexAggregator, BaseRegressor
+from iotfunctions.base import BaseTransformer,BaseSimpleAggregator,BaseComplexAggregator, BaseRegressor, BaseEstimatorFunction
 #from iotfunctions.estimator import SimpleAnomaly
 from iotfunctions.metadata import EntityType
 from iotfunctions.db import Database
@@ -17,6 +17,9 @@ from iotfunctions import ui
 from iotfunctions.ui import UIMultiItem, UISingle ,UISingleItem, UIFunctionOutSingle, UIFunctionOutMulti
 from iotfunctions.enginelog import EngineLogging
 from sklearn.cluster import KMeans
+from sklearn import metrics
+from sklearn.gaussian_process import GaussianProcessRegressor
+from sklearn.gaussian_process.kernels import RBF, WhiteKernel, ExpSineSquared, ConstantKernel as C
 
 EngineLogging.configure_console_logging(logging.DEBUG)
 
@@ -303,6 +306,39 @@ event for speed and torque come at different times
 Do I have to merge, resp outer join the data before I can apply pearson ?
 ( https://stackoverflow.com/questions/32215024/merging-time-series-data-by-timestamp-using-numpy-pandas )
 '''
+
+class GaussianProcess(BaseEstimatorFunction):
+    '''
+    Base class for building regression models
+    '''
+    eval_metric = staticmethod(metrics.r2_score)
+    train_if_no_model = True
+    
+    def set_estimators(self):
+        #gauss radial kernel
+        params = {'kernel': [C(1.0, (1e-3, 1e3)), C(1.0, (1e-3, 1e3)) * RBF(10, (1e-2, 1e2)),  ExpSineSquared()],
+                   'n_restarts_optimizer': [9]}
+        self.estimators['gaussian_process'] = (GaussianProcessRegressor,params)
+
+    def __init__(self, features, targets, predictions=None):
+        super().__init__(features=features, targets=targets, predictions=predictions)
+
+    @classmethod
+    def build_ui(cls):
+        # define arguments that behave as function inputs
+        inputs = []
+        inputs.append(UIMultiItem(name='features',
+                                  datatype=float,
+                                  required=True
+                                  ))
+        inputs.append(UIMultiItem(name='targets',
+                                  datatype=float,
+                                  required=True,
+                                  output_item='predictions',
+                                  is_output_datatype_derived=True
+                                  ))
+        return (inputs,[])
+
 
 class AnomalyTest(BaseRegressor):
 

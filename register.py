@@ -18,7 +18,51 @@ from mmfunctions import functions
 
 PACKAGE_URL= "https://github.com/sedgewickmm18/mmfunctions"
 
+credentials = {
+  "tenantId": "AnalyticsServiceDev",
+  "as_api_host": "https://api-dev.connectedproducts.internetofthings.ibmcloud.com",
+  "as_api_key": "a-69xgm4-8bdgtvnsv4",
+  "as_api_token": "9X_tMKdupOiJ!mzaPV",
+  "config" : {
+      "objectStorageEndpoint" : "https://s3-api.us-geo.objectstorage.softlayer.net",
+      "bos_runtime_bucket" : "analytics-runtime-analyticsservicedev-799d2008b460",
+      "bos_logs_bucket" : "analytics-logs-analyticsservicedev-32703c52ec8b"
+  },
+  "objectStorage": {
+      "username" : "58ddd86b5de8468b819d385046f17033",
+      "password" : "ee0d6c5521ce9ff100f91b0e37d4eb8cc1a038b5a6d05b38",
+      "region" : "us",
+      "endpoint" : "https://s3-api.us-geo.objectstorage.softlayer.net"
+  },
+  "db2": {
+    "username": "bluadmin",
+    "password": "ZmM5MmE5NmZkZGZl",
+    "databaseName": "BLUDB",
+    "port": 50000,
+    "httpsUrl": "https://dashdb-enterprise-yp-dal13-74.services.dal.bluemix.net:50000",
+    "host": "dashdb-enterprise-yp-dal13-74.services.dal.bluemix.net"
+  }
+}
+
+
 EngineLogging.configure_console_logging(logging.DEBUG)
+
+'''
+The db_schema is the db2_schema name for your client database. If 
+you are using the default schema of your user, there is no need to
+provide a schema.
+'''
+db_schema = None
+
+
+'''
+Use the credentials to build an AS Database connection.
+'''
+
+db = Database(credentials=credentials)
+
+print (db.cos_load)
+
 
 # if in test mode call execute()
 if (len(sys.argv) > 1) and (sys.argv[1] == 'test'):
@@ -63,7 +107,19 @@ if (len(sys.argv) > 1) and (sys.argv[1] == 'test'):
     print ("Instantiated - done")
 
 print ("Instantiate 4")
-ais = functions.AnomalyTest('col1','col2','col5')
+ais = functions.GaussianProcess(['col1'],['col2'],['col5'])
+
+# if in test mode call execute()
+if (len(sys.argv) > 1) and (sys.argv[1] == 'test'):
+    Let = ais._build_entity_type()
+    Let.db = db
+    ais.set_entity_type(Let)
+    dff = ais.execute(df)
+    print (dff)
+    print ("Instantiated - done")
+
+print ("Instantiate 5")
+ais = functions.AnomalyTest('col1','col2','col6')
 
 # if in test mode call execute()
 if (len(sys.argv) > 1) and (sys.argv[1] == 'test'):
@@ -80,38 +136,8 @@ if (len(sys.argv) > 1):
 
 EngineLogging.configure_console_logging(logging.DEBUG)
 
-credentials = {
-  "tenantId": "AnalyticsServiceDev",
-  "as_api_host": "https://api-dev.connectedproducts.internetofthings.ibmcloud.com",
-  "as_api_key": "a-69xgm4-8bdgtvnsv4",
-  "as_api_token": "9X_tMKdupOiJ!mzaPV",
-  "db2": {
-    "username": "bluadmin",
-    "password": "ZmM5MmE5NmZkZGZl",
-    "databaseName": "BLUDB",
-    "port": 50000,
-    "httpsUrl": "https://dashdb-enterprise-yp-dal13-74.services.dal.bluemix.net:50000",
-    "host": "dashdb-enterprise-yp-dal13-74.services.dal.bluemix.net"
-  }
-}
-
 #with open('credentials_as_dev.json', encoding='utf-8') as F:
 #    credentials = json.loads(F.read())
-
-'''
-The db_schema is the db2_schema name for your client database. If 
-you are using the default schema of your user, there is no need to
-provide a schema.
-'''
-db_schema = None
-
-
-'''
-Use the credentials to build an AS Database connection.
-'''
-
-db = Database(credentials=credentials)
-
 
 #fn = AggregateItemStats(
 #        input_item_1='x1',
