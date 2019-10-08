@@ -187,6 +187,7 @@ class SpectralFeatureExtract(BaseTransformer):
     def execute(self, df):
 
         # one dimensional time series - named temperature for catchyness
+        print (df.head(5))
         temperature = df[[self.input_item]].fillna(0).to_numpy().reshape(-1,)
 
         # Fourier transform:
@@ -202,7 +203,6 @@ class SpectralFeatureExtract(BaseTransformer):
 
         # Compute energy = frequency * spectral density over time in decibel
         ETS = np.log10(np.dot(SxTS.T, freqsTS))
-        print (ETS)
 
         # compute zscore over the energy
         ets_zscore = (ETS - ETS.mean())/ETS.std(ddof=0)
