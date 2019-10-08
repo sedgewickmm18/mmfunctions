@@ -59,9 +59,9 @@ db_schema = None
 Use the credentials to build an AS Database connection.
 '''
 
-db = Database(credentials=credentials)
-
-print (db.cos_load)
+if (len(sys.argv) <= 1) or (sys.argv[1] != 'test'):
+   db = Database(credentials=credentials)
+   print (db.cos_load)
 
 
 # if in test mode call execute()
@@ -73,6 +73,11 @@ if (len(sys.argv) > 1) and (sys.argv[1] == 'test'):
            #col2 = np.random.laplace(400,50,40)
         ))
     print (df)
+
+df2 = pd.read_csv('./anomalyoutput.csv',
+                  parse_dates=['timestamp_date','metricTS_date'],
+                  dtype={"$O-AnomalyIndex":float})
+df2 = df2.sort_values(by='timestamp')
 
 print ("Instantiate 1")
 ais = functions.AggregateItemStats(['col1','col2'],None)
@@ -110,7 +115,7 @@ print ("Instantiate 4")
 ais = functions.GaussianProcess(['col1'],['col2'],['col5'])
 
 # if in test mode call execute()
-if (len(sys.argv) > 1) and (sys.argv[1] == 'test'):
+if (len(sys.argv) > 1) and (sys.argv[1] == 'test') and False:
     Let = ais._build_entity_type()
     Let.db = db
     ais.set_entity_type(Let)
@@ -125,6 +130,16 @@ ais = functions.AnomalyTest('col1','col2','col6')
 if (len(sys.argv) > 1) and (sys.argv[1] == 'test'):
     ais.set_entity_type(ais._build_entity_type())
     dff = ais.execute(df)
+    print (dff)
+    print ("Instantiated - done")
+
+print ("Instantiate 6")
+ais = functions.SpectralFeatureExtract('Val', zscore=3, windowsize=24, output_item='zscore')
+
+# if in test mode call execute()
+if (len(sys.argv) > 1) and (sys.argv[1] == 'test'):
+    ais.set_entity_type(ais._build_entity_type())
+    dff = ais.execute(df2)
     print (dff)
     print ("Instantiated - done")
 

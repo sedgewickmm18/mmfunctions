@@ -6,7 +6,10 @@ import logging
 import json
 import pandas as pd
 import numpy as np
+import scipy as sp
 from scipy import stats
+from scipy import fftpack
+from scipy import signal
 from sqlalchemy import Column, Integer, String, Float, DateTime, Boolean, func
 from iotfunctions.base import BaseTransformer,BaseSimpleAggregator,BaseComplexAggregator, BaseRegressor, BaseEstimatorFunction
 #from iotfunctions.estimator import SimpleAnomaly
@@ -154,6 +157,105 @@ class AggregateItemStatsT(BaseTransformer):
                 name = 'output_item',
                 datatype=float,
                 description='Column with the (scalar) coefficient'
+                ))
+        return (inputs,outputs)
+
+class SpectralFeatureExtract(BaseTransformer):
+    '''
+    Employs spectral analysis to extract features from the time series data
+    '''
+    def __init__(self, input_item, zscore, windowsize, output_item):
+        super().__init__()
+        print (input_item)
+        self.input_item = input_item
+
+        # zscore - 3 deviation above mean
+        self.zscore = zscore
+
+        # use 24 by default - must be larger than 12
+        self.windowsize = windowsize
+
+        # overlap 
+        self.windowoverlap = self.windowsize - self.windowsize // 12
+
+        # assume 1 per sec for now
+        self.frame_rate = 1
+
+        self.output_item = output_item
+
+
+    def execute(self, df):
+
+        # one dimensional time series - named temperature for catchyness
+        temperature = df[[self.input_item]].fillna(0).to_numpy().reshape(-1,)
+
+        # Fourier transform:
+        #   frequency, time, spectral density
+        freqsTS, timesTS, SxTS = signal.spectrogram(temperature, fs = self.frame_rate, window = 'hanning',
+                                                        nperseg = self.windowsize, noverlap = self.windowoverlap,
+                                                        detrend = False, scaling='spectrum')
+
+        # cut off freqencies too low to fit into the window
+        freqsTSb = (freqsTS > 2/self.windowsize).astype(int)
+        freqsTS = freqsTS * freqsTSb
+        freqsTS[freqsTS == 0] = 1 / self.windowsize
+
+        # Compute energy = frequency * spectral density over time in decibel
+        ETS = np.log10(np.dot(SxTS.T, freqsTS))
+        print (ETS)
+
+        # compute zscore over the energy
+        ets_zscore = (ETS - ETS.mean())/ETS.std(ddof=0)
+
+        # length of timesTS, ETS and ets_zscore is smaller than half the original
+        #   extend it to cover the full original length 
+        timesI = np.linspace(0, temperature.size-1, temperature.size)
+        zscoreI = np.interp(timesI, timesTS, ets_zscore)
+
+        # absolute zscore > 3 ---> anomaly
+        ets_zscoreb = (abs(zscoreI) > self.zscore).astype(float) 
+
+        df_copy = df.copy()
+
+        df_copy['_diff_'] = ets_zscoreb
+        alert = bif.AlertHighValue(input_item = '_diff_',
+                                      upper_threshold = self.zscore/2,
+                                      alert_name = '_diff_')
+        alert.set_entity_type(self.get_entity_type())
+        df_copy = alert.execute(df_copy)
+
+        msg = 'SpectralAnalysisFeatureExtract'
+        self.trace_append(msg)
+
+        df_copy[self.output_item] = zscoreI
+        return (df_copy)
+
+    @classmethod
+    def build_ui(cls):
+        #define arguments that behave as function inputs
+        inputs = []
+        inputs.append(ui.UISingleItem(
+                name = 'input_item',
+                datatype=float,
+                description = 'Column for feature extraction'
+                                              ))
+        inputs.append(ui.UISingle(
+                name = 'windowsize',
+                datatype=int,
+                description = 'Window size for spectral analysis - default 24'
+                                              ))
+        inputs.append(ui.UISingle(
+                name = 'zscore',
+                datatype=float,
+                description = 'Zscore to be interpreted as anomaly'
+                                              ))
+
+        #define arguments that behave as function outputs
+        outputs = []
+        outputs.append(ui.UIFunctionOutSingle(
+                name = 'output_item',
+                datatype=float,
+                description='zscore'
                 ))
         return (inputs,outputs)
 
