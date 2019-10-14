@@ -25,6 +25,7 @@ from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import RBF, WhiteKernel, ExpSineSquared, ConstantKernel as C
 
 EngineLogging.configure_console_logging(logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 PACKAGE_URL= "git+https://github.com/sedgewickmm18/mmfunctions@"
 
@@ -164,9 +165,9 @@ class SpectralFeatureExtract(BaseTransformer):
     '''
     Employs spectral analysis to extract features from the time series data
     '''
-    def __init__(self, input_item, zscore, windowsize, output_item):
+    def __init__(self, input_item, windowsize, zscore, output_item):
         super().__init__()
-        print (input_item)
+        logger.debug(input_item)
         self.input_item = input_item
 
         # zscore - 3 deviation above mean
@@ -183,52 +184,59 @@ class SpectralFeatureExtract(BaseTransformer):
 
         self.output_item = output_item
 
-
     def execute(self, df):
 
-        # one dimensional time series - named temperature for catchyness
-        print (df.head(5))
-        temperature = df[[self.input_item]].fillna(0).to_numpy().reshape(-1,)
-
-        # Fourier transform:
-        #   frequency, time, spectral density
-        freqsTS, timesTS, SxTS = signal.spectrogram(temperature, fs = self.frame_rate, window = 'hanning',
+        #print (df.index.levels[0])
+        entities = np.unique(df.index.levels[0])
+        logger.debug(entities)
+        
+        for entity in entities: 
+            # per entity
+            dfe = df.loc[[entity]].dropna(how='all')
+            
+            # interpolate gaps - data imputation
+            #dfe.set_index('timestamp')
+            dfe = dfe.reset_index(level=[0])
+            Size = dfe[[self.input_item]].fillna(0).to_numpy().size
+            dfe = dfe.interpolate(method='time')
+            
+            # one dimensional time series - named temperature for catchyness
+            temperature = dfe[[self.input_item]].fillna(0).to_numpy().reshape(-1,)
+            
+            logger.debug(entity, self.input_item, self.windowsize, self.zscore, self.output_item, self.windowoverlap, temperature.size)
+            
+            if temperature.size > self.windowsize:
+                # Fourier transform:
+                #   frequency, time, spectral density
+                freqsTS, timesTS, SxTS = signal.spectrogram(temperature, fs = self.frame_rate, window = 'hanning',
                                                         nperseg = self.windowsize, noverlap = self.windowoverlap,
                                                         detrend = False, scaling='spectrum')
 
-        # cut off freqencies too low to fit into the window
-        freqsTSb = (freqsTS > 2/self.windowsize).astype(int)
-        freqsTS = freqsTS * freqsTSb
-        freqsTS[freqsTS == 0] = 1 / self.windowsize
+                # cut off freqencies too low to fit into the window
+                freqsTSb = (freqsTS > 2/self.windowsize).astype(int)
+                freqsTS = freqsTS * freqsTSb
+                freqsTS[freqsTS == 0] = 1 / self.windowsize
 
-        # Compute energy = frequency * spectral density over time in decibel
-        ETS = np.log10(np.dot(SxTS.T, freqsTS))
+                # Compute energy = frequency * spectral density over time in decibel
+                ETS = np.log10(np.dot(SxTS.T, freqsTS))
 
-        # compute zscore over the energy
-        ets_zscore = (ETS - ETS.mean())/ETS.std(ddof=0)
+                # compute zscore over the energy
+                ets_zscore = (ETS - ETS.mean())/ETS.std(ddof=0)
+                logger.debug(entity, ETS, ets_zscore)
 
-        # length of timesTS, ETS and ets_zscore is smaller than half the original
-        #   extend it to cover the full original length 
-        timesI = np.linspace(0, temperature.size-1, temperature.size)
-        zscoreI = np.interp(timesI, timesTS, ets_zscore)
+                # length of timesTS, ETS and ets_zscore is smaller than half the original
+                #   extend it to cover the full original length 
+                #timesI = np.linspace(0, temperature.size-1, temperature.size)
+                timesI = np.linspace(0, Size - 1, Size)
+                zscoreI = np.interp(timesI, timesTS, ets_zscore)
 
-        # absolute zscore > 3 ---> anomaly
-        ets_zscoreb = (abs(zscoreI) > self.zscore).astype(float) 
-
-        df_copy = df.copy()
-
-        df_copy['_diff_'] = ets_zscoreb
-        alert = bif.AlertHighValue(input_item = '_diff_',
-                                      upper_threshold = self.zscore/2,
-                                      alert_name = '_diff_')
-        alert.set_entity_type(self.get_entity_type())
-        df_copy = alert.execute(df_copy)
+                # absolute zscore > 3 ---> anomaly
+                ets_zscoreb = (abs(zscoreI) > self.zscore).astype(float)
+                df.loc[[entity]][self.output_item] = zscoreI #ets_zscoreb
 
         msg = 'SpectralAnalysisFeatureExtract'
         self.trace_append(msg)
-
-        df_copy[self.output_item] = zscoreI
-        return (df_copy)
+        return (df)
 
     @classmethod
     def build_ui(cls):
@@ -249,7 +257,6 @@ class SpectralFeatureExtract(BaseTransformer):
                 datatype=float,
                 description = 'Zscore to be interpreted as anomaly'
                                               ))
-
         #define arguments that behave as function outputs
         outputs = []
         outputs.append(ui.UIFunctionOutSingle(
@@ -258,7 +265,6 @@ class SpectralFeatureExtract(BaseTransformer):
                 description='zscore'
                 ))
         return (inputs,outputs)
-
 
 class KMeans2D(BaseTransformer):
     '''
@@ -492,6 +498,168 @@ class AnomalyTest(BaseRegressor):
                                           ))
             
         return (inputs,outputs)    
+
+class BaseWindowedFeatureExtractor(BaseTransformer):
+    '''
+    Base class to chop a multidimensional time series into digestible, overlapping windows and
+    then apply a nifty algorithm to extract and score features. Since the length of the overlapping
+    windows sequence and hence the sequence of scores is shorter than the original
+    time series stretch the result sequence by interpolating.
+    '''
+
+    # input items - columns to extract features from
+    # feature     - extracted features (output), for example closest centroid for proximity based algos or spectral densities 
+    # anomalyscore - anomaly score column name (output)
+    # windowsize  - size of windows after chopping the time series into pieces
+    # windowoverlap - size of the overlap, if 0 relative to windowsize
+    # nochop      - use an integrate algorithm like spectrogram instead of 'manually' chopping the time series data
+    def __init__(self, input_items, features, anomalyscore = 'anomalyscore',
+                 windowsize = 24, windowoverlap = 0, windowfunction = 'none', nochop = False, **kwargs):
+        self.input_items = input_items
+        self.feature = features
+        self.anomalyscore = anomalyscore
+        self.windowsize = windowsize
+        self.windowoverlap = windowoverlap
+        self.windowfunction = windowfunction
+        self.nochop = nochop
+        super().__init__()
+
+    # returns output features (multidimensional, time), score (time)
+    #  this is to be implemented by the subclass (or passed to this k-means proximity example
+    def scorer(self, inputData, slices = 'nan'):
+
+        if math.isnan(slices):
+            return 'nan'
+
+        # construct PyOD K-Means proximity measure
+        cblofwin = CBLOF(n_clusters=40, n_jobs=-1)
+        cblofwin.fit(slices)
+        preddec = cblofwin.decision_function(slices)
+
+        # proximity measures do not really extract features
+        #   they return a measure how far a datapoint is from the center of a centroid/cluster
+        return 'nan', preddec
+
+    def extractPerEntity(self, dfent):
+        # ToDo get timestamp handling right - hardcoded evt_timestamp for now
+        dfent.set_index('evt_timestamp')        
+
+        # missing data - data imputation ?
+        dfe = dfent.interpolate(method='time')
+        
+        # get multi-dimensional numpy array from the input items
+        inputData = dfe[[self.input_items]].fillna(0).to_numpy().reshape(-1,)
+
+        if nochop:
+            output, score = scorer(inputData)
+
+        else:
+            # provide windows only in time direction
+            step = np.linspace(0, inputData.ndim, 0)
+            step[0] = 1
+            slices = skiutil.view_as_windows(inputData,
+                                        window_shape=(self.windowsize,), step = step)
+        
+            # Apply hanning window function
+            if self.windowfunction == 'hanning':
+                slices = slices * np.hanning(self.windowsize + 1)[:-1]
+
+            score = scorer(inputData, slices = slices)
+
+            # rescale score to fit to the original timescale
+            timesI = np.linspace(0, len(dfe.index)-1, len(dfe.index))
+            timesTS = np.linspace(0, slices.size-1, slices.size)
+
+            # timesTS does not exist here, how should I compute it
+            dfe[self.anomalyscore] = np.interp(timesI, timesTS, score)
+
+        return (def)
+    
+
+    def execute(self, df, func = func):
+        # sanity check
+        if self.input_items.size < 1:
+            return 'nan'
+
+        # per entity id
+        entities = np.unique(df.deviceid.values)
+
+        for entity in entities:
+
+            # ToDo get deviceid handling right - using deviceid for now
+            dfe = extractPerEntity(df.where(df.deviceid == entity).dropna(how='all'))
+
+            #.....
+            
+
+        # how to integrate the dfe slices after interpolation in time and projecting to each entity id into the overall df
+
+
+    @classmethod
+    def build_ui(cls):
+        '''
+        Registration metadata
+        '''
+        inputs = []
+        inputs.append(UIMultiItem(name='input_items',
+                                  datatype=float,
+                                  description='Input data items'
+                                  ))
+        inputs.append(UISingleItem(name='windowsize',
+                                   datatype=int,
+                                   description='Window Size'
+                                   ))
+        inputs.append(UISingleItem(name='windowoverlap',
+                                   datatype=int,
+                                   description='Window Overlap'
+                                   ))
+        inputs.append(UISingleItem(name='nochop',
+                                   datatype=bool,
+                                   description='Function does not need excplicit chopping of the timeseries data'
+                                   ))
+        
+        # define arguments that behave as function outputs
+        outputs = []
+        outputs.append(UIFunctionOutSingle(name='anomalyscore',
+                                           datatype=float,
+                                           description='Anomaly Score - Column Name'
+                                           ))
+        #self.feature = features - not reflected
+
+        return (inputs, o
+
+    @classmethod
+    def build_ui(cls):
+        '''
+        Registration metadata
+        '''
+        inputs = []
+        inputs.append(UIMultiItem(name='input_items',
+                                  datatype=float,
+                                  description='Input data items'
+                                  ))
+        inputs.append(UISingleItem(name='windowsize',
+                                   datatype=int,
+                                   description='Window Size'
+                                   ))
+        inputs.append(UISingleItem(name='windowoverlap',
+                                   datatype=int,
+                                   description='Window Overlap'
+                                   ))
+        inputs.append(UISingleItem(name='nochop',
+                                   datatype=bool,
+                                   description='Function does not need excplicit chopping of the timeseries data'
+                                   ))
+        
+        # define arguments that behave as function outputs
+        outputs = []
+        outputs.append(UIFunctionOutSingle(name='anomalyscore',
+                                           datatype=float,
+                                           description='Anomaly Score - Column Name'
+                                           ))
+        #self.feature = features - not reflected
+
+        return (inputs, outputs)
 
 #db.register_functions([AggregateItemStats])
 
