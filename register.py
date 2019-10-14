@@ -134,10 +134,10 @@ if (len(sys.argv) > 1) and (sys.argv[1] == 'test'):
     print ("Instantiated - done")
 
 print ("Instantiate 6")
-ais = functions.SpectralFeatureExtract('Val', zscore=3, windowsize=24, output_item='zscore')
+ais = functions.SpectralFeatureExtract('Val', windowsize=12, zscore=2.3, output_item='zscore')
 
-# if in test mode call execute()
-if (len(sys.argv) > 1) and (sys.argv[1] == 'test'):
+# if in test mode call execute() - dff is not equipped with a multiindex, won't work
+if (len(sys.argv) > 1) and (sys.argv[1] == 'test') and False:
     ais.set_entity_type(ais._build_entity_type())
     dff = ais.execute(df2)
     print (dff)
