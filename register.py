@@ -11,7 +11,8 @@ from sqlalchemy import Column, Integer, String, Float, DateTime, Boolean, func
 #from iotfunctions.bif import SimpleAnomaly
 #from iotfunctions.metadata import EntityType
 from iotfunctions.db import Database
-#from iotfunctions import bif
+from iotfunctions import bif
+from iotfunctions import anomaly
 #from iotfunctions import ui
 from iotfunctions.enginelog import EngineLogging
 from mmfunctions import functions
@@ -143,6 +144,8 @@ if (len(sys.argv) > 1) and (sys.argv[1] == 'test') and False:
     print (dff)
     print ("Instantiated - done")
 
+ais = anomaly.SpectralAnomalyScore('Val', windowsize=12, output_item='zscore')
+
 print ("Instantiated")
 
 # if there is a 2nd argument do not register but exit
@@ -173,4 +176,6 @@ EngineLogging.configure_console_logging(logging.DEBUG)
 #db.register_functions([functions.AggregateItemStats])
 
 db.register_module(functions)
+
+db.register_functions([anomaly.SpectralAnomalyScore])
 
