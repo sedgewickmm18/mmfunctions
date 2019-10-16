@@ -226,13 +226,12 @@ class SpectralFeatureExtract(BaseTransformer):
 
                 # length of timesTS, ETS and ets_zscore is smaller than half the original
                 #   extend it to cover the full original length 
-                #timesI = np.linspace(0, temperature.size-1, temperature.size)
                 timesI = np.linspace(0, Size - 1, Size)
                 zscoreI = np.interp(timesI, timesTS, ets_zscore)
 
                 # absolute zscore > 3 ---> anomaly
                 ets_zscoreb = (abs(zscoreI) > self.zscore).astype(float)
-                df.loc[[entity]][self.output_item] = zscoreI #ets_zscoreb
+                df.loc[(entity,), self.output_item] = zscoreI
 
         msg = 'SpectralAnalysisFeatureExtract'
         self.trace_append(msg)
