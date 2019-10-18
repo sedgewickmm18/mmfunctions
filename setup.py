@@ -20,6 +20,7 @@ setup(
         'pandas==0.24.0',
         'scipy==1.1.0',
         'scikit-learn==0.19.2',
-        'scikit-image==0.16.1'
+        'scikit-image==0.16.1',
+        'pyod==0.7.5'
     ]
 )
