@@ -187,15 +187,16 @@ class KMeansAnomalyScore(BaseTransformer):
 
     def execute(self, df):
 
-        entities = np.unique(df.index.levels[0])
+        entities = np.unique(df_copy.index.levels[0])
         logger.debug(str(entities))
 
-        df[self.output_item] = 0
+        df_copy[self.output_item] = 0
+        df_copy.sort_index(level=1)
 
         for entity in entities:
             # per entity
-            dfe = df.loc[[entity]].dropna(how='all')
-            dfe_orig = df.loc[[entity]].copy()
+            dfe = df_copy.loc[[entity]].dropna(how='all')
+            dfe_orig = df_copy.loc[[entity]].copy()
 
             # get rid of entityid part of the index
             dfe = dfe.reset_index(level=[0])
@@ -249,18 +250,19 @@ class KMeansAnomalyScore(BaseTransformer):
                 dfe[self.output_item] = kmeans_scoreI
 
                 # absolute kmeans_score > 1000 ---> anomaly
-                #df.loc[(entity,), self.output_item] = kmeans_scoreI
+                #df_copy.loc[(entity,), self.output_item] = kmeans_scoreI
                 dfe_orig = pd.merge_asof(dfe_orig, dfe[self.output_item],
                          left_index = True, right_index = True, direction='nearest', tolerance = mindelta)
 
                 zScoreII = dfe_orig[self.output_item+'_y'].to_numpy()
 
-                df.loc[(entity,) :, self.output_item] = zScoreII
+                #df_copy.loc[(entity,)][self.output_item] = zScoreII
+                df_copy.loc[(entity,) :, self.output_item] = zScoreII
 
 
         msg = 'KMeansAnomalyScore'
         self.trace_append(msg)
-        return (df)
+        return (df_copy)
 
     @classmethod
     def build_ui(cls):
