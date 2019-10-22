@@ -70,15 +70,17 @@ class SpectralAnomalyScore(BaseTransformer):
 
     def execute(self, df):
 
+        df_copy = df.copy()
         entities = np.unique(df.index.levels[0])
         logger.debug(str(entities))
 
         df[self.output_item] = 0
+        df_copy.sort_index(level=1)
 
         for entity in entities:
             # per entity
-            dfe = df.loc[[entity]].dropna(how='all')
-            dfe_orig = df.loc[[entity]].copy()
+            dfe = df_copy.loc[[entity]].dropna(how='all')
+            dfe_orig = df_copy.loc[[entity]].copy()
 
             # get rid of entityid part of the index
             dfe = dfe.reset_index(level=[0])
@@ -126,18 +128,18 @@ class SpectralAnomalyScore(BaseTransformer):
                 dfe[self.output_item] = zscoreI
 
                 # absolute zscore > 3 ---> anomaly
-                #df.loc[(entity,), self.output_item] = zscoreI
+                #df_copy.loc[(entity,), self.output_item] = zscoreI
 
                 dfe_orig = pd.merge_asof(dfe_orig, dfe[self.output_item],
                          left_index = True, right_index = True, direction='nearest', tolerance = mindelta)
 
                 zScoreII = dfe_orig[self.output_item+'_y'].to_numpy()
 
-                df.loc[(entity,) :, self.output_item] = zScoreII
+                df_copy.loc[(entity,) :, self.output_item] = zScoreII
 
         msg = 'SpectralAnomalyScore'
         self.trace_append(msg)
-        return (df)
+        return (df_copy)
 
     @classmethod
     def build_ui(cls):
@@ -187,6 +189,7 @@ class KMeansAnomalyScore(BaseTransformer):
 
     def execute(self, df):
 
+        df_copy = df.copy()
         entities = np.unique(df_copy.index.levels[0])
         logger.debug(str(entities))
 
