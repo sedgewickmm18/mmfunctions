@@ -75,7 +75,8 @@ class SpectralAnomalyScore(BaseTransformer):
         logger.debug(str(entities))
 
         df[self.output_item] = 0
-        df_copy.sort_index(level=1)
+        #df_copy.sort_index(level=1)
+        df_copy.sort_index()
 
         for entity in entities:
             # per entity
@@ -200,7 +201,7 @@ class KMeansAnomalyScore(BaseTransformer):
         logger.debug(str(entities))
 
         df_copy[self.output_item] = 0
-        df_copy.sort_index(level=1)
+        df_copy.sort_index()
 
         for entity in entities:
             # per entity
