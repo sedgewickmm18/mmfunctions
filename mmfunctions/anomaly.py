@@ -135,7 +135,7 @@ class SpectralAnomalyScore(BaseTransformer):
 
                 if self.output_item+'_y' in dfe_orig:
                     zScoreII = dfe_orig[self.output_item+'_y'].to_numpy()
-                elif self.output_item in dfe_orig
+                elif self.output_item in dfe_orig:
                     zScoreII = dfe_orig[self.output_item].to_numpy()
                 else:
                     print (dfe_orig.head(2))
