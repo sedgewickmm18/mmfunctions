@@ -266,10 +266,17 @@ class KMeansAnomalyScore(BaseTransformer):
                 dfe_orig = pd.merge_asof(dfe_orig, dfe[self.output_item],
                          left_index = True, right_index = True, direction='nearest', tolerance = mindelta)
 
-                zScoreII = dfe_orig[self.output_item+'_y'].to_numpy()
+                if self.output_item+'_y' in dfe_orig:
+                    zScoreII = dfe_orig[self.output_item+'_y'].to_numpy()
+                elif self.output_item in dfe_orig:
+                    zScoreII = dfe_orig[self.output_item].to_numpy()
+                else:
+                    print (dfe_orig.head(2))
+                    zScoreII = dfe_orig[self.input_item].to_numpy()
 
-                #df_copy.loc[(entity,)][self.output_item] = zScoreII
-                df_copy.loc[(entity,) :, self.output_item] = zScoreII
+                #df_copy.loc[(entity,) :, self.output_item] = zScoreII
+                idx = pd.IndexSlice
+                df_copy.loc[idx[entity,:], self.output_item] = zScoreII
 
 
         msg = 'KMeansAnomalyScore'
