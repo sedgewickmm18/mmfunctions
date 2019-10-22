@@ -133,12 +133,12 @@ class SpectralAnomalyScore(BaseTransformer):
                 dfe_orig = pd.merge_asof(dfe_orig, dfe[self.output_item],
                          left_index = True, right_index = True, direction='nearest', tolerance = mindelta)
 
-                if self.output_item+'_y' in dfe_orig.columns:
+                if self.output_item+'_y' in dfe_orig:
                     zScoreII = dfe_orig[self.output_item+'_y'].to_numpy()
-                elif self.output_item in dfe_orig.columns
+                elif self.output_item in dfe_orig
                     zScoreII = dfe_orig[self.output_item].to_numpy()
                 else:
-                    print (dfe_orig.columns)
+                    print (dfe_orig.head(2))
                     zScoreII = dfe_orig[self.input_item].to_numpy()
 
                 df_copy.loc[(entity,) :, self.output_item] = zScoreII
