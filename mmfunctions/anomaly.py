@@ -142,7 +142,9 @@ class SpectralAnomalyScore(BaseTransformer):
                     print (dfe_orig.head(2))
                     zScoreII = dfe_orig[self.input_item].to_numpy()
 
-                df_copy.loc[(entity,) :, self.output_item] = zScoreII
+                #df_copy.loc[(entity,) :, self.output_item] = zScoreII
+                idx = pd.IndexSlice
+                df_copy.loc[idx[entity,:], self.output_item] = zScoreII
 
         msg = 'SpectralAnomalyScore'
         self.trace_append(msg)
