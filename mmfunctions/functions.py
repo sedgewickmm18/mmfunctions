@@ -24,7 +24,8 @@ from sklearn import metrics
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import RBF, WhiteKernel, ExpSineSquared, ConstantKernel as C
 
-EngineLogging.configure_console_logging(logging.DEBUG)
+# configure logging in the notebooks
+#EngineLogging.configure_console_logging(logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 PACKAGE_URL= "git+https://github.com/sedgewickmm18/mmfunctions@"
@@ -497,6 +498,7 @@ class AnomalyTest(BaseRegressor):
                                           ))
             
         return (inputs,outputs)    
+
 
 #db.register_functions([AggregateItemStats])
 
