@@ -21,8 +21,6 @@ setup(
         'scikit-learn>=0.19.2',
         'nose>=1.3.7',
         'scikit-image>=0.16.1',
-        'pyod>=0.7.5',
-        'numba>=0.46.0',
-        'ray>=0.7.5'
+        'pyod>=0.7.5'
     ]
 )
