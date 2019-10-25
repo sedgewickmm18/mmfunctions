@@ -45,6 +45,77 @@ PACKAGE_URL = 'git+https://github.com/sedgewickmm18/mmfunctions.git@'
 _IS_PREINSTALLED = False
 
 
+class ASAnomalyHandler:
+
+    def __init__(self, input_item , output_item, scorer):
+
+        self.entities = np.unique(self.df.levels[0])
+        self.input_item = input_item
+        self.output_item = output_item
+
+        #logger.debug(str(entities))
+
+        self.df[self.output_item] = 0
+        self.df.sort_index()
+
+    def score(self, df):
+
+        # pipeline provides a copy
+
+        for entity in entities:
+            # per entity
+            dfe = df.loc[[entity]].dropna(how='all')
+            dfe_orig = df.loc[[entity]].copy()
+
+            # get rid of entityid part of the index
+            dfe = dfe.reset_index(level=[0])
+            dfe_orig = dfe_orig.reset_index(level=[0])
+
+            # minimal time delta for merging
+            mindelta = dfe_orig.index.to_series().diff().min()
+            if mindelta == 0 or pd.isnull(mindelta):
+                mindelta = pd.Timedelta.min
+
+            # interpolate gaps - data imputation
+            Size = dfe[[self.input_item]].fillna(0).to_numpy().size
+            dfe = dfe.interpolate(method='time')
+
+            # get a one-dim numpy array as resulting pred_score
+            # computed from a one-dim numpy array as input, conveniently named temperature
+            temperature = dfe[[self.input_item]].fillna(0).to_numpy().reshape(-1,)
+            pred_score = scorer.execute(temperature)
+
+            stretchFactor = temperature.size - pred_score.size
+
+            # length of timesTS, pred_zscore are smaller than the original
+            #   and need to be stretched to the original
+            timesTS = np.linspace(stretchFactor//2, temperature.size - stretchFactor//2 + 1, temperature.size - stretchFactor//2*2 + 1)
+
+            #print (timesTS.shape, pred_score.shape)
+
+            # stretch the results and assign them to the originating dataframe 
+            Linear = sp.interpolate.interp1d(timesTS, pred_score, kind='linear', fill_value='extrapolate')
+            dfe[self.output_item] = Linear(np.arange(0, temperature.size, 1))
+
+            # merge original dataframe with the modified one to get point in times almost right
+            dfe_orig = pd.merge_asof(dfe_orig, dfe[self.output_item],
+                         left_index = True, right_index = True, direction='nearest', tolerance = mindelta)
+
+            # now extract the merged output column - the _y column *should* exist
+            if self.output_item+'_y' in dfe_orig:
+                adaptedScore = dfe_orig[self.output_item+'_y'].to_numpy()
+            else:
+                adaptedScore = dfe_orig[self.input_item].to_numpy()
+
+            # deal with the multi index over entities and time values
+            idx = pd.IndexSlice
+
+            # and add the entity specific slice's column for the predicted and adapted score
+            df.loc[idx[entity,:], self.output_item] = adaptedScore
+
+        return (df)
+
+
 class SpectralAnomalyScore(BaseTransformer):
     '''
     Employs spectral analysis to extract features from the time series data and to compute zscore from it
