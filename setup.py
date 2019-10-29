@@ -11,7 +11,7 @@ setup(
         'urllib3==1.22',
         'sqlalchemy>=1.3.7',
         'numpy>=1.14.5',
-        'requests==2.18.4',
+        'requests==2.20.0',
         'lxml==4.3.4',
         'ibm_db==3.0.1',
         'ibm_db_sa==0.3.3',
