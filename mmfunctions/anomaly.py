@@ -20,6 +20,7 @@ import scipy as sp
 
 # for Spectral Analysis
 from scipy import signal
+from scipy.stats import energy_distance
 
 # for KMeans
 import skimage as ski
@@ -44,9 +45,16 @@ logger = logging.getLogger(__name__)
 PACKAGE_URL = 'git+https://github.com/sedgewickmm18/mmfunctions.git@'
 _IS_PREINSTALLED = False
 
+def custom_resampler(array_like):
+    if (array_like.values.size > 0):
+        return array_like.values[0]
+    return np.nan
+
 
 class ASAnomalyHandler:
-
+    '''
+    Superclass not to be instantiated directly
+    '''
     def __init__(self, input_item , output_item, scorer):
 
         self.entities = np.unique(self.df.levels[0])
@@ -114,6 +122,145 @@ class ASAnomalyHandler:
             df.loc[idx[entity,:], self.output_item] = adaptedScore
 
         return (df)
+
+class GapAnomalyScore(BaseTransformer):
+    '''
+    Employs earth-mover lysis to extract features from the time series data and to compute zscore from it
+    '''
+    def __init__(self, input_item, windowsize, output_item):
+        super().__init__()
+        logger.debug(input_item)
+        self.input_item = input_item
+
+        # use 24 by default - must be larger than 12
+        self.windowsize = np.maximum(windowsize,1)
+
+        # overlap 
+        if self.windowsize == 1:
+            self.windowoverlap = 0
+        else:
+            self.windowoverlap = self.windowsize - np.maximum(self.windowsize // 12, 1)
+
+        # assume 1 per sec for now
+        self.frame_rate = 1
+
+        self.output_item = output_item
+
+    def execute(self, df):
+
+        df_copy = df.copy()
+        entities = np.unique(df.index.levels[0])
+        logger.debug(str(entities))
+
+
+        df[self.output_item] = 0
+        #df_copy.sort_index(level=1)
+        df_copy.sort_index()
+
+        for entity in entities:
+            # per entity
+            dfe = df_copy.loc[[entity]].dropna(how='all')
+            dfe_orig = df_copy.loc[[entity]].copy()
+
+            # get rid of entityid part of the index
+            dfe = dfe.reset_index(level=[0])
+            dfe_orig = dfe_orig.reset_index(level=[0])
+
+            # minimal time delta for merging
+            mindelta = dfe_orig.index.to_series().diff().min()
+            if mindelta == 0 or pd.isnull(mindelta):
+                mindelta = pd.Timedelta.min
+
+            # compute meandelta for upsampling
+            meandelta = dfe_orig.index.to_series().diff().mean()
+            if meandelta == 0 or pd.isnull(meandelta):
+                meandelta = pd.Timedelta.min
+
+            # upsample original per entity dataframe and compute the gap frame
+            upsampled_na = dfe_orig.resample(meandelta).apply(custom_resampler)
+            dfe = upsampled_na.where(upsampled_na.isna(), 0).fillna(1)
+
+            # interpolate gaps - data imputation
+            Size = dfe[[self.input_item]].to_numpy().size
+
+            # one dimensional time series - named temperature for catchyness
+            temperature = dfe[[self.input_item]].to_numpy().reshape(-1,)
+
+            logger.debug('Spectral: ' + str(entity) + ', ' + str(self.input_item) + ', ' + str(self.windowsize) + ', ' +
+                         str(self.output_item) + ', ' + str(self.windowoverlap) + ', ' + str(temperature.size))
+
+            if temperature.size > self.windowsize:
+                logger.debug(str(temperature.size) + str(self.windowsize))
+                # Fourier transform:
+                #   frequency, time, spectral density
+                freqsTS, timesTS, SxTS = signal.spectrogram(temperature, fs = self.frame_rate, window = 'hanning',
+                                                        nperseg = self.windowsize, noverlap = self.windowoverlap,
+                                                        detrend = False, scaling='spectrum')
+
+                # cut off freqencies too low to fit into the window
+                freqsTSb = (freqsTS > 2/self.windowsize).astype(int)
+                freqsTS = freqsTS * freqsTSb
+                freqsTS[freqsTS == 0] = 1 / self.windowsize
+
+                # Compute energy = frequency * spectral density over time in decibel
+                ETS = np.log10(np.dot(SxTS.T, freqsTS))
+
+                # compute zscore over the energy
+                ets_zscore = (ETS - ETS.mean())/ETS.std(ddof=0)
+
+                # length of timesTS, ETS and ets_zscore is smaller than half the original
+                #   extend it to cover the full original length 
+                Linear = sp.interpolate.interp1d(timesTS, ets_zscore, kind='linear', fill_value='extrapolate')
+                zscoreI = Linear(np.arange(0, temperature.size, 1))
+
+                dfe[self.output_item] = zscoreI
+
+                # absolute zscore > 3 ---> anomaly
+                #df_copy.loc[(entity,), self.output_item] = zscoreI
+
+                dfe_orig = pd.merge_asof(dfe_orig, dfe[self.output_item],
+                         left_index = True, right_index = True, direction='nearest', tolerance = mindelta)
+
+                if self.output_item+'_y' in dfe_orig:
+                    zScoreII = dfe_orig[self.output_item+'_y'].to_numpy()
+                elif self.output_item in dfe_orig:
+                    zScoreII = dfe_orig[self.output_item].to_numpy()
+                else:
+                    print (dfe_orig.head(2))
+                    zScoreII = dfe_orig[self.input_item].to_numpy()
+
+                #df_copy.loc[(entity,) :, self.output_item] = zScoreII
+                idx = pd.IndexSlice
+                df_copy.loc[idx[entity,:], self.output_item] = zScoreII
+
+        msg = 'GapAnomalyScore'
+        self.trace_append(msg)
+        return (df_copy)
+
+    @classmethod
+    def build_ui(cls):
+        #define arguments that behave as function inputs
+        inputs = []
+        inputs.append(UISingleItem(
+                name = 'input_item',
+                datatype=float,
+                description = 'Column for feature extraction'
+                                              ))
+
+        inputs.append(UISingle(
+                name = 'windowsize',
+                datatype=int,
+                description = 'Window size for spectral analysis - default 12'
+                                              ))
+
+        #define arguments that behave as function outputs
+        outputs = []
+        outputs.append(UIFunctionOutSingle(
+                name = 'output_item2',
+                datatype=float,
+                description='Anomaly gap score'
+                ))
+        return (inputs,outputs)
 
 
 class SpectralAnomalyScore(BaseTransformer):
