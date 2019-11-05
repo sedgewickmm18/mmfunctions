@@ -176,7 +176,7 @@ class GapAnomalyScore(BaseTransformer):
             if meandelta <= 0 or pd.isnull(meandelta):
                 meandelta = mindelta
 
-            print(mindelta, meandelta)
+            logger.info('Timedelta:' + str(mindelta) + ',' + str(meandelta))
 
             # upsample original per entity dataframe and compute the gap frame
             upsampled_na = dfe_orig.resample(meandelta).apply(custom_resampler)
