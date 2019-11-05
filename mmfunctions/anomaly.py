@@ -81,7 +81,7 @@ class ASAnomalyHandler:
 
             # minimal time delta for merging
             mindelta = dfe_orig.index.to_series().diff().min()
-            if mindelta == 0 or pd.isnull(mindelta):
+            if mindelta <= 0 or pd.isnull(mindelta):
                 mindelta = pd.Timedelta.min
 
             # interpolate gaps - data imputation
@@ -168,13 +168,13 @@ class GapAnomalyScore(BaseTransformer):
 
             # minimal time delta for merging
             mindelta = dfe_orig.index.to_series().diff().min()
-            if mindelta == 0 or pd.isnull(mindelta):
+            if mindelta <= 0 or pd.isnull(mindelta):
                 mindelta = pd.Timedelta.min
 
             # compute meandelta for upsampling
             meandelta = dfe_orig.index.to_series().diff().mean()
-            if meandelta == 0 or pd.isnull(meandelta):
-                meandelta = pd.Timedelta.min
+            if meandelta <= 0 or pd.isnull(meandelta):
+                meandelta = mindelta
 
             # upsample original per entity dataframe and compute the gap frame
             upsampled_na = dfe_orig.resample(meandelta).apply(custom_resampler)
@@ -307,7 +307,7 @@ class SpectralAnomalyScore(BaseTransformer):
 
             # minimal time delta for merging
             mindelta = dfe_orig.index.to_series().diff().min()
-            if mindelta == 0 or pd.isnull(mindelta):
+            if mindelta <= 0 or pd.isnull(mindelta):
                 mindelta = pd.Timedelta.min
 
             # interpolate gaps - data imputation
@@ -434,7 +434,7 @@ class KMeansAnomalyScore(BaseTransformer):
 
             # minimal time delta for merging
             mindelta = dfe_orig.index.to_series().diff().min()
-            if mindelta == 0 or pd.isnull(mindelta):
+            if mindelta <= 0 or pd.isnull(mindelta):
                 mindelta = pd.Timedelta.min
 
             # interpolate gaps - data imputation
