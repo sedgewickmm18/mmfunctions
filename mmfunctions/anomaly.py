@@ -76,13 +76,13 @@ class ASAnomalyHandler:
             dfe_orig = df.loc[[entity]].copy()
 
             # get rid of entityid part of the index
-            dfe = dfe.reset_index(level=[0])
-            dfe_orig = dfe_orig.reset_index(level=[0])
+            dfe = dfe.reset_index(level=[0]).sort_index()
+            dfe_orig = dfe_orig.reset_index(level=[0]).sort_index()
 
             # minimal time delta for merging
             mindelta = dfe_orig.index.to_series().diff().min()
-            if mindelta <= 0 or pd.isnull(mindelta):
-                mindelta = pd.Timedelta.min
+            if mindelta == dt.timedelta(seconds = 0) or pd.isnull(mindelta):
+                mindelta = pd.Timedelta('5 seconds')
 
             # interpolate gaps - data imputation
             Size = dfe[[self.input_item]].fillna(0).to_numpy().size
@@ -125,7 +125,7 @@ class ASAnomalyHandler:
 
 class GapAnomalyScore(BaseTransformer):
     '''
-    Employs earth-mover lysis to extract features from the time series data and to compute zscore from it
+    Employs spectral analysis to extract features from the gaps in time series data and to compute zscore from it
     '''
     def __init__(self, input_item, windowsize, output_item):
         super().__init__()
@@ -153,7 +153,7 @@ class GapAnomalyScore(BaseTransformer):
         logger.debug(str(entities))
 
 
-        df[self.output_item] = 0
+        df_copy[self.output_item] = 0
         #df_copy.sort_index(level=1)
         df_copy.sort_index()
 
@@ -163,17 +163,17 @@ class GapAnomalyScore(BaseTransformer):
             dfe_orig = df_copy.loc[[entity]].copy()
 
             # get rid of entityid part of the index
-            dfe = dfe.reset_index(level=[0])
-            dfe_orig = dfe_orig.reset_index(level=[0])
+            dfe = dfe.reset_index(level=[0]).sort_index()
+            dfe_orig = dfe_orig.reset_index(level=[0]).sort_index()
 
             # minimal time delta for merging
             mindelta = dfe_orig.index.to_series().diff().min()
-            if mindelta <= 0 or pd.isnull(mindelta):
-                mindelta = pd.Timedelta.min
+            if mindelta == dt.timedelta(seconds = 0) or pd.isnull(mindelta):
+                mindelta = pd.Timedelta('5 seconds')
 
             # compute meandelta for upsampling
             meandelta = dfe_orig.index.to_series().diff().mean()
-            if meandelta <= 0 or pd.isnull(meandelta):
+            if meandelta == dt.timedelta(seconds = 0) or pd.isnull(meandelta):
                 meandelta = mindelta
 
             logger.info('Timedelta:' + str(mindelta) + ',' + str(meandelta))
@@ -204,11 +204,12 @@ class GapAnomalyScore(BaseTransformer):
                 freqsTS = freqsTS * freqsTSb
                 freqsTS[freqsTS == 0] = 1 / self.windowsize
 
-                # Compute energy = frequency * spectral density over time in decibel
-                ETS = np.log10(np.dot(SxTS.T, freqsTS))
+                # Compute energy = frequency * spectral density over time in decibel - no log10
+                ETS = np.dot(SxTS.T, freqsTS)
 
                 # compute zscore over the energy
                 ets_zscore = (ETS - ETS.mean())/ETS.std(ddof=0)
+                logger.debug('Gap z-score max: ' + str(ets_zscore.max()))
 
                 # length of timesTS, ETS and ets_zscore is smaller than half the original
                 #   extend it to cover the full original length 
@@ -258,7 +259,7 @@ class GapAnomalyScore(BaseTransformer):
         #define arguments that behave as function outputs
         outputs = []
         outputs.append(UIFunctionOutSingle(
-                name = 'output_item2',
+                name = 'output_item',
                 datatype=float,
                 description='Anomaly gap score'
                 ))
@@ -294,7 +295,7 @@ class SpectralAnomalyScore(BaseTransformer):
         entities = np.unique(df.index.levels[0])
         logger.debug(str(entities))
 
-        df[self.output_item] = 0
+        df_copy[self.output_item] = 0
         #df_copy.sort_index(level=1)
         df_copy.sort_index()
 
@@ -304,13 +305,15 @@ class SpectralAnomalyScore(BaseTransformer):
             dfe_orig = df_copy.loc[[entity]].copy()
 
             # get rid of entityid part of the index
-            dfe = dfe.reset_index(level=[0])
-            dfe_orig = dfe_orig.reset_index(level=[0])
+            dfe = dfe.reset_index(level=[0]).sort_index()
+            dfe_orig = dfe_orig.reset_index(level=[0]).sort_index()
 
             # minimal time delta for merging
             mindelta = dfe_orig.index.to_series().diff().min()
-            if mindelta <= 0 or pd.isnull(mindelta):
-                mindelta = pd.Timedelta.min
+            if mindelta == dt.timedelta(seconds = 0) or pd.isnull(mindelta):
+                mindelta = pd.Timedelta('5 seconds')
+
+            logger.info('Timedelta:' + str(mindelta))
 
             # interpolate gaps - data imputation
             Size = dfe[[self.input_item]].fillna(0).to_numpy().size
@@ -340,6 +343,7 @@ class SpectralAnomalyScore(BaseTransformer):
 
                 # compute zscore over the energy
                 ets_zscore = (ETS - ETS.mean())/ETS.std(ddof=0)
+                logger.debug('Spectral z-score max: ' + str(ets_zscore.max()))
 
                 # length of timesTS, ETS and ets_zscore is smaller than half the original
                 #   extend it to cover the full original length 
@@ -362,12 +366,15 @@ class SpectralAnomalyScore(BaseTransformer):
                     print (dfe_orig.head(2))
                     zScoreII = dfe_orig[self.input_item].to_numpy()
 
-                #df_copy.loc[(entity,) :, self.output_item] = zScoreII
+                print (dfe_orig.head(2))
+
                 idx = pd.IndexSlice
                 df_copy.loc[idx[entity,:], self.output_item] = zScoreII
 
         msg = 'SpectralAnomalyScore'
         self.trace_append(msg)
+        print(df_copy.head(30))
+
         return (df_copy)
 
     @classmethod
@@ -431,13 +438,15 @@ class KMeansAnomalyScore(BaseTransformer):
             dfe_orig = df_copy.loc[[entity]].copy()
 
             # get rid of entityid part of the index
-            dfe = dfe.reset_index(level=[0])
-            dfe_orig = dfe_orig.reset_index(level=[0])
+            dfe = dfe.reset_index(level=[0]).sort_index()
+            dfe_orig = dfe_orig.reset_index(level=[0]).sort_index()
 
             # minimal time delta for merging
             mindelta = dfe_orig.index.to_series().diff().min()
-            if mindelta <= 0 or pd.isnull(mindelta):
-                mindelta = pd.Timedelta.min
+            if mindelta == dt.timedelta(seconds = 0) or pd.isnull(mindelta):
+                mindelta = pd.Timedelta('5 seconds')
+
+            logger.info('Timedelta:' + str(mindelta))
 
             # interpolate gaps - data imputation
             Size = dfe[[self.input_item]].fillna(0).to_numpy().size
