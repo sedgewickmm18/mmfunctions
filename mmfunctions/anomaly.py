@@ -176,6 +176,8 @@ class GapAnomalyScore(BaseTransformer):
             if meandelta <= 0 or pd.isnull(meandelta):
                 meandelta = mindelta
 
+            print(mindelta, meandelta)
+
             # upsample original per entity dataframe and compute the gap frame
             upsampled_na = dfe_orig.resample(meandelta).apply(custom_resampler)
             dfe = upsampled_na.where(upsampled_na.isna(), 0).fillna(1)
@@ -186,7 +188,7 @@ class GapAnomalyScore(BaseTransformer):
             # one dimensional time series - named temperature for catchyness
             temperature = dfe[[self.input_item]].to_numpy().reshape(-1,)
 
-            logger.debug('Spectral: ' + str(entity) + ', ' + str(self.input_item) + ', ' + str(self.windowsize) + ', ' +
+            logger.debug('GapAnomaly: ' + str(entity) + ', ' + str(self.input_item) + ', ' + str(self.windowsize) + ', ' +
                          str(self.output_item) + ', ' + str(self.windowoverlap) + ', ' + str(temperature.size))
 
             if temperature.size > self.windowsize:
