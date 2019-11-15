@@ -61,7 +61,7 @@ class ASAnomalyHandler:
         self.input_item = input_item
         self.output_item = output_item
 
-        #logger.debug(str(entities))
+        #logger.info(str(entities))
 
         self.df[self.output_item] = 0
         self.df.sort_index()
@@ -129,7 +129,7 @@ class NoDataAnomalyScore(BaseTransformer):
     '''
     def __init__(self, input_item, windowsize, output_item):
         super().__init__()
-        logger.debug(input_item)
+        logger.info(input_item)
         self.input_item = input_item
 
         # use 24 by default - must be larger than 12
@@ -150,7 +150,7 @@ class NoDataAnomalyScore(BaseTransformer):
 
         df_copy = df.copy()
         entities = np.unique(df.index.levels[0])
-        logger.debug(str(entities))
+        logger.info(str(entities))
 
 
         df_copy[self.output_item] = 0
@@ -188,11 +188,11 @@ class NoDataAnomalyScore(BaseTransformer):
             # one dimensional time series - named temperature for catchyness
             temperature = dfe[[self.input_item]].to_numpy().reshape(-1,)
 
-            logger.debug('NoDataAnomaly: ' + str(entity) + ', ' + str(self.input_item) + ', ' + str(self.windowsize) + ', ' +
+            logger.info('NoDataAnomaly: ' + str(entity) + ', ' + str(self.input_item) + ', ' + str(self.windowsize) + ', ' +
                          str(self.output_item) + ', ' + str(self.windowoverlap) + ', ' + str(temperature.size))
 
             if temperature.size > self.windowsize:
-                logger.debug(str(temperature.size) + str(self.windowsize))
+                logger.info(str(temperature.size) + str(self.windowsize))
                 # Fourier transform:
                 #   frequency, time, spectral density
                 freqsTS, timesTS, SxTS = signal.spectrogram(temperature, fs = self.frame_rate, window = 'hanning',
@@ -209,7 +209,7 @@ class NoDataAnomalyScore(BaseTransformer):
 
                 # compute zscore over the energy
                 ets_zscore = (ETS - ETS.mean())/ETS.std(ddof=0)
-                logger.debug('NoData z-score max: ' + str(ets_zscore.max()))
+                logger.info('NoData z-score max: ' + str(ets_zscore.max()))
 
                 # length of timesTS, ETS and ets_zscore is smaller than half the original
                 #   extend it to cover the full original length 
@@ -272,7 +272,7 @@ class SpectralAnomalyScore(BaseTransformer):
     '''
     def __init__(self, input_item, windowsize, output_item):
         super().__init__()
-        logger.debug(input_item)
+        logger.info(input_item)
         self.input_item = input_item
 
         # use 24 by default - must be larger than 12
@@ -293,7 +293,7 @@ class SpectralAnomalyScore(BaseTransformer):
 
         df_copy = df.copy()
         entities = np.unique(df.index.levels[0])
-        logger.debug(str(entities))
+        logger.info(str(entities))
 
         df_copy[self.output_item] = 0
         #df_copy.sort_index(level=1)
@@ -322,11 +322,11 @@ class SpectralAnomalyScore(BaseTransformer):
             # one dimensional time series - named temperature for catchyness
             temperature = dfe[[self.input_item]].fillna(0).to_numpy().reshape(-1,)
 
-            logger.debug('Spectral: ' + str(entity) + ', ' + str(self.input_item) + ', ' + str(self.windowsize) + ', ' +
+            logger.info('Spectral: ' + str(entity) + ', ' + str(self.input_item) + ', ' + str(self.windowsize) + ', ' +
                          str(self.output_item) + ', ' + str(self.windowoverlap) + ', ' + str(temperature.size))
 
             if temperature.size > self.windowsize:
-                logger.debug(str(temperature.size) + str(self.windowsize))
+                logger.info(str(temperature.size) + str(self.windowsize))
                 # Fourier transform:
                 #   frequency, time, spectral density
                 freqsTS, timesTS, SxTS = signal.spectrogram(temperature, fs = self.frame_rate, window = 'hanning',
@@ -343,7 +343,7 @@ class SpectralAnomalyScore(BaseTransformer):
 
                 # compute zscore over the energy
                 ets_zscore = (ETS - ETS.mean())/ETS.std(ddof=0)
-                logger.debug('Spectral z-score max: ' + str(ets_zscore.max()))
+                logger.info('Spectral z-score max: ' + str(ets_zscore.max()))
 
                 # length of timesTS, ETS and ets_zscore is smaller than half the original
                 #   extend it to cover the full original length 
@@ -409,7 +409,7 @@ class KMeansAnomalyScore(BaseTransformer):
     '''
     def __init__(self, input_item, windowsize, output_item):
         super().__init__()
-        logger.debug(input_item)
+        logger.info(input_item)
         self.input_item = input_item
 
         # use 24 by default - must be larger than 12
@@ -427,7 +427,7 @@ class KMeansAnomalyScore(BaseTransformer):
 
         df_copy = df.copy()
         entities = np.unique(df_copy.index.levels[0])
-        logger.debug(str(entities))
+        logger.info(str(entities))
 
         df_copy[self.output_item] = 0
         df_copy.sort_index()
@@ -456,11 +456,11 @@ class KMeansAnomalyScore(BaseTransformer):
             # one dimensional time series - named temperature for catchyness
             temperature = dfe[[self.input_item]].fillna(0).to_numpy().reshape(-1,)
 
-            logger.debug('KMeans: ' + str(entity) + ', ' + str(self.input_item) + ', ' + str(self.windowsize) + ', ' +
+            logger.info('KMeans: ' + str(entity) + ', ' + str(self.input_item) + ', ' + str(self.windowsize) + ', ' +
                          str(self.output_item) + ', ' + str(self.step) + ', ' + str(temperature.size))
 
             if temperature.size > self.windowsize:
-                logger.debug(str(temperature.size) + ',' + str(self.windowsize))
+                logger.info(str(temperature.size) + ',' + str(self.windowsize))
 
                 # Chop into overlapping windows
                 slices = skiutil.view_as_windows(temperature, window_shape=(self.windowsize,), step=self.step)
