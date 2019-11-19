@@ -472,8 +472,12 @@ class KMeansAnomalyScore(BaseTransformer):
                    n_clus = 20
 
                 cblofwin = CBLOF(n_clusters=n_clus, n_jobs=-1)
-                cblofwin.fit(slices)
-
+                try:
+                    cblofwin.fit(slices)
+                except:
+                    self.trace_append('KMeans failed')
+                    continue
+                    
                 pred_score = cblofwin.decision_scores_.copy()
 
                 # length of timesTS, ETS and ets_zscore is smaller than half the original
