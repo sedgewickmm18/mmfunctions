@@ -346,7 +346,7 @@ class SpectralAnomalyScore(BaseTransformer):
                 ETS = np.log10(np.dot(SxTS.T, freqsTS))
 
                 # compute the elliptic envelope to exploit Minimum Covariance Determinant estimates
-                ellEnv = EllipticEnvelope(random_state=0).fit(ETS)
+                ellEnv = EllipticEnvelope(random_state=0).fit(np.vstack((timesTS, ETS)).T)
                 ets_zscore = ellEnv.predict(ETS)
 
                 # compute zscore over the energy
