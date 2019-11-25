@@ -209,7 +209,7 @@ class NoDataAnomalyScore(BaseTransformer):
                 ETS = np.dot(SxTS.T, freqsTS)
 
                 # compute zscore over the energy
-                ets_zscore = (ETS - ETS.mean())/ETS.std(ddof=0)
+                ets_zscore = np.abs((ETS - ETS.mean())/ETS.std(ddof=0))
                 logger.info('NoData z-score max: ' + str(ets_zscore.max()))
 
                 # length of timesTS, ETS and ets_zscore is smaller than half the original
@@ -347,11 +347,10 @@ class SpectralAnomalyScore(BaseTransformer):
 
                 # compute the elliptic envelope to exploit Minimum Covariance Determinant estimates
                 ellEnv = EllipticEnvelope(random_state=0).fit(X)
-                
                 ets_zscore = ellEnv.predict(X)
 
                 # compute zscore over the energy
-                #ets_zscore = (ETS - ETS.mean())/ETS.std(ddof=0)
+                #ets_zscore = np.abs((ETS - ETS.mean())/ETS.std(ddof=0))
                 logger.info('Spectral z-score max: ' + str(ets_zscore.max()))
 
                 # length of timesTS, ETS and ets_zscore is smaller than half the original
