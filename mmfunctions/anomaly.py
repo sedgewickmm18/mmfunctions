@@ -25,6 +25,7 @@ from scipy.stats import energy_distance
 # for KMeans
 import skimage as ski
 from skimage import util as skiutil # for nifty windowing
+from sklearn.covariance import EllipticEnvelope
 from pyod.models.cblof import CBLOF
 
 import re
@@ -344,8 +345,13 @@ class SpectralAnomalyScore(BaseTransformer):
                 # Compute energy = frequency * spectral density over time in decibel
                 ETS = np.log10(np.dot(SxTS.T, freqsTS))
 
+                # compute the elliptic envelope to exploit Minimum Covariance Determinant estimates
+                ellEnv = EllipticEnvelope(random_state=0).fit(X)
+                
+                ets_zscore = ellEnv.predict(X)
+
                 # compute zscore over the energy
-                ets_zscore = (ETS - ETS.mean())/ETS.std(ddof=0)
+                #ets_zscore = (ETS - ETS.mean())/ETS.std(ddof=0)
                 logger.info('Spectral z-score max: ' + str(ets_zscore.max()))
 
                 # length of timesTS, ETS and ets_zscore is smaller than half the original
