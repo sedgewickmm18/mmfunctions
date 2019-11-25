@@ -47,7 +47,7 @@ _IS_PREINSTALLED = False
 
 def custom_resampler(array_like):
     if (array_like.values.size > 0):
-        return array_like.values[0]
+        return 1 #array_like.values[0]
     return np.nan
 
 
@@ -238,6 +238,9 @@ class NoDataAnomalyScore(BaseTransformer):
 
         msg = 'NoDataAnomalyScore'
         self.trace_append(msg)
+
+        print(df_copy.head(20))
+
         return (df_copy)
 
     @classmethod
@@ -366,14 +369,14 @@ class SpectralAnomalyScore(BaseTransformer):
                     print (dfe_orig.head(2))
                     zScoreII = dfe_orig[self.input_item].to_numpy()
 
-                print (dfe_orig.head(2))
+                #print (dfe_orig.head(2))
 
                 idx = pd.IndexSlice
                 df_copy.loc[idx[entity,:], self.output_item] = zScoreII
 
         msg = 'SpectralAnomalyScore'
         self.trace_append(msg)
-        print(df_copy.head(30))
+        #print(df_copy.head(30))
 
         return (df_copy)
 
