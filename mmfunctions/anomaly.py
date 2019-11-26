@@ -347,19 +347,26 @@ class SpectralAnomalyScore(BaseTransformer):
 
                 # compute the elliptic envelope to exploit Minimum Covariance Determinant estimates
                 twoDimETS = np.vstack((timesTS, ETS)).T
-                ellEnv = EllipticEnvelope(random_state=0).fit(twoDimETS)
-                ets_zscore = ellEnv.predict(twoDimETS)
 
-                # compute zscore over the energy
-                #ets_zscore = np.abs((ETS - ETS.mean())/ETS.std(ddof=0))
-                logger.info('Spectral z-score max: ' + str(ets_zscore.max()))
+                # inliers have a score of 1, outliers -1, and 0 indicates an issue with the data
+                try:
+                    ellEnv = EllipticEnvelope(random_state=0).fit(twoDimETS)
+                    ets_zscore = ellEnv.predict(twoDimETS)
 
-                # length of timesTS, ETS and ets_zscore is smaller than half the original
-                #   extend it to cover the full original length 
-                Linear = sp.interpolate.interp1d(timesTS, ets_zscore, kind='linear', fill_value='extrapolate')
-                zscoreI = Linear(np.arange(0, temperature.size, 1))
+                    # compute zscore over the energy
+                    #ets_zscore = np.abs((ETS - ETS.mean())/ETS.std(ddof=0))
+                    logger.info('Spectral z-score max: ' + str(ets_zscore.max()))
 
-                dfe[self.output_item] = zscoreI
+                    # length of timesTS, ETS and ets_zscore is smaller than half the original
+                    #   extend it to cover the full original length 
+                    Linear = sp.interpolate.interp1d(timesTS, ets_zscore, kind='linear', fill_value='extrapolate')
+                    zscoreI = Linear(np.arange(0, temperature.size, 1))
+
+                    dfe[self.output_item] = zscoreI
+
+                except:
+
+                    dfe[self.output_item] = 0
 
                 # absolute zscore > 3 ---> anomaly
                 #df_copy.loc[(entity,), self.output_item] = zscoreI
