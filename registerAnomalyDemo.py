@@ -110,5 +110,5 @@ EngineLogging.configure_console_logging(logging.DEBUG)
 
 db.register_functions([anomaly.SpectralAnomalyScore])
 db.register_functions([anomaly.KMeansAnomalyScore])
-db.register_functions([anomaly.GapAnomalyScore])
+db.register_functions([anomaly.NoDataAnomalyScore])
 

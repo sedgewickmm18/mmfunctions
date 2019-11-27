@@ -68,7 +68,7 @@ if (len(sys.argv) <= 1) or (sys.argv[1] != 'test'):
 # if in test mode call execute()
 ais = anomaly.SpectralAnomalyScore('Val', windowsize=12, output_item='zscore')
 kis = anomaly.KMeansAnomalyScore('Val', windowsize=4, output_item='kscore')
-gis = anomaly.GapAnomalyScore('Val', windowsize=12, output_item='kscore')
+gis = anomaly.NoDataAnomalyScore('Val', windowsize=12, output_item='kscore')
 
 print ("Instantiated")
 
@@ -103,5 +103,5 @@ EngineLogging.configure_console_logging(logging.DEBUG)
 
 db.register_functions([anomaly.SpectralAnomalyScore])
 db.register_functions([anomaly.KMeansAnomalyScore])
-db.register_functions([anomaly.GapAnomalyScore])
+db.register_functions([anomaly.NoDataAnomalyScore])
 

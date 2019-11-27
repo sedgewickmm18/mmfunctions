@@ -351,7 +351,8 @@ class SpectralAnomalyScore(BaseTransformer):
                 # inliers have a score of 1, outliers -1, and 0 indicates an issue with the data
                 try:
                     ellEnv = EllipticEnvelope(random_state=0).fit(twoDimETS)
-                    ets_zscore = ellEnv.predict(twoDimETS)
+                    #ets_zscore = ellEnv.predict(twoDimETS)
+                    ets_zscore = ellEnv.decision_function(twoDimETS, raw_values=True)
 
                     # compute zscore over the energy
                     #ets_zscore = np.abs((ETS - ETS.mean())/ETS.std(ddof=0))
