@@ -47,9 +47,16 @@ PACKAGE_URL = 'git+https://github.com/sedgewickmm18/mmfunctions.git@'
 _IS_PREINSTALLED = False
 
 def custom_resampler(array_like):
+    # initialize
+    if not 'gap' in dir():
+        gap = 0
+    
     if (array_like.values.size > 0):
-        return 1 #array_like.values[0]
-    return np.nan
+        gap = 0
+        return 0
+    else:
+        gap += 1
+        return gap
 
 
 class ASAnomalyHandler:
@@ -172,16 +179,16 @@ class NoDataAnomalyScore(BaseTransformer):
             if mindelta == dt.timedelta(seconds = 0) or pd.isnull(mindelta):
                 mindelta = pd.Timedelta('5 seconds')
 
-            # compute meandelta for upsampling
-            meandelta = dfe_orig.index.to_series().diff().mean()
-            if meandelta == dt.timedelta(seconds = 0) or pd.isnull(meandelta):
-                meandelta = mindelta
-
-            logger.info('Timedelta:' + str(mindelta) + ',' + str(meandelta))
+            logger.info('Timedelta:' + str(mindelta))
 
             # upsample original per entity dataframe and compute the gap frame
-            upsampled_na = dfe_orig.resample(meandelta).apply(custom_resampler)
-            dfe = upsampled_na.where(upsampled_na.isna(), 0).fillna(1)
+            #upsampled_na = dfe_orig.resample(meandelta).apply(custom_resampler)
+
+            upsampled_na = dfe_orig.resample(mindelta).apply(custom_resampler)
+
+            #dfe = upsampled_na.where(upsampled_na.isna(), 0).fillna(1)
+
+            dfe
 
             # interpolate gaps - data imputation
             Size = dfe[[self.input_item]].to_numpy().size
