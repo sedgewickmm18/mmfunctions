@@ -347,7 +347,7 @@ class SpectralAnomalyScore(BaseTransformer):
                 freqsTS[freqsTS == 0] = 1 / self.windowsize
 
                 highfreqsTS = freqsTS
-                lowfreqs = freqsTS
+                lowfreqsTS = freqsTS
                 highfreqsTS[highfreqsTS <= 0.25] = 0
                 lowfreqsTS[lowfreqsTS > 0.25] = 0
 
