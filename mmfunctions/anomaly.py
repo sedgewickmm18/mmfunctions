@@ -357,8 +357,8 @@ class SpectralAnomalyScore(BaseTransformer):
                 ETS = np.log10(np.dot(SxTS.T, freqsTS))
 
                 # compute the elliptic envelope to exploit Minimum Covariance Determinant estimates
-                #twoDimETS = np.vstack((timesTS, ETS)).T
-                twoDimETS = np.vstack((lowETS, highETS)).T
+                twoDimETS = np.vstack((timesTS, ETS)).T
+                #twoDimETS = np.vstack((lowETS, highETS)).T
 
                 # inliers have a score of 1, outliers -1, and 0 indicates an issue with the data
                 try:
