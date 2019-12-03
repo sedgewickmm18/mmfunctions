@@ -187,9 +187,6 @@ class NoDataAnomalyScore(BaseTransformer):
             upsampled_na = dfe_orig.resample(mindelta).apply(custom_resampler)
 
             #dfe = upsampled_na.where(upsampled_na.isna(), 0).fillna(1)
-
-            dfe
-
             # interpolate gaps - data imputation
             Size = dfe[[self.input_item]].to_numpy().size
 
@@ -353,7 +350,8 @@ class SpectralAnomalyScore(BaseTransformer):
                 ETS = np.log10(np.dot(SxTS.T, freqsTS))
 
                 # compute the elliptic envelope to exploit Minimum Covariance Determinant estimates
-                twoDimETS = np.vstack((timesTS, ETS)).T
+                #twoDimETS = np.vstack((timesTS, ETS)).T
+                twoDimETS = np.vstack((SxTS, freqsTS)).T
 
                 # inliers have a score of 1, outliers -1, and 0 indicates an issue with the data
                 try:
