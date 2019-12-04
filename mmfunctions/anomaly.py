@@ -60,6 +60,18 @@ def custom_resampler(array_like):
         gap += 1
         return gap
 
+def minDelta(df):
+    # minimal time delta for merging
+            
+    try: 
+        mindelta = dfe_orig.index.to_series().diff().min()
+    except: 
+        mindelta = pd.Timedelta('5 seconds')
+
+    if mindelta == dt.timedelta(seconds = 0) or pd.isnull(mindelta):
+        mindelta = pd.Timedelta('5 seconds')
+    return mindelta
+    
 
 class ASAnomalyHandler:
     '''
@@ -90,9 +102,7 @@ class ASAnomalyHandler:
             dfe_orig = dfe_orig.reset_index(level=[0]).sort_index()
 
             # minimal time delta for merging
-            mindelta = dfe_orig.index.to_series().diff().min()
-            if mindelta == dt.timedelta(seconds = 0) or pd.isnull(mindelta):
-                mindelta = pd.Timedelta('5 seconds')
+            mindelta = minDelta(dfe_orig)
 
             # interpolate gaps - data imputation
             Size = dfe[[self.input_item]].fillna(0).to_numpy().size
@@ -177,9 +187,7 @@ class NoDataAnomalyScore(BaseTransformer):
             dfe_orig = dfe_orig.reset_index(level=[0]).sort_index()
 
             # minimal time delta for merging
-            mindelta = dfe_orig.index.to_series().diff().min()
-            if mindelta == dt.timedelta(seconds = 0) or pd.isnull(mindelta):
-                mindelta = pd.Timedelta('5 seconds')
+            mindelta = minDelta(dfe_orig)
 
             logger.info('Timedelta:' + str(mindelta))
 
@@ -319,9 +327,7 @@ class SpectralAnomalyScore(BaseTransformer):
             dfe_orig = dfe_orig.reset_index(level=[0]).sort_index()
 
             # minimal time delta for merging
-            mindelta = dfe_orig.index.to_series().diff().min()
-            if mindelta == dt.timedelta(seconds = 0) or pd.isnull(mindelta):
-                mindelta = pd.Timedelta('5 seconds')
+            mindelta = minDelta(dfe_orig)
 
             logger.info('Timedelta:' + str(mindelta))
 
@@ -473,9 +479,7 @@ class KMeansAnomalyScore(BaseTransformer):
             dfe_orig = dfe_orig.reset_index(level=[0]).sort_index()
 
             # minimal time delta for merging
-            mindelta = dfe_orig.index.to_series().diff().min()
-            if mindelta == dt.timedelta(seconds = 0) or pd.isnull(mindelta):
-                mindelta = pd.Timedelta('5 seconds')
+            mindelta = minDelta(dfe_orig)
 
             logger.info('Timedelta:' + str(mindelta))
 
