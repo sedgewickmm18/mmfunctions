@@ -354,25 +354,25 @@ class SpectralAnomalyScore(BaseTransformer):
                 freqsTS = freqsTS * freqsTSb
                 freqsTS[freqsTS == 0] = 1 / self.windowsize
 
-                #highfreqsTS = freqsTS
-                #lowfreqsTS = freqsTS
-                #highfreqsTS[highfreqsTS <= 0.25] = 0
-                #lowfreqsTS[lowfreqsTS > 0.25] = 0
+                highfreqsTS = freqsTS
+                lowfreqsTS = freqsTS
+                highfreqsTS[highfreqsTS <= 0.25] = 0
+                lowfreqsTS[lowfreqsTS > 0.25] = 0
 
                 # Compute energy = frequency * spectral density over time in decibel
-                #lowETS = np.log10(np.dot(SxTS.T, lowfreqsTS))
-                #highETS = np.log10(np.dot(SxTS.T, highfreqsTS))
+                lowETS = np.log10(np.dot(SxTS.T, lowfreqsTS))
+                highETS = np.log10(np.dot(SxTS.T, highfreqsTS))
                 ETS = np.log10(np.dot(SxTS.T, freqsTS))
 
                 # compute the elliptic envelope to exploit Minimum Covariance Determinant estimates
-                twoDimETS = np.vstack((timesTS, ETS)).T
-                #twoDimETS = np.vstack((lowETS, highETS)).T
+                #twoDimETS = np.vstack((timesTS, ETS)).T
+                twoDimETS = np.vstack((lowETS, highETS)).T
 
                 # inliers have a score of 1, outliers -1, and 0 indicates an issue with the data
                 try:
                     ellEnv = EllipticEnvelope(random_state=0).fit(twoDimETS)
                     #ets_zscore = ellEnv.predict(twoDimETS)
-                    ets_zscore = ellEnv.decision_function(twoDimETS, raw_values=True)
+                    ets_zscore = ellEnv.decision_function(twoDimETS, raw_values=True).copy()
 
                     # compute zscore over the energy
                     #ets_zscore = np.abs((ETS - ETS.mean())/ETS.std(ddof=0))
