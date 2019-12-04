@@ -341,7 +341,10 @@ class SpectralAnomalyScore(BaseTransformer):
             logger.info('Spectral: ' + str(entity) + ', ' + str(self.input_item) + ', ' + str(self.windowsize) + ', ' +
                          str(self.output_item) + ', ' + str(self.windowoverlap) + ', ' + str(temperature.size))
 
-            if temperature.size > self.windowsize:
+            if temperature.size <= self.windowsize:
+                logger.info(str(temperature.size) + ' <= ' + str(self.windowsize))
+                df_copy.loc[[entity]] = 0.0001
+            else:
                 logger.info(str(temperature.size) + str(self.windowsize))
                 # Fourier transform:
                 #   frequency, time, spectral density
@@ -370,7 +373,9 @@ class SpectralAnomalyScore(BaseTransformer):
 
                 # inliers have a score of 1, outliers -1, and 0 indicates an issue with the data
                 try:
-                    ellEnv = EllipticEnvelope(random_state=0).fit(twoDimETS)
+                    ellEnv = EllipticEnvelope(random_state=0)
+
+                    ellEnv.fit(twoDimETS)
                     #ets_zscore = ellEnv.predict(twoDimETS)
                     ets_zscore = ellEnv.decision_function(twoDimETS, raw_values=True).copy()
 
@@ -387,7 +392,7 @@ class SpectralAnomalyScore(BaseTransformer):
 
                 except:
 
-                    dfe[self.output_item] = 0
+                    dfe[self.output_item] = 0.0002
 
                 # absolute zscore > 3 ---> anomaly
                 #df_copy.loc[(entity,), self.output_item] = zscoreI
