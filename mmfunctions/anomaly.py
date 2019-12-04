@@ -1,5 +1,5 @@
 # *****************************************************************************
-# Â© Copyright IBM Corp. 2018.  All Rights Reserved.
+# © Copyright IBM Corp. 2018.  All Rights Reserved.
 #
 # This program and the accompanying materials
 # are made available under the terms of the Apache V2.0
@@ -254,7 +254,7 @@ class NoDataAnomalyScore(BaseTransformer):
         msg = 'NoDataAnomalyScore'
         self.trace_append(msg)
 
-        print(df_copy.head(20))
+        #print(df_copy.head(20))
 
         return (df_copy)
 
@@ -354,14 +354,14 @@ class SpectralAnomalyScore(BaseTransformer):
                 freqsTS = freqsTS * freqsTSb
                 freqsTS[freqsTS == 0] = 1 / self.windowsize
 
-                highfreqsTS = freqsTS
-                lowfreqsTS = freqsTS
-                highfreqsTS[highfreqsTS <= 0.25] = 0
-                lowfreqsTS[lowfreqsTS > 0.25] = 0
+                #highfreqsTS = freqsTS
+                #lowfreqsTS = freqsTS
+                #highfreqsTS[highfreqsTS <= 0.25] = 0
+                #lowfreqsTS[lowfreqsTS > 0.25] = 0
 
                 # Compute energy = frequency * spectral density over time in decibel
-                lowETS = np.log10(np.dot(SxTS.T, lowfreqsTS))
-                highETS = np.log10(np.dot(SxTS.T, highfreqsTS))
+                #lowETS = np.log10(np.dot(SxTS.T, lowfreqsTS))
+                #highETS = np.log10(np.dot(SxTS.T, highfreqsTS))
                 ETS = np.log10(np.dot(SxTS.T, freqsTS))
 
                 # compute the elliptic envelope to exploit Minimum Covariance Determinant estimates
