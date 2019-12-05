@@ -372,14 +372,19 @@ class SpectralAnomalyScore(BaseTransformer):
                 lowETS = (lowETS - lowETS.mean())/lowETS.std(ddof=0)
                 highETS = (highETS - highETS.mean())/highETS.std(ddof=0)
 
-                twoDimETS = np.vstack((lowETS, highETS)).T
+                #twoDimETS = np.vstack((lowETS, highETS)).T
+                twoDimETS = np.hstack((lowETS, highETS))
 
                 # inliers have a score of 1, outliers -1, and 0 indicates an issue with the data
                 try:
+                    dfe[self.output_item] = 0.0002
                     ellEnv = EllipticEnvelope(random_state=0)
 
+                    dfe[self.output_item] = 0.0003
                     ellEnv.fit(twoDimETS)
+                     
                     #ets_zscore = ellEnv.predict(twoDimETS)
+                    dfe[self.output_item] = 0.0004
                     ets_zscore = ellEnv.decision_function(twoDimETS, raw_values=True).copy()
 
                     # compute zscore over the energy
@@ -388,14 +393,18 @@ class SpectralAnomalyScore(BaseTransformer):
 
                     # length of timesTS, ETS and ets_zscore is smaller than half the original
                     #   extend it to cover the full original length 
+                    dfe[self.output_item] = 0.0005
                     Linear = sp.interpolate.interp1d(timesTS, ets_zscore, kind='linear', fill_value='extrapolate')
+
+                    dfe[self.output_item] = 0.0006
                     zscoreI = Linear(np.arange(0, temperature.size, 1))
 
                     dfe[self.output_item] = zscoreI
 
-                except:
+                except Exception as e:
+                    logger.error('Spectral failed with ' + str(e))
 
-                    dfe[self.output_item] = 0.0002
+                    
 
                 # absolute zscore > 3 ---> anomaly
                 #df_copy.loc[(entity,), self.output_item] = zscoreI
