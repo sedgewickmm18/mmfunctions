@@ -374,6 +374,7 @@ class SpectralAnomalyScore(BaseTransformer):
 
                 #twoDimETS = np.vstack((lowETS, highETS)).T
                 twoDimETS = np.hstack((lowETS, highETS))
+                print (lowETS, highETS, twoDimETS)
 
                 # inliers have a score of 1, outliers -1, and 0 indicates an issue with the data
                 try:
