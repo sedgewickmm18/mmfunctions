@@ -72,7 +72,7 @@ def minDelta(df):
         mindelta = pd.Timedelta('5 seconds')
     return mindelta
 
-class NoDataAnomalyScore(BaseTransformer):
+class NoDataAnomalyScoreNew(BaseTransformer):
     '''
     Employs spectral analysis to extract features from the gaps in the time series data and to compute the elliptic envelope from it
     '''
