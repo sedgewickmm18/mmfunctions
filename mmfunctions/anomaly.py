@@ -736,7 +736,7 @@ class FFTbasedGeneralizedAnomalyScore2(GeneralizedAnomalyScore2):
         )
         slices = []
         for slice in slices_:
-            slices.append(fft.rfft(slice))
+            slices.append(sp.fft.rfft(slice))
 
         return slices
 
