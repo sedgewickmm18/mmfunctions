@@ -741,7 +741,7 @@ class FFTbasedGeneralizedAnomalyScore2(GeneralizedAnomalyScore2):
         return slices
 
     def execute(self, df):
-        df_copy = super.execute(df)
+        df_copy = super().execute(df)
 
         msg = "FFTbasedGeneralizedAnomalyScore"
         self.trace_append(msg)
