@@ -17,7 +17,7 @@ import numpy as np
 import scipy as sp
 
 #  for Spectral Analysis
-from scipy import signal,fft
+from scipy import signal,fftpack
 # from scipy.stats import energy_distance
 # from sklearn import metrics
 from sklearn.covariance import EllipticEnvelope, MinCovDet
@@ -736,7 +736,7 @@ class FFTbasedGeneralizedAnomalyScore2(GeneralizedAnomalyScore2):
         )
         slices = []
         for slice in slices_:
-            slices.append(sp.fft.rfft(slice))
+            slices.append(fftpack.rfft(slice))
 
         return slices
 
