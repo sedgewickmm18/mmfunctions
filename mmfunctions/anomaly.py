@@ -17,7 +17,7 @@ import numpy as np
 import scipy as sp
 
 #  for Spectral Analysis
-from scipy import signal,fftpack
+from scipy import signal, fftpack
 # from scipy.stats import energy_distance
 # from sklearn import metrics
 from sklearn.covariance import EllipticEnvelope, MinCovDet
@@ -43,6 +43,7 @@ _IS_PREINSTALLED = False
 
 FrequencySplit = 0.3
 DefaultWindowSize = 12
+SmallEnergy = 0.0000001
 
 
 def custom_resampler(array_like):
@@ -335,8 +336,10 @@ class SpectralAnomalyScore(BaseTransformer):
 
                 # Compute energy = frequency * spectral density over time in decibel
                 try:
-                    lowsignal_energy = np.log10(np.dot(spectral_density_temperature.T, lowfrequency_temperature))
-                    highsignal_energy = np.log10(np.dot(spectral_density_temperature.T, highfrequency_temperature))
+                    lowsignal_energy = np.log10(
+                        np.maximum(SmallEnergy, np.dot(spectral_density_temperature.T, lowfrequency_temperature)))
+                    highsignal_energy = np.log10(
+                        np.maximum(SmallEnergy, np.dot(spectral_density_temperature.T, highfrequency_temperature)))
 
                     # compute the elliptic envelope to exploit Minimum Covariance Determinant estimates
                     lowsignal_energy = (lowsignal_energy - lowsignal_energy.mean())/lowsignal_energy.std(ddof=0)
@@ -483,9 +486,9 @@ class KMeansAnomalyScore(BaseTransformer):
                 slices = skiutil.view_as_windows(temperature, window_shape=(self.windowsize,), step=self.step)
 
                 if self.windowsize > 1:
-                    n_clus = 40
+                    n_clus = np.maximum(40, slices.size / 2)
                 else:
-                    n_clus = 20
+                    n_clus = np.maximum(20, slices.size / 2)
 
                 cblofwin = CBLOF(n_clusters=n_clus, n_jobs=-1)
                 try:
@@ -607,7 +610,7 @@ class GeneralizedAnomalyScore2(BaseTransformer):
             mindelta = min_delta(dfe_orig)
 
             # interpolate gaps - data imputation
-            Size = dfe[[self.input_item]].fillna(0).to_numpy().size
+            # Size = dfe[[self.input_item]].fillna(0).to_numpy().size
             dfe = dfe.interpolate(method="time")
 
             # one dimensional time series - named temperature for catchyness
@@ -622,7 +625,7 @@ class GeneralizedAnomalyScore2(BaseTransformer):
 
                 # NN = GeneralizedAnomalyModel( base_learner=MinCovDet(), fit_function="fit",
                 #        predict_function="mahalanobis", score_sign=1,)
-                loc = np.mean(temperature, axis=0)
+                temperature -= np.mean(temperature, axis=0)
                 mcd = MinCovDet()
 
                 # Chop into overlapping windows (default) or run through FFT first
@@ -655,14 +658,14 @@ class GeneralizedAnomalyScore2(BaseTransformer):
 
                     dfe[self.output_item] = gam_scoreI
 
-                except:
+                except Exception as e:
                     dfe[self.output_item] = 0
                     logger.error(
                         "GeneralizedAnomalyScore: "
                         + str(entity) + ", " + str(self.input_item) + ", "
                         + str(self.windowsize) + ", " + str(self.output_item) + ", "
                         + str(self.step) + ", " + str(temperature.size)
-                        + " failed in the fitting step.")
+                        + " failed in the fitting step with " + str(e))
 
                 # absolute kmeans_score > 1000 ---> anomaly
 
