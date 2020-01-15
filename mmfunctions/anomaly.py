@@ -330,25 +330,26 @@ class SpectralAnomalyScore(BaseTransformer):
             else:
                 logger.debug(str(temperature.size) + str(self.windowsize))
 
-                # Fourier transform:
-                #   frequency, time, spectral density
-                frequency_temperature, time_series_temperature, spectral_density_temperature = signal.spectrogram(
-                    temperature, fs=self.frame_rate, window='hanning',
-                    nperseg=self.windowsize, noverlap=self.windowoverlap,
-                    detrend=False, scaling='spectrum')
-
-                # cut off freqencies too low to fit into the window
-                frequency_temperatureb = (frequency_temperature > 2/self.windowsize).astype(int)
-                frequency_temperature = frequency_temperature * frequency_temperatureb
-                frequency_temperature[frequency_temperature == 0] = 1 / self.windowsize
-
-                highfrequency_temperature = frequency_temperature.copy()
-                lowfrequency_temperature = frequency_temperature.copy()
-                highfrequency_temperature[highfrequency_temperature <= FrequencySplit] = 0
-                lowfrequency_temperature[lowfrequency_temperature > FrequencySplit] = 0
-
-                # Compute energy = frequency * spectral density over time in decibel
+                df_copy.loc[[entity]] = 0.0007
                 try:
+                    # Fourier transform:
+                    #   frequency, time, spectral density
+                    frequency_temperature, time_series_temperature, spectral_density_temperature = signal.spectrogram(
+                        temperature, fs=self.frame_rate, window='hanning',
+                        nperseg=self.windowsize, noverlap=self.windowoverlap,
+                        detrend=False, scaling='spectrum')
+
+                    # cut off freqencies too low to fit into the window
+                    frequency_temperatureb = (frequency_temperature > 2/self.windowsize).astype(int)
+                    frequency_temperature = frequency_temperature * frequency_temperatureb
+                    frequency_temperature[frequency_temperature == 0] = 1 / self.windowsize
+
+                    highfrequency_temperature = frequency_temperature.copy()
+                    lowfrequency_temperature = frequency_temperature.copy()
+                    highfrequency_temperature[highfrequency_temperature <= FrequencySplit] = 0
+                    lowfrequency_temperature[lowfrequency_temperature > FrequencySplit] = 0
+
+                    # Compute energy = frequency * spectral density over time in decibel
                     lowsignal_energy = np.log10(
                         np.maximum(SmallEnergy, np.dot(spectral_density_temperature.T, lowfrequency_temperature)))
                     highsignal_energy = np.log10(
