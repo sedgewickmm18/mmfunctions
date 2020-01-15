@@ -142,8 +142,9 @@ class NoDataAnomalyScore(BaseTransformer):
             #   one dimensional time series - named temperature for catchyness
             # temperature = dfe[[self.input_item]].fillna(0).to_numpy().reshape(-1,)
 
-            logger.debug('NoData: ' + str(entity) + ', ' + str(self.input_item) + ', ' + str(self.windowsize) + ', ' +
-                         str(self.output_item) + ', ' + str(self.windowoverlap) + ', ' + str(temperature.size))
+            logger.debug('Module NoData, Entity: ' + str(entity) + ', Input: ' + str(self.input_item) +
+                         ', Windowsize: ' + str(self.windowsize) + ', Output: ' + str(self.output_item) +
+                         ', Overlap: ' + str(self.windowoverlap) + ', Inputsize: ' + str(temperature.size))
 
             if temperature.size <= self.windowsize:
                 logger.debug(str(temperature.size) + ' <= ' + str(self.windowsize))
@@ -305,8 +306,9 @@ class SpectralAnomalyScore(BaseTransformer):
             # one dimensional time series - named temperature for catchyness
             temperature = dfe[[self.input_item]].fillna(0).to_numpy().reshape(-1,)
 
-            logger.debug('Spectral: ' + str(entity) + ', ' + str(self.input_item) + ', ' + str(self.windowsize) + ', ' +
-                         str(self.output_item) + ', ' + str(self.windowoverlap) + ', ' + str(temperature.size))
+            logger.debug('Module Spectral, Entity: ' + str(entity) + ', Input: ' + str(self.input_item) +
+                         ', Windowsize: ' + str(self.windowsize) + ', Output: ' + str(self.output_item) +
+                         ', Overlap: ' + str(self.windowoverlap) + ', Inputsize: ' + str(temperature.size))
 
             if temperature.size <= self.windowsize:
                 logger.debug(str(temperature.size) + ' <= ' + str(self.windowsize))
@@ -470,8 +472,9 @@ class KMeansAnomalyScore(BaseTransformer):
             # one dimensional time series - named temperature for catchyness
             temperature = dfe[[self.input_item]].fillna(0).to_numpy().reshape(-1,)
 
-            logger.debug('KMeans: ' + str(entity) + ', ' + str(self.input_item) + ', ' + str(self.windowsize) + ', ' +
-                         str(self.output_item) + ', ' + str(self.step) + ', ' + str(temperature.size))
+            logger.debug('Module KMeans, Entity: ' + str(entity) + ', Input: ' + str(self.input_item) +
+                         ', Windowsize: ' + str(self.windowsize) + ', Output: ' + str(self.output_item) +
+                         ', Overlap: ' + str(self.step) + ', Inputsize: ' + str(temperature.size))
 
             if temperature.size > self.windowsize:
                 logger.debug(str(temperature.size) + ',' + str(self.windowsize))
@@ -573,7 +576,7 @@ class GeneralizedAnomalyScore2(BaseTransformer):
         self.output_item = output_item
 
     def feature_extract(self, temperature):
-        print('GAM extract')
+        logger.debug('GAM extract')
         slices = skiutil.view_as_windows(
             temperature, window_shape=(self.windowsize,), step=self.step
         )
@@ -610,20 +613,9 @@ class GeneralizedAnomalyScore2(BaseTransformer):
             # one dimensional time series - named temperature for catchyness
             temperature = dfe[[self.input_item]].fillna(0).to_numpy().reshape(-1,)
 
-            logger.debug(
-                "GeneralizedAnomaly: "
-                + str(entity)
-                + ", "
-                + str(self.input_item)
-                + ", "
-                + str(self.windowsize)
-                + ", "
-                + str(self.output_item)
-                + ", "
-                + str(self.step)
-                + ", "
-                + str(temperature.size)
-            )
+            logger.debug('Module GeneralizedAnomaly, Entity: ' + str(entity) + ', Input: ' + str(self.input_item) +
+                         ', Windowsize: ' + str(self.windowsize) + ', Output: ' + str(self.output_item) +
+                         ', Overlap: ' + str(self.step) + ', Inputsize: ' + str(temperature.size))
 
             if temperature.size > self.windowsize:
                 logger.debug(str(temperature.size) + "," + str(self.windowsize))
@@ -742,7 +734,7 @@ class FFTbasedGeneralizedAnomalyScore2(GeneralizedAnomalyScore2):
 
     def feature_extract(self, temperature):
 
-        print('FFT extract')
+        logger.debug('FFT extract')
         slices_ = skiutil.view_as_windows(
             temperature, window_shape=(self.windowsize,), step=self.step
         )
