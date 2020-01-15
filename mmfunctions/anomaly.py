@@ -151,7 +151,7 @@ class NoDataAnomalyScore(BaseTransformer):
                 logger.debug(str(temperature.size) + ' <= ' + str(self.windowsize))
                 df_copy.loc[[entity]] = 0.0001
             else:
-                logger.debug('Size: + str(temperature.size) + ', Windowsize: ' + str(self.windowsize) +
+                logger.debug('Size:' + str(temperature.size) + ', Windowsize: ' + str(self.windowsize) +
                              ', Type: ' + temperature.dtype)
                 df_copy.loc[[entity]] = 0.0007
                 # Fourier transform:
