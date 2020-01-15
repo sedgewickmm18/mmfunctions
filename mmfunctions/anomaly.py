@@ -114,13 +114,14 @@ class NoDataAnomalyScore(BaseTransformer):
         # df_copy.sort_index()   - NoOP
 
         for entity in entities:
-            # per entity
+            # per entity - copy for later inplace operations
             dfe = df_copy.loc[[entity]].dropna(how='all')
             dfe_orig = df_copy.loc[[entity]].copy()
 
             # get rid of entityid part of the index
-            dfe = dfe.reset_index(level=[0]).sort_index()
-            dfe_orig = dfe_orig.reset_index(level=[0]).sort_index()
+            # do it inplace as we copied the data before
+            dfe = dfe.reset_index(level=[0], inplace=True).sort_index(inplace=True)
+            dfe_orig = dfe_orig.reset_index(level=[0], inplace=True).sort_index(inplace=True)
 
             # minimal time delta for merging
             mindelta = min_delta(dfe_orig)
@@ -279,13 +280,14 @@ class SpectralAnomalyScore(BaseTransformer):
         # df_copy.sort_index()   # NoOp
 
         for entity in entities:
-            # per entity
+            # per entity - copy for later inplace operations
             dfe = df_copy.loc[[entity]].dropna(how='all')
             dfe_orig = df_copy.loc[[entity]].copy()
 
             # get rid of entityid part of the index
-            dfe = dfe.reset_index(level=[0]).sort_index()
-            dfe_orig = dfe_orig.reset_index(level=[0]).sort_index()
+            # do it inplace as we copied the data before
+            dfe = dfe.reset_index(level=[0], inplace=True).sort_index(inplace=True)
+            dfe_orig = dfe_orig.reset_index(level=[0], inplace=True).sort_index(inplace=True)
 
             # minimal time delta for merging
             mindelta = min_delta(dfe_orig)
@@ -441,13 +443,14 @@ class KMeansAnomalyScore(BaseTransformer):
         # df_copy.sort_index() - NoOP
 
         for entity in entities:
-            # per entity
+            # per entity - copy for later inplace operations
             dfe = df_copy.loc[[entity]].dropna(how='all')
             dfe_orig = df_copy.loc[[entity]].copy()
 
             # get rid of entityid part of the index
-            dfe = dfe.reset_index(level=[0]).sort_index()
-            dfe_orig = dfe_orig.reset_index(level=[0]).sort_index()
+            # do it inplace as we copied the data before
+            dfe = dfe.reset_index(level=[0], inplace=True).sort_index(inplace=True)
+            dfe_orig = dfe_orig.reset_index(level=[0], inplace=True).sort_index(inplace=True)
 
             # minimal time delta for merging
             mindelta = min_delta(dfe_orig)
@@ -580,13 +583,14 @@ class GeneralizedAnomalyScore2(BaseTransformer):
         # df_copy.sort_index()
 
         for entity in entities:
-            # per entity
-            dfe = df_copy.loc[[entity]].dropna(how="all")
+            # per entity - copy for later inplace operations
+            dfe = df_copy.loc[[entity]].dropna(how='all')
             dfe_orig = df_copy.loc[[entity]].copy()
 
             # get rid of entityid part of the index
-            dfe = dfe.reset_index(level=[0]).sort_index()
-            dfe_orig = dfe_orig.reset_index(level=[0]).sort_index()
+            # do it inplace as we copied the data before
+            dfe = dfe.reset_index(level=[0], inplace=True).sort_index(inplace=True)
+            dfe_orig = dfe_orig.reset_index(level=[0], inplace=True).sort_index(inplace=True)
 
             # minimal time delta for merging
             mindelta = min_delta(dfe_orig)
