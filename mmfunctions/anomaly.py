@@ -171,13 +171,26 @@ class NoDataAnomalyScore(BaseTransformer):
 
                 # Compute energy = frequency * spectral density over time in decibel
                 try:
-                    lowsignal_energy = np.log10(np.dot(spectral_density_temperature.T, lowfrequency_temperature))
-                    highsignal_energy = np.log10(np.dot(spectral_density_temperature.T, highfrequency_temperature))
+                    lowsignal_energy = np.log10(
+                        np.maximum(SmallEnergy, np.dot(spectral_density_temperature.T, lowfrequency_temperature)))
+                    highsignal_energy = np.log10(
+                        np.maximum(SmallEnergy, np.dot(spectral_density_temperature.T, highfrequency_temperature)))
 
                     # compute the elliptic envelope to exploit Minimum Covariance Determinant estimates
                     #    standardizing
-                    lowsignal_energy = (lowsignal_energy - lowsignal_energy.mean())/lowsignal_energy.std(ddof=0)
-                    highsignal_energy = (highsignal_energy - highsignal_energy.mean())/highsignal_energy.std(ddof=0)
+                    try:
+                        lowsignal_energy = (
+                             lowsignal_energy - lowsignal_energy.mean())/lowsignal_energy.std(ddof=0)
+                    except Exception as ee:
+                        # standard dev is zero
+                        lowsignal_energy = 0
+
+                    try:
+                        highsignal_energy = (
+                            highsignal_energy - highsignal_energy.mean())/highsignal_energy.std(ddof=0)
+                    except Exception as ee:
+                        # standard dev is zero
+                        highsignal_energy = 0
 
                     twoDimsignal_energy = np.vstack((lowsignal_energy, highsignal_energy)).T
                     logger.debug('lowsignal_energy: ' + str(lowsignal_energy) + ', highsignal_energy:' +
@@ -342,8 +355,21 @@ class SpectralAnomalyScore(BaseTransformer):
                         np.maximum(SmallEnergy, np.dot(spectral_density_temperature.T, highfrequency_temperature)))
 
                     # compute the elliptic envelope to exploit Minimum Covariance Determinant estimates
-                    lowsignal_energy = (lowsignal_energy - lowsignal_energy.mean())/lowsignal_energy.std(ddof=0)
-                    highsignal_energy = (highsignal_energy - highsignal_energy.mean())/highsignal_energy.std(ddof=0)
+                    #    standardizing
+                    try:
+                        lowsignal_energy = (
+                             lowsignal_energy - lowsignal_energy.mean())/lowsignal_energy.std(ddof=0)
+                    except Exception as ee:
+                        # standard dev is zero
+                        lowsignal_energy = 0
+
+                    try:
+                        highsignal_energy = (
+                            highsignal_energy - highsignal_energy.mean())/highsignal_energy.std(ddof=0)
+                    except Exception as ee:
+                        # standard dev is zero
+                        highsignal_energy = 0
+
 
                     twoDimsignal_energy = np.vstack((lowsignal_energy, highsignal_energy)).T
                     logger.debug('lowsignal_energy: ' + str(lowsignal_energy) + ', highsignal_energy:' +
@@ -486,9 +512,9 @@ class KMeansAnomalyScore(BaseTransformer):
                 slices = skiutil.view_as_windows(temperature, window_shape=(self.windowsize,), step=self.step)
 
                 if self.windowsize > 1:
-                    n_clus = np.maximum(40, slices.size / 2)
+                    n_clus = np.minimum(40, slices.size / 2)
                 else:
-                    n_clus = np.maximum(20, slices.size / 2)
+                    n_clus = np.minimum(20, slices.size / 2)
 
                 cblofwin = CBLOF(n_clusters=n_clus, n_jobs=-1)
                 try:
