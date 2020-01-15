@@ -184,11 +184,11 @@ class NoDataAnomalyScore(BaseTransformer):
                     if low_stddev != 0:
                         lowsignal_energy = (lowsignal_energy - lowsignal_energy.mean())/low_stddev
                     else:
-                        lowsignal_energy = 0
+                        lowsignal_energy = (lowsignal_energy - lowsignal_energy.mean())
                     if high_stddev != 0:
                         highsignal_energy = (highsignal_energy - highsignal_energy.mean())/high_stddev
                     else:
-                        highsignal_energy = 0
+                        highsignal_energy = (highsignal_energy - highsignal_energy.mean())
 
                     twoDimsignal_energy = np.vstack((lowsignal_energy, highsignal_energy)).T
                     logger.debug('lowsignal_energy: ' + str(lowsignal_energy) + ', highsignal_energy:' +
@@ -360,11 +360,11 @@ class SpectralAnomalyScore(BaseTransformer):
                     if low_stddev != 0:
                         lowsignal_energy = (lowsignal_energy - lowsignal_energy.mean())/low_stddev
                     else:
-                        lowsignal_energy = 0
+                        lowsignal_energy = (lowsignal_energy - lowsignal_energy.mean())
                     if high_stddev != 0:
                         highsignal_energy = (highsignal_energy - highsignal_energy.mean())/high_stddev
                     else:
-                        highsignal_energy = 0
+                        highsignal_energy = (highsignal_energy - highsignal_energy.mean())
 
                     twoDimsignal_energy = np.vstack((lowsignal_energy, highsignal_energy)).T
                     logger.debug('lowsignal_energy: ' + str(lowsignal_energy) + ', highsignal_energy:' +
@@ -512,6 +512,7 @@ class KMeansAnomalyScore(BaseTransformer):
                     n_clus = 20
 
                 n_clus = np.minimum(n_clus, slices.size // 2)
+                logger.debug('KMeans parms, Clusters: ' + str(n_clus) + ', Slices: ' + str(slices.size))
 
                 cblofwin = CBLOF(n_clusters=n_clus, n_jobs=-1)
                 try:
