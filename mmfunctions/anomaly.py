@@ -120,8 +120,10 @@ class NoDataAnomalyScore(BaseTransformer):
 
             # get rid of entityid part of the index
             # do it inplace as we copied the data before
-            dfe = dfe.reset_index(level=[0], inplace=True).sort_index(inplace=True)
-            dfe_orig = dfe_orig.reset_index(level=[0], inplace=True).sort_index(inplace=True)
+            dfe.reset_index(level=[0], inplace=True)
+            dfe.sort_index(inplace=True)
+            dfe_orig.reset_index(level=[0], inplace=True)
+            dfe_orig.sort_index(inplace=True)
 
             # minimal time delta for merging
             mindelta = min_delta(dfe_orig)
@@ -286,8 +288,10 @@ class SpectralAnomalyScore(BaseTransformer):
 
             # get rid of entityid part of the index
             # do it inplace as we copied the data before
-            dfe = dfe.reset_index(level=[0], inplace=True).sort_index(inplace=True)
-            dfe_orig = dfe_orig.reset_index(level=[0], inplace=True).sort_index(inplace=True)
+            dfe.reset_index(level=[0], inplace=True)
+            dfe.sort_index(inplace=True)
+            dfe_orig.reset_index(level=[0], inplace=True)
+            dfe_orig.sort_index(inplace=True)
 
             # minimal time delta for merging
             mindelta = min_delta(dfe_orig)
@@ -449,8 +453,10 @@ class KMeansAnomalyScore(BaseTransformer):
 
             # get rid of entityid part of the index
             # do it inplace as we copied the data before
-            dfe = dfe.reset_index(level=[0], inplace=True).sort_index(inplace=True)
-            dfe_orig = dfe_orig.reset_index(level=[0], inplace=True).sort_index(inplace=True)
+            dfe.reset_index(level=[0], inplace=True)
+            dfe.sort_index(inplace=True)
+            dfe_orig.reset_index(level=[0], inplace=True)
+            dfe_orig.sort_index(inplace=True)
 
             # minimal time delta for merging
             mindelta = min_delta(dfe_orig)
@@ -589,8 +595,10 @@ class GeneralizedAnomalyScore2(BaseTransformer):
 
             # get rid of entityid part of the index
             # do it inplace as we copied the data before
-            dfe = dfe.reset_index(level=[0], inplace=True).sort_index(inplace=True)
-            dfe_orig = dfe_orig.reset_index(level=[0], inplace=True).sort_index(inplace=True)
+            dfe.reset_index(level=[0], inplace=True)
+            dfe.sort_index(inplace=True)
+            dfe_orig.reset_index(level=[0], inplace=True)
+            dfe_orig.sort_index(inplace=True)
 
             # minimal time delta for merging
             mindelta = min_delta(dfe_orig)
