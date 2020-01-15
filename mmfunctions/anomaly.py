@@ -149,11 +149,11 @@ class NoDataAnomalyScore(BaseTransformer):
 
             if temperature.size <= self.windowsize:
                 logger.debug(str(temperature.size) + ' <= ' + str(self.windowsize))
-                df_copy.loc[[entity]] = 0.0001
+                #df_copy.loc[[entity]] = 0.0001
             else:
                 logger.debug('Size:' + str(temperature.size) + ', Windowsize: ' + str(self.windowsize) +
                              ', Type: ' + str(temperature.dtype))
-                df_copy.loc[[entity]] = 0.0007
+                dfe[self.output_item] = 0.0007
                 # Fourier transform:
                 #   frequency, time, spectral density
                 try:
@@ -330,7 +330,7 @@ class SpectralAnomalyScore(BaseTransformer):
             else:
                 logger.debug(str(temperature.size) + str(self.windowsize))
 
-                df_copy.loc[[entity]] = 0.0007
+                dfe[self.output_item] = 0.0007
                 try:
                     # Fourier transform:
                     #   frequency, time, spectral density
