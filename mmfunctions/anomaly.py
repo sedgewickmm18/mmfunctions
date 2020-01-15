@@ -178,18 +178,16 @@ class NoDataAnomalyScore(BaseTransformer):
 
                     # compute the elliptic envelope to exploit Minimum Covariance Determinant estimates
                     #    standardizing
-                    try:
-                        lowsignal_energy = (
-                             lowsignal_energy - lowsignal_energy.mean())/lowsignal_energy.std(ddof=0)
-                    except Exception as ee:
-                        # standard dev is zero
-                        lowsignal_energy = 0
+                    low_stddev = lowsignal_energy.std(ddof=0)
+                    high_stddev = highsignal_energy.std(ddof=0)
 
-                    try:
-                        highsignal_energy = (
-                            highsignal_energy - highsignal_energy.mean())/highsignal_energy.std(ddof=0)
-                    except Exception as ee:
-                        # standard dev is zero
+                    if low_stddev != 0:
+                        lowsignal_energy = (lowsignal_energy - lowsignal_energy.mean())/low_stddev
+                    else:
+                        lowsignal_energy = 0
+                    if high_stddev != 0:
+                        highsignal_energy = (highsignal_energy - highsignal_energy.mean())/high_stddev
+                    else:
                         highsignal_energy = 0
 
                     twoDimsignal_energy = np.vstack((lowsignal_energy, highsignal_energy)).T
@@ -356,20 +354,17 @@ class SpectralAnomalyScore(BaseTransformer):
 
                     # compute the elliptic envelope to exploit Minimum Covariance Determinant estimates
                     #    standardizing
-                    try:
-                        lowsignal_energy = (
-                             lowsignal_energy - lowsignal_energy.mean())/lowsignal_energy.std(ddof=0)
-                    except Exception as ee:
-                        # standard dev is zero
+                    low_stddev = lowsignal_energy.std(ddof=0)
+                    high_stddev = highsignal_energy.std(ddof=0)
+
+                    if low_stddev != 0:
+                        lowsignal_energy = (lowsignal_energy - lowsignal_energy.mean())/low_stddev
+                    else:
                         lowsignal_energy = 0
-
-                    try:
-                        highsignal_energy = (
-                            highsignal_energy - highsignal_energy.mean())/highsignal_energy.std(ddof=0)
-                    except Exception as ee:
-                        # standard dev is zero
+                    if high_stddev != 0:
+                        highsignal_energy = (highsignal_energy - highsignal_energy.mean())/high_stddev
+                    else:
                         highsignal_energy = 0
-
 
                     twoDimsignal_energy = np.vstack((lowsignal_energy, highsignal_energy)).T
                     logger.debug('lowsignal_energy: ' + str(lowsignal_energy) + ', highsignal_energy:' +
@@ -512,9 +507,11 @@ class KMeansAnomalyScore(BaseTransformer):
                 slices = skiutil.view_as_windows(temperature, window_shape=(self.windowsize,), step=self.step)
 
                 if self.windowsize > 1:
-                    n_clus = np.minimum(40, slices.size / 2)
+                    n_clus = 40
                 else:
-                    n_clus = np.minimum(20, slices.size / 2)
+                    n_clus = 20
+
+                n_clus = np.minimum(n_clus, slices.size // 2)
 
                 cblofwin = CBLOF(n_clusters=n_clus, n_jobs=-1)
                 try:
