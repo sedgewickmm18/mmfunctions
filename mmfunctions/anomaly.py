@@ -326,7 +326,7 @@ class SpectralAnomalyScore(BaseTransformer):
 
             if temperature.size <= self.windowsize:
                 logger.debug(str(temperature.size) + ' <= ' + str(self.windowsize))
-                df_copy.loc[[entity]] = 0.0001
+                #df_copy.loc[[entity]] = 0.0001
             else:
                 logger.debug(str(temperature.size) + str(self.windowsize))
 
