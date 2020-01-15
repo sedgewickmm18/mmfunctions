@@ -514,8 +514,7 @@ class KMeansAnomalyScore(BaseTransformer):
                 else:
                     n_clus = 20
 
-                if n_clus > slices.size:
-                    n_clus = slices.size // 2
+                n_clus = np.minimum(n_clus, slices.size // 2)
 
                 logger.debug('KMeans parms, Clusters: ' + str(n_clus) + ', Slices: ' + str(slices.shape))
 
