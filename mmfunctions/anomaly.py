@@ -512,7 +512,7 @@ class KMeansAnomalyScore(BaseTransformer):
                     n_clus = 20
 
                 n_clus = np.minimum(n_clus, slices.size // 2)
-                logger.debug('KMeans parms, Clusters: ' + str(n_clus) + ', Slices: ' + str(slices.size))
+                logger.debug('KMeans parms, Clusters: ' + str(n_clus) + ', Slices: ' + str(slices.shape))
 
                 cblofwin = CBLOF(n_clusters=n_clus, n_jobs=-1)
                 try:
