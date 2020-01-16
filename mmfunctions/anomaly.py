@@ -585,7 +585,7 @@ class KMeansAnomalyScore(BaseTransformer):
         return (inputs, outputs)
 
 
-class GeneralizedAnomalyScore2(BaseTransformer):
+class GeneralizedAnomalyScore(BaseTransformer):
     """
     Employs GAM on windowed time series data and to compute an anomaly score from proximity to centroid's center points
     """
@@ -754,7 +754,7 @@ class GeneralizedAnomalyScore2(BaseTransformer):
         return (inputs, outputs)
 
 
-class FFTbasedGeneralizedAnomalyScore2(GeneralizedAnomalyScore2):
+class FFTbasedGeneralizedAnomalyScore(GeneralizedAnomalyScore):
     """
     Employs GAM on windowed time series data and to compute an anomaly score from proximity to centroid's center points
     """
