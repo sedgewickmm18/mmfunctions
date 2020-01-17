@@ -86,7 +86,7 @@ def set_window_size_and_overlap(windowsize, trim_value=2*DefaultWindowSize):
     return trimmed_ws, ws_overlap
 
 
-class NoDataAnomalyScoreOld(BaseTransformer):
+class NoDataAnomalyScore(BaseTransformer):
     '''
     Employs spectral analysis to extract features from the
       gaps in time series data and to compute the elliptic envelope from it
@@ -761,7 +761,7 @@ class GeneralizedAnomalyScore(BaseTransformer):
         return (inputs, outputs)
 
 
-class NoDataAnomalyScore(GeneralizedAnomalyScore):
+class NoDataAnomalyScoreRecent(GeneralizedAnomalyScore):
     '''
     Employs generalized anomaly analysis to extract features from the
       gaps in time series data and to compute the elliptic envelope from it
