@@ -21,6 +21,7 @@ from scipy import signal, fftpack
 # from scipy.stats import energy_distance
 # from sklearn import metrics
 from sklearn.covariance import EllipticEnvelope, MinCovDet
+from sklearn.exceptions import NotFittedError
 
 #   for KMeans
 #  import skimage as ski
@@ -371,8 +372,8 @@ class SpectralAnomalyScore(BaseTransformer):
                         highsignal_energy = (highsignal_energy - highsignal_energy.mean())
 
                     twoDimsignal_energy = np.vstack((lowsignal_energy, highsignal_energy)).T
-                    logger.debug('lowsignal_energy: ' + str(lowsignal_energy) + ', highsignal_energy:' +
-                                 str(highsignal_energy) + 'input' + str(twoDimsignal_energy))
+                    logger.debug('lowsignal_energy: ' + str(lowsignal_energy.shape) + ', highsignal_energy:' +
+                                 str(highsignal_energy.shape) + 'input' + str(twoDimsignal_energy.shape))
 
                     # inliers have a score of 1, outliers -1, and 0 indicates an issue with the data
                     dfe[self.output_item] = 0.0002
@@ -383,7 +384,10 @@ class SpectralAnomalyScore(BaseTransformer):
 
                     # compute distance to elliptic envelope
                     dfe[self.output_item] = 0.0004
-                    ets_zscore = ellEnv.decision_function(twoDimsignal_energy, raw_values=True).copy()
+
+                    # ets_zscore = ellEnv.decision_function(twoDimsignal_energy, raw_values=True).copy()
+                    ets_zscore = ellEnv.decision_function(twoDimsignal_energy).copy()
+
                     logger.debug('Spectral z-score max: ' + str(ets_zscore.max()))
 
                     # length of time_series_temperature, signal_energy and ets_zscore is smaller than half the original
@@ -609,7 +613,7 @@ class GeneralizedAnomalyScore(BaseTransformer):
 
     def prepare_data(self, dfEntity):
 
-        logger.info('prepare Data Generalized extract')
+        logger.debug('prepare Data GAM')
 
         # interpolate gaps - data imputation
         dfe = dfEntity.interpolate(method="time")
@@ -651,7 +655,8 @@ class GeneralizedAnomalyScore(BaseTransformer):
             # minimal time delta for merging
             mindelta = min_delta(dfe_orig)
 
-            # interpolate gaps - data imputation
+            # interpolate gaps - data imputation by default
+            #   for missing data detection we look at the timestamp gradient instead
             dfe, temperature = self.prepare_data(dfe)
 
             logger.debug('Module GeneralizedAnomaly, Entity: ' + str(entity) + ', Input: ' + str(self.input_item) +
@@ -669,6 +674,8 @@ class GeneralizedAnomalyScore(BaseTransformer):
                 # Chop into overlapping windows (default) or run through FFT first
                 slices = self.feature_extract(temperature)
 
+                pred_score = None
+
                 try:
                     # NN.fit(slices)
                     mcd.fit(slices)
@@ -676,6 +683,38 @@ class GeneralizedAnomalyScore(BaseTransformer):
                     # pred_score = NN.decision_function(slices).copy()
                     pred_score = mcd.mahalanobis(slices).copy()
 
+                except NotFittedError as nfe:
+
+                    logger.error(
+                        "GeneralizedAnomalyScore: Entity: "
+                        + str(entity) + ", Input: " + str(self.input_item) + ", WindowSize: "
+                        + str(self.windowsize) + ", Output: " + str(self.output_item) + ", Step: "
+                        + str(self.step) + ", InputSize: " + str(temperature.size)
+                        + " failed in the fitting step with \"" + str(nfe) + "\" - trying KMeans")
+
+                    if self.windowsize > 1:
+                        n_clus = 40
+                    else:
+                        n_clus = 20
+
+                    n_clus = np.minimum(n_clus, slices.size // 2)
+
+                    logger.debug('FFT -> KMeans parms, Clusters: ' + str(n_clus) + ', Slices: ' + str(slices.shape))
+
+                    cblofwin = CBLOF(n_clusters=n_clus, n_jobs=-1)
+
+                    try:
+                        cblofwin.fit(slices)
+
+                        pred_score = cblofwin.decision_scores_.copy()
+
+                    except Exception as ke:
+                        logger.info('KMeans failed with ' + str(ke))
+                        self.trace_append('KMeans failed with' + str(ke))
+                        continue
+
+                try:
+                    # will break if pred_score is None
                     # length of timesTS, ETS and ets_zscore is smaller than half the original
                     #   extend it to cover the full original length
                     timesTS = np.linspace(
@@ -684,7 +723,8 @@ class GeneralizedAnomalyScore(BaseTransformer):
                         temperature.size - self.windowsize + 1,
                     )
 
-                    print(timesTS.shape, pred_score.shape)
+                    logger.debug('GAM:  Entity: ' + str(entity) + ', result shape: ' + str(timesTS.shape) +
+                                 ' score shape: ' + str(pred_score.shape))
 
                     # timesI = np.linspace(0, Size - 1, Size)
                     linear_interpolateK = sp.interpolate.interp1d(
@@ -697,12 +737,13 @@ class GeneralizedAnomalyScore(BaseTransformer):
                     dfe[self.output_item] = gam_scoreI
 
                 except Exception as e:
+
                     dfe[self.output_item] = 0
                     logger.error(
-                        "GeneralizedAnomalyScore: "
-                        + str(entity) + ", " + str(self.input_item) + ", "
-                        + str(self.windowsize) + ", " + str(self.output_item) + ", "
-                        + str(self.step) + ", " + str(temperature.size)
+                        "GeneralizedAnomalyScore: Entity: "
+                        + str(entity) + ", Input: " + str(self.input_item) + ", WindowSize: "
+                        + str(self.windowsize) + ", Output: " + str(self.output_item) + ", Step: "
+                        + str(self.step) + ", InputSize: " + str(temperature.size)
                         + " failed in the fitting step with " + str(e))
 
                 # absolute kmeans_score > 1000 ---> anomaly
@@ -775,7 +816,7 @@ class NoDataAnomalyScore(GeneralizedAnomalyScore):
 
     def prepare_data(self, dfEntity):
 
-        logger.info('prepare Data NoData extract')
+        logger.debug('prepare Data NoData')
 
         # count the timedelta in seconds between two events
         timeSeq = (dfEntity.index.values - dfEntity.index[0].to_datetime64()) / np.timedelta64(1, 's')
@@ -783,9 +824,6 @@ class NoDataAnomalyScore(GeneralizedAnomalyScore):
         # one dimensional time series - named temperature for catchyness
         #   we look at the gradient of the time series timestamps for anomaly detection
         temperature = np.gradient(timeSeq)
-
-        logger.info('NoData:' + str(temperature.size) + ', Windowsize: ' + str(self.windowsize) +
-                             ', Type: ' + str(temperature.dtype))
 
         dfe = dfEntity.copy()
         dfe[[self.input_item]] = temperature
