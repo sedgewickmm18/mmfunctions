@@ -86,7 +86,7 @@ def set_window_size_and_overlap(windowsize, trim_value=2*DefaultWindowSize):
     return trimmed_ws, ws_overlap
 
 
-class NoDataAnomalyScore(BaseTransformer):
+class NoDataAnomalyScoreOld(BaseTransformer):
     '''
     Employs spectral analysis to extract features from the
       gaps in time series data and to compute the elliptic envelope from it
@@ -149,7 +149,7 @@ class NoDataAnomalyScore(BaseTransformer):
 
             if temperature.size <= self.windowsize:
                 logger.debug(str(temperature.size) + ' <= ' + str(self.windowsize))
-                #df_copy.loc[[entity]] = 0.0001
+                # df_copy.loc[[entity]] = 0.0001
             else:
                 logger.debug('Size:' + str(temperature.size) + ', Windowsize: ' + str(self.windowsize) +
                              ', Type: ' + str(temperature.dtype))
@@ -326,7 +326,7 @@ class SpectralAnomalyScore(BaseTransformer):
 
             if temperature.size <= self.windowsize:
                 logger.debug(str(temperature.size) + ' <= ' + str(self.windowsize))
-                #df_copy.loc[[entity]] = 0.0001
+                # df_copy.loc[[entity]] = 0.0001
             else:
                 logger.debug(str(temperature.size) + str(self.windowsize))
 
@@ -606,7 +606,18 @@ class GeneralizedAnomalyScore(BaseTransformer):
 
         self.output_item = output_item
 
+    def prepare_data(self, dfEntity):
+
+        # interpolate gaps - data imputation
+        dfe = dfEntity.interpolate(method="time")
+
+        # one dimensional time series - named temperature for catchyness
+        temperature = dfe[[self.input_item]].fillna(0).to_numpy().reshape(-1,)
+
+        return dfe, temperature
+
     def feature_extract(self, temperature):
+
         logger.debug('GAM extract')
         slices = skiutil.view_as_windows(
             temperature, window_shape=(self.windowsize,), step=self.step
@@ -638,11 +649,7 @@ class GeneralizedAnomalyScore(BaseTransformer):
             mindelta = min_delta(dfe_orig)
 
             # interpolate gaps - data imputation
-            # Size = dfe[[self.input_item]].fillna(0).to_numpy().size
-            dfe = dfe.interpolate(method="time")
-
-            # one dimensional time series - named temperature for catchyness
-            temperature = dfe[[self.input_item]].fillna(0).to_numpy().reshape(-1,)
+            dfe, temperature = self.prepare_data(dfe)
 
             logger.debug('Module GeneralizedAnomaly, Entity: ' + str(entity) + ', Input: ' + str(self.input_item) +
                          ', Windowsize: ' + str(self.windowsize) + ', Output: ' + str(self.output_item) +
@@ -751,6 +758,82 @@ class GeneralizedAnomalyScore(BaseTransformer):
                 description="Anomaly score (GeneralizedAnomaly)",
             )
         )
+        return (inputs, outputs)
+
+
+class NoDataAnomalyScore(BaseTransformer):
+    '''
+    Employs generalized anomaly analysis to extract features from the
+      gaps in time series data and to compute the elliptic envelope from it
+    '''
+
+    def __init__(self, input_item, windowsize, output_item):
+        super().__init__()
+        logger.debug(input_item)
+        self.input_item = input_item
+
+        # use 24 by default - must be larger than 1
+        self.windowsize, self.windowoverlap = set_window_size_and_overlap(windowsize)
+
+        # assume 1 per sec for now
+        self.frame_rate = 1
+
+        self.output_item = output_item
+
+    def feature_extract(self, temperature):
+
+        logger.debug('NoData extract')
+        slices = skiutil.view_as_windows(
+            temperature, window_shape=(self.windowsize,), step=self.step
+        )
+        return slices
+
+    def prepare_data(self, dfEntity):
+
+        # count the timedelta in seconds between two events
+        timeSeq = dfEntity.index.values - dfEntity.index[0].to_datetime64()
+
+        # one dimensional time series - named temperature for catchyness
+        # we look at the gradient of the time series for anomaly detection
+        temperature = np.gradient(timeSeq)
+
+        # interpolate gaps - data imputation
+        dfEntity[[self.input_item]] = temperature
+        dfe = dfEntity.interpolate(method='time')
+
+        return dfe, temperature
+
+    def execute(self, df):
+        df_copy = super().execute(df)
+
+        msg = "GeneralizedNoDataAnomalyScore"
+        self.trace_append(msg)
+        return df_copy
+
+    @classmethod
+    def build_ui(cls):
+
+        # define arguments that behave as function inputs
+        inputs = []
+        inputs.append(UISingleItem(
+                name='input_item',
+                datatype=float,
+                description='Column for feature extraction'
+                                              ))
+
+        inputs.append(UISingle(
+                name='windowsize',
+                datatype=int,
+                description='Window size for no data spectral analysis - default 12'
+                                              ))
+
+        # define arguments that behave as function outputs
+        outputs = []
+        outputs.append(UIFunctionOutSingle(
+                name='output_item',
+                datatype=float,
+                description='No data anomaly score'
+                ))
         return (inputs, outputs)
 
 
