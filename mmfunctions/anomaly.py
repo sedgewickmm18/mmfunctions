@@ -351,9 +351,9 @@ class SpectralAnomalyScore(BaseTransformer):
 
                     # Compute energy = frequency * spectral density over time in decibel
                     lowsignal_energy = np.log10(
-                        np.maximum(SmallEnergy, np.dot(spectral_density_temperature.T, lowfrequency_temperature)))
+                        np.maximum(1, np.dot(spectral_density_temperature.T, lowfrequency_temperature)) + 1)
                     highsignal_energy = np.log10(
-                        np.maximum(SmallEnergy, np.dot(spectral_density_temperature.T, highfrequency_temperature)))
+                        np.maximum(1, np.dot(spectral_density_temperature.T, highfrequency_temperature)) + 1)
 
                     # compute the elliptic envelope to exploit Minimum Covariance Determinant estimates
                     #    standardizing
@@ -364,6 +364,7 @@ class SpectralAnomalyScore(BaseTransformer):
                         lowsignal_energy = (lowsignal_energy - lowsignal_energy.mean())/low_stddev
                     else:
                         lowsignal_energy = (lowsignal_energy - lowsignal_energy.mean())
+
                     if high_stddev != 0:
                         highsignal_energy = (highsignal_energy - highsignal_energy.mean())/high_stddev
                     else:
