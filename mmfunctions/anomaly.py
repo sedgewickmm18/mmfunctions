@@ -518,7 +518,7 @@ class KMeansAnomalyScore(BaseTransformer):
                 else:
                     n_clus = 20
 
-                n_clus = np.minimum(n_clus, slices.size // 2)
+                n_clus = np.minimum(n_clus, slices.shape[0] // 2)
 
                 logger.debug('KMeans parms, Clusters: ' + str(n_clus) + ', Slices: ' + str(slices.shape))
 
@@ -696,7 +696,7 @@ class GeneralizedAnomalyScore(BaseTransformer):
                     else:
                         n_clus = 20
 
-                    n_clus = np.minimum(n_clus, slices.size // 2)
+                    n_clus = np.minimum(n_clus, slices.shape[0] // 2)
 
                     logger.debug('FFT -> KMeans parms, Clusters: ' + str(n_clus) + ', Slices: ' + str(slices.shape) +
                                  ',' + str(slices.size))
@@ -884,11 +884,11 @@ class FFTbasedGeneralizedAnomalyScore(GeneralizedAnomalyScore):
         slices_ = skiutil.view_as_windows(
             temperature, window_shape=(self.windowsize,), step=self.step
         )
-        slices = []
+        slicelist = []
         for slice in slices_:
-            slices.append(fftpack.rfft(slice))
+            slicelist.append(fftpack.rfft(slice))
 
-        return slices
+        return np.array(slicelist)
 
     def execute(self, df):
         df_copy = super().execute(df)
