@@ -777,7 +777,7 @@ class NoDataAnomalyScore(GeneralizedAnomalyScore):
         logger.info('prepare Data NoData extract')
 
         # count the timedelta in seconds between two events
-        timeSeq = dfEntity.index.values - dfEntity.index[0].to_datetime64()
+        timeSeq = (dfEntity.index.values - dfEntity.index[0].to_datetime64()) / np.timedelta64(1, 's')
 
         # one dimensional time series - named temperature for catchyness
         #   we look at the gradient of the time series timestamps for anomaly detection
