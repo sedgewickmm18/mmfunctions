@@ -783,6 +783,9 @@ class NoDataAnomalyScore(GeneralizedAnomalyScore):
         #   we look at the gradient of the time series timestamps for anomaly detection
         temperature = np.gradient(timeSeq)
 
+        logger.info('NoData:' + str(temperature.size) + ', Windowsize: ' + str(self.windowsize) +
+                             ', Type: ' + str(temperature.dtype))
+
         dfe = dfEntity.copy()
         dfe[[self.input_item]] = temperature
 
