@@ -413,6 +413,9 @@ class GeneralizedAnomalyScore(BaseTransformer):
     def __init__(self, input_item, windowsize, output_item):
         super().__init__()
         logger.debug(input_item)
+
+        self.whoami = 'GAM'
+
         self.input_item = input_item
 
         # use 12 by default
@@ -428,7 +431,7 @@ class GeneralizedAnomalyScore(BaseTransformer):
 
     def prepare_data(self, dfEntity):
 
-        logger.debug('prepare Data GAM')
+        logger.debug(self.whoami + ': prepare Data')
 
         # interpolate gaps - data imputation
         dfe = dfEntity.interpolate(method="time")
@@ -440,7 +443,8 @@ class GeneralizedAnomalyScore(BaseTransformer):
 
     def feature_extract(self, temperature):
 
-        logger.info('GAM extract')
+        logger.debug(self.whoami + ': feature extract')
+
         slices = skiutil.view_as_windows(
             temperature, window_shape=(self.windowsize,), step=self.step
         )
@@ -500,11 +504,11 @@ class GeneralizedAnomalyScore(BaseTransformer):
 
                 except ValueError as ve:
 
-                    logger.error(
-                        "GeneralizedAnomalyScore: Entity: "
+                    logger.info(
+                        self.whoami + " GeneralizedAnomalyScore: Entity: "
                         + str(entity) + ", Input: " + str(self.input_item) + ", WindowSize: "
                         + str(self.windowsize) + ", Output: " + str(self.output_item) + ", Step: "
-                        + str(self.step) + ", InputSize: " + str(temperature.size)
+                        + str(self.step) + ", InputSize: " + str(slices.shape)
                         + " failed in the fitting step with \"" + str(ve) + "\" - scoring zero")
 
                     pred_score = np.zeros(slices.shape[0])
@@ -514,10 +518,10 @@ class GeneralizedAnomalyScore(BaseTransformer):
 
                     dfe[self.output_item] = 0
                     logger.error(
-                        "GeneralizedAnomalyScore: Entity: "
+                        self.whoami + " GeneralizedAnomalyScore: Entity: "
                         + str(entity) + ", Input: " + str(self.input_item) + ", WindowSize: "
                         + str(self.windowsize) + ", Output: " + str(self.output_item) + ", Step: "
-                        + str(self.step) + ", InputSize: " + str(temperature.size)
+                        + str(self.step) + ", InputSize: " + str(slices.shape)
                         + " failed in the fitting step with " + str(e))
                     continue
 
@@ -530,7 +534,7 @@ class GeneralizedAnomalyScore(BaseTransformer):
                     temperature.size - self.windowsize + 1,
                 )
 
-                logger.debug('GAM:  Entity: ' + str(entity) + ', result shape: ' + str(timesTS.shape) +
+                logger.debug(self.whoami + '   Entity: ' + str(entity) + ', result shape: ' + str(timesTS.shape) +
                              ' score shape: ' + str(pred_score.shape))
 
                 # timesI = np.linspace(0, Size - 1, Size)
@@ -562,7 +566,6 @@ class GeneralizedAnomalyScore(BaseTransformer):
                     print(dfe_orig.head(2))
                     zScoreII = dfe_orig[self.input_item].to_numpy()
 
-                # df_copy.loc[(entity,) :, self.output_item] = zScoreII
                 idx = pd.IndexSlice
                 df_copy.loc[idx[entity, :], self.output_item] = zScoreII
 
@@ -609,11 +612,12 @@ class NoDataAnomalyScore(GeneralizedAnomalyScore):
     '''
     def __init__(self, input_item, windowsize, output_item):
         super().__init__(input_item, windowsize, output_item)
-        logger.debug(input_item)
+        self.whoami = 'NoData'
+        logger.debug('NoData')
 
     def prepare_data(self, dfEntity):
 
-        logger.debug('prepare Data NoData')
+        logger.debug(self.whoami + ': prepare Data')
 
         # count the timedelta in seconds between two events
         timeSeq = (dfEntity.index.values - dfEntity.index[0].to_datetime64()) / np.timedelta64(1, 's')
@@ -630,7 +634,7 @@ class NoDataAnomalyScore(GeneralizedAnomalyScore):
     def execute(self, df):
         df_copy = super().execute(df)
 
-        msg = "GeneralizedNoDataAnomalyScore"
+        msg = "NoDataAnomalyScore"
         self.trace_append(msg)
         return df_copy
 
@@ -668,11 +672,12 @@ class FFTbasedGeneralizedAnomalyScore(GeneralizedAnomalyScore):
 
     def __init__(self, input_item, windowsize, output_item):
         super().__init__(input_item, windowsize, output_item)
-        logger.debug(input_item)
+        self.whoami = 'FFT'
+        logger.debug('FFT')
 
     def feature_extract(self, temperature):
 
-        logger.info('FFT extract')
+        logger.debug(self.whoami + ': feature extract')
 
         slices_ = skiutil.view_as_windows(
             temperature, window_shape=(self.windowsize,), step=self.step
@@ -681,7 +686,8 @@ class FFTbasedGeneralizedAnomalyScore(GeneralizedAnomalyScore):
         for slice in slices_:
             slicelist.append(fftpack.rfft(slice))
 
-        return np.array(slicelist)
+        # return np.array(slicelist)
+        return np.stack(slicelist, axis=0)
 
     def execute(self, df):
         df_copy = super().execute(df)
