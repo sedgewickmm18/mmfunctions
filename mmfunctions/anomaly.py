@@ -21,7 +21,6 @@ from scipy import signal, fftpack
 # from scipy.stats import energy_distance
 # from sklearn import metrics
 from sklearn.covariance import EllipticEnvelope, MinCovDet
-from sklearn.exceptions import NotFittedError
 
 #   for KMeans
 #  import skimage as ski
@@ -683,14 +682,14 @@ class GeneralizedAnomalyScore(BaseTransformer):
                     # pred_score = NN.decision_function(slices).copy()
                     pred_score = mcd.mahalanobis(slices).copy()
 
-                except NotFittedError as nfe:
+                except ValueError as ve:
 
                     logger.error(
                         "GeneralizedAnomalyScore: Entity: "
                         + str(entity) + ", Input: " + str(self.input_item) + ", WindowSize: "
                         + str(self.windowsize) + ", Output: " + str(self.output_item) + ", Step: "
                         + str(self.step) + ", InputSize: " + str(temperature.size)
-                        + " failed in the fitting step with \"" + str(nfe) + "\" - trying KMeans")
+                        + " failed in the fitting step with \"" + str(ve) + "\" - trying KMeans")
 
                     if self.windowsize > 1:
                         n_clus = 40
@@ -699,7 +698,8 @@ class GeneralizedAnomalyScore(BaseTransformer):
 
                     n_clus = np.minimum(n_clus, slices.size // 2)
 
-                    logger.debug('FFT -> KMeans parms, Clusters: ' + str(n_clus) + ', Slices: ' + str(slices.shape))
+                    logger.debug('FFT -> KMeans parms, Clusters: ' + str(n_clus) + ', Slices: ' + str(slices.shape) +
+                                 ',' + str(slices.size))
 
                     cblofwin = CBLOF(n_clusters=n_clus, n_jobs=-1)
 
@@ -711,6 +711,10 @@ class GeneralizedAnomalyScore(BaseTransformer):
                     except Exception as ke:
                         logger.info('KMeans failed with ' + str(ke))
                         self.trace_append('KMeans failed with' + str(ke))
+                        continue
+
+                except Exception as ee:
+                        logger.info('GAM failed with ' + str(ee))
                         continue
 
                 try:
