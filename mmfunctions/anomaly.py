@@ -761,7 +761,7 @@ class GeneralizedAnomalyScore(BaseTransformer):
         return (inputs, outputs)
 
 
-class NoDataAnomalyScore(BaseTransformer):
+class NoDataAnomalyScore(GeneralizedAnomalyScore):
     '''
     Employs generalized anomaly analysis to extract features from the
       gaps in time series data and to compute the elliptic envelope from it
