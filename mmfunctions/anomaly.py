@@ -794,12 +794,11 @@ class NoDataAnomalyScore(GeneralizedAnomalyScore):
         timeSeq = dfEntity.index.values - dfEntity.index[0].to_datetime64()
 
         # one dimensional time series - named temperature for catchyness
-        # we look at the gradient of the time series for anomaly detection
+        #   we look at the gradient of the time series timestamps for anomaly detection
         temperature = np.gradient(timeSeq)
 
-        # interpolate gaps - data imputation
-        dfEntity[[self.input_item]] = temperature
-        dfe = dfEntity.interpolate(method='time')
+        dfe = dfEntity.copy()
+        dfe[[self.input_item]] = temperature
 
         return dfe, temperature
 
