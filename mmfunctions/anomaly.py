@@ -86,7 +86,7 @@ def set_window_size_and_overlap(windowsize, trim_value=2*DefaultWindowSize):
     return trimmed_ws, ws_overlap
 
 
-class NoDataAnomalyScore(BaseTransformer):
+class NoDataAnomalyScoreOld(BaseTransformer):
     '''
     Employs spectral analysis to extract features from the
       gaps in time series data and to compute the elliptic envelope from it
@@ -608,6 +608,8 @@ class GeneralizedAnomalyScore(BaseTransformer):
 
     def prepare_data(self, dfEntity):
 
+        logger.info('prepare Data Generalized extract')
+
         # interpolate gaps - data imputation
         dfe = dfEntity.interpolate(method="time")
 
@@ -618,7 +620,7 @@ class GeneralizedAnomalyScore(BaseTransformer):
 
     def feature_extract(self, temperature):
 
-        logger.debug('GAM extract')
+        logger.info('GAM extract')
         slices = skiutil.view_as_windows(
             temperature, window_shape=(self.windowsize,), step=self.step
         )
@@ -761,34 +763,18 @@ class GeneralizedAnomalyScore(BaseTransformer):
         return (inputs, outputs)
 
 
-class NoDataAnomalyScoreRecent(GeneralizedAnomalyScore):
+class NoDataAnomalyScore(GeneralizedAnomalyScore):
     '''
     Employs generalized anomaly analysis to extract features from the
       gaps in time series data and to compute the elliptic envelope from it
     '''
-
     def __init__(self, input_item, windowsize, output_item):
-        super().__init__()
+        super().__init__(input_item, windowsize, output_item)
         logger.debug(input_item)
-        self.input_item = input_item
-
-        # use 24 by default - must be larger than 1
-        self.windowsize, self.windowoverlap = set_window_size_and_overlap(windowsize)
-
-        # assume 1 per sec for now
-        self.frame_rate = 1
-
-        self.output_item = output_item
-
-    def feature_extract(self, temperature):
-
-        logger.debug('NoData extract')
-        slices = skiutil.view_as_windows(
-            temperature, window_shape=(self.windowsize,), step=self.step
-        )
-        return slices
 
     def prepare_data(self, dfEntity):
+
+        logger.info('prepare Data NoData extract')
 
         # count the timedelta in seconds between two events
         timeSeq = dfEntity.index.values - dfEntity.index[0].to_datetime64()
@@ -847,7 +833,8 @@ class FFTbasedGeneralizedAnomalyScore(GeneralizedAnomalyScore):
 
     def feature_extract(self, temperature):
 
-        logger.debug('FFT extract')
+        logger.info('FFT extract')
+
         slices_ = skiutil.view_as_windows(
             temperature, window_shape=(self.windowsize,), step=self.step
         )
