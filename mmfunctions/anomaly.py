@@ -507,7 +507,7 @@ class GeneralizedAnomalyScore(BaseTransformer):
                         + str(self.step) + ", InputSize: " + str(temperature.size)
                         + " failed in the fitting step with \"" + str(ve) + "\" - scoring zero")
 
-                    pred_score = np.zero(slices.shape[0])
+                    pred_score = np.zeros(slices.shape[0])
                     pass
 
                 except Exception as e:
