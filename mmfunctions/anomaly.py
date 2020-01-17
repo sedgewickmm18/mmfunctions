@@ -86,190 +86,6 @@ def set_window_size_and_overlap(windowsize, trim_value=2*DefaultWindowSize):
     return trimmed_ws, ws_overlap
 
 
-class NoDataAnomalyScoreOld(BaseTransformer):
-    '''
-    Employs spectral analysis to extract features from the
-      gaps in time series data and to compute the elliptic envelope from it
-    '''
-    def __init__(self, input_item, windowsize, output_item):
-        super().__init__()
-        logger.debug(input_item)
-        self.input_item = input_item
-
-        # use 24 by default - must be larger than 1
-        self.windowsize, self.windowoverlap = set_window_size_and_overlap(windowsize)
-
-        # assume 1 per sec for now
-        self.frame_rate = 1
-
-        self.output_item = output_item
-
-    def execute(self, df):
-
-        df_copy = df.copy()
-        entities = np.unique(df.index.levels[0])
-        logger.debug(str(entities))
-
-        df_copy[self.output_item] = 0
-        # df_copy.sort_index(level=1)
-        # df_copy.sort_index()   - NoOP
-
-        for entity in entities:
-            # per entity - copy for later inplace operations
-            dfe = df_copy.loc[[entity]].dropna(how='all')
-            dfe_orig = df_copy.loc[[entity]].copy()
-
-            # get rid of entityid part of the index
-            # do it inplace as we copied the data before
-            dfe.reset_index(level=[0], inplace=True)
-            dfe.sort_index(inplace=True)
-            dfe_orig.reset_index(level=[0], inplace=True)
-            dfe_orig.sort_index(inplace=True)
-
-            # minimal time delta for merging
-            mindelta = min_delta(dfe_orig)
-
-            logger.debug('Timedelta:' + str(mindelta))
-
-            # count the timedelta in seconds between two events
-            timeSeq = dfe.index.values - dfe.index[0].to_datetime64()
-            temperature = np.gradient(timeSeq)  # we look at the gradient for anomaly detection
-
-            # interpolate gaps - data imputation
-            dfe[[self.input_item]] = temperature
-            # Size = temperature.size
-            dfe = dfe.interpolate(method='time')
-
-            #   one dimensional time series - named temperature for catchyness
-            # temperature = dfe[[self.input_item]].fillna(0).to_numpy().reshape(-1,)
-
-            logger.debug('Module NoData, Entity: ' + str(entity) + ', Input: ' + str(self.input_item) +
-                         ', Windowsize: ' + str(self.windowsize) + ', Output: ' + str(self.output_item) +
-                         ', Overlap: ' + str(self.windowoverlap) + ', Inputsize: ' + str(temperature.size))
-
-            if temperature.size <= self.windowsize:
-                logger.debug(str(temperature.size) + ' <= ' + str(self.windowsize))
-                # df_copy.loc[[entity]] = 0.0001
-            else:
-                logger.debug('Size:' + str(temperature.size) + ', Windowsize: ' + str(self.windowsize) +
-                             ', Type: ' + str(temperature.dtype))
-                dfe[self.output_item] = 0.0007
-                # Fourier transform:
-                #   frequency, time, spectral density
-                try:
-                    frequency_temperature, time_series_temperature, spectral_density_temperature = signal.spectrogram(
-                        temperature, fs=self.frame_rate, window='hanning',
-                        nperseg=self.windowsize, noverlap=self.windowoverlap,
-                        detrend=False, scaling='spectrum')
-
-                    # cut off freqencies too low to fit into the window
-                    frequency_temperatureb = (frequency_temperature > 2/self.windowsize).astype(int)
-                    frequency_temperature = frequency_temperature * frequency_temperatureb
-                    frequency_temperature[frequency_temperature == 0] = 1 / self.windowsize
-
-                    highfrequency_temperature = frequency_temperature.copy()
-                    lowfrequency_temperature = frequency_temperature.copy()
-                    highfrequency_temperature[highfrequency_temperature <= FrequencySplit] = 0
-                    lowfrequency_temperature[lowfrequency_temperature > FrequencySplit] = 0
-
-                    # Compute energy = frequency * spectral density over time in decibel
-                    lowsignal_energy = np.log10(
-                        np.maximum(SmallEnergy, np.dot(spectral_density_temperature.T, lowfrequency_temperature)))
-                    highsignal_energy = np.log10(
-                        np.maximum(SmallEnergy, np.dot(spectral_density_temperature.T, highfrequency_temperature)))
-
-                    # compute the elliptic envelope to exploit Minimum Covariance Determinant estimates
-                    #    standardizing
-                    low_stddev = lowsignal_energy.std(ddof=0)
-                    high_stddev = highsignal_energy.std(ddof=0)
-
-                    if low_stddev != 0:
-                        lowsignal_energy = (lowsignal_energy - lowsignal_energy.mean())/low_stddev
-                    else:
-                        lowsignal_energy = (lowsignal_energy - lowsignal_energy.mean())
-                    if high_stddev != 0:
-                        highsignal_energy = (highsignal_energy - highsignal_energy.mean())/high_stddev
-                    else:
-                        highsignal_energy = (highsignal_energy - highsignal_energy.mean())
-
-                    twoDimsignal_energy = np.vstack((lowsignal_energy, highsignal_energy)).T
-                    logger.debug('lowsignal_energy: ' + str(lowsignal_energy) + ', highsignal_energy:' +
-                                 str(highsignal_energy) + 'input' + str(twoDimsignal_energy))
-
-                    # inliers have a score of 1, outliers -1, and 0 indicates an issue with the data
-                    dfe[self.output_item] = 0.0002
-                    ellEnv = EllipticEnvelope(random_state=0)
-
-                    dfe[self.output_item] = 0.0003
-                    ellEnv.fit(twoDimsignal_energy)
-
-                    dfe[self.output_item] = 0.0004
-
-                    # compute elliptic envelope
-                    ets_zscore = ellEnv.decision_function(twoDimsignal_energy, raw_values=True).copy()
-                    logger.debug('Spectral z-score max: ' + str(ets_zscore.max()))
-
-                    # length of time_series_temperature, signal_energy and ets_zscore is smaller than half the original
-                    #   extend it to cover the full original length
-                    dfe[self.output_item] = 0.0005
-                    linear_interpolate = sp.interpolate.interp1d(
-                        time_series_temperature, ets_zscore, kind='linear', fill_value='extrapolate')
-
-                    dfe[self.output_item] = 0.0006
-                    zscoreI = linear_interpolate(np.arange(0, temperature.size, 1))
-
-                    dfe[self.output_item] = zscoreI
-
-                except Exception as e:
-                    logger.error('Spectral failed with ' + str(e))
-
-                # absolute zscore > 3 ---> anomaly
-                dfe_orig = pd.merge_asof(
-                            dfe_orig, dfe[self.output_item], left_index=True, right_index=True,
-                            direction='nearest', tolerance=mindelta)
-
-                if self.output_item+'_y' in dfe_orig:
-                    zScoreII = dfe_orig[self.output_item+'_y'].to_numpy()
-                elif self.output_item in dfe_orig:
-                    zScoreII = dfe_orig[self.output_item].to_numpy()
-                else:
-                    zScoreII = dfe_orig[self.input_item].to_numpy()
-
-                idx = pd.IndexSlice
-                df_copy.loc[idx[entity, :], self.output_item] = zScoreII
-
-        msg = 'NoDataAnomalyScore'
-        self.trace_append(msg)
-
-        return (df_copy)
-
-    @classmethod
-    def build_ui(cls):
-
-        # define arguments that behave as function inputs
-        inputs = []
-        inputs.append(UISingleItem(
-                name='input_item',
-                datatype=float,
-                description='Column for feature extraction'
-                                              ))
-
-        inputs.append(UISingle(
-                name='windowsize',
-                datatype=int,
-                description='Window size for no data spectral analysis - default 12'
-                                              ))
-
-        # define arguments that behave as function outputs
-        outputs = []
-        outputs.append(UIFunctionOutSingle(
-                name='output_item',
-                datatype=float,
-                description='No data anomaly score'
-                ))
-        return (inputs, outputs)
-
-
 class SpectralAnomalyScore(BaseTransformer):
     '''
     Employs spectral analysis to extract features from the time series data and to compute zscore from it
@@ -350,10 +166,10 @@ class SpectralAnomalyScore(BaseTransformer):
                     lowfrequency_temperature[lowfrequency_temperature > FrequencySplit] = 0
 
                     # Compute energy = frequency * spectral density over time in decibel
-                    lowsignal_energy = np.log10(
-                        np.maximum(1, np.dot(spectral_density_temperature.T, lowfrequency_temperature)) + 1)
-                    highsignal_energy = np.log10(
-                        np.maximum(1, np.dot(spectral_density_temperature.T, highfrequency_temperature)) + 1)
+                    lowsignal_energy = np.log10(np.maximum(SmallEnergy, np.dot(spectral_density_temperature.T,
+                                                lowfrequency_temperature)) + SmallEnergy)
+                    highsignal_energy = np.log10(np.maximum(SmallEnergy, np.dot(spectral_density_temperature.T,
+                                                 highfrequency_temperature)) + SmallEnergy)
 
                     # compute the elliptic envelope to exploit Minimum Covariance Determinant estimates
                     #    standardizing
@@ -591,7 +407,7 @@ class KMeansAnomalyScore(BaseTransformer):
 
 class GeneralizedAnomalyScore(BaseTransformer):
     """
-    Employs GAM on windowed time series data and to compute an anomaly score from proximity to centroid's center points
+    Employs GAM on windowed time series data to compute an anomaly score from the covariance matrix
     """
 
     def __init__(self, input_item, windowsize, output_item):
@@ -689,56 +505,10 @@ class GeneralizedAnomalyScore(BaseTransformer):
                         + str(entity) + ", Input: " + str(self.input_item) + ", WindowSize: "
                         + str(self.windowsize) + ", Output: " + str(self.output_item) + ", Step: "
                         + str(self.step) + ", InputSize: " + str(temperature.size)
-                        + " failed in the fitting step with \"" + str(ve) + "\" - trying KMeans")
+                        + " failed in the fitting step with \"" + str(ve) + "\" - scoring zero")
 
-                    if self.windowsize > 1:
-                        n_clus = 40
-                    else:
-                        n_clus = 20
-
-                    n_clus = np.minimum(n_clus, slices.shape[0] // 2)
-
-                    logger.debug('FFT -> KMeans parms, Clusters: ' + str(n_clus) + ', Slices: ' + str(slices.shape) +
-                                 ',' + str(slices.size))
-
-                    cblofwin = CBLOF(n_clusters=n_clus, n_jobs=-1)
-
-                    try:
-                        cblofwin.fit(slices)
-
-                        pred_score = cblofwin.decision_scores_.copy()
-
-                    except Exception as ke:
-                        logger.info('KMeans failed with ' + str(ke))
-                        self.trace_append('KMeans failed with' + str(ke))
-                        continue
-
-                except Exception as ee:
-                        logger.info('GAM failed with ' + str(ee))
-                        continue
-
-                try:
-                    # will break if pred_score is None
-                    # length of timesTS, ETS and ets_zscore is smaller than half the original
-                    #   extend it to cover the full original length
-                    timesTS = np.linspace(
-                        self.windowsize // 2,
-                        temperature.size - self.windowsize // 2 + 1,
-                        temperature.size - self.windowsize + 1,
-                    )
-
-                    logger.debug('GAM:  Entity: ' + str(entity) + ', result shape: ' + str(timesTS.shape) +
-                                 ' score shape: ' + str(pred_score.shape))
-
-                    # timesI = np.linspace(0, Size - 1, Size)
-                    linear_interpolateK = sp.interpolate.interp1d(
-                        timesTS, pred_score, kind="linear", fill_value="extrapolate"
-                    )
-
-                    # kmeans_scoreI = np.interp(timesI, timesTS, pred_score)
-                    gam_scoreI = linear_interpolateK(np.arange(0, temperature.size, 1))
-
-                    dfe[self.output_item] = gam_scoreI
+                    pred_score = np.zero(slices.shape[0])
+                    pass
 
                 except Exception as e:
 
@@ -749,6 +519,29 @@ class GeneralizedAnomalyScore(BaseTransformer):
                         + str(self.windowsize) + ", Output: " + str(self.output_item) + ", Step: "
                         + str(self.step) + ", InputSize: " + str(temperature.size)
                         + " failed in the fitting step with " + str(e))
+                    continue
+
+                # will break if pred_score is None
+                # length of timesTS, ETS and ets_zscore is smaller than half the original
+                #   extend it to cover the full original length
+                timesTS = np.linspace(
+                    self.windowsize // 2,
+                    temperature.size - self.windowsize // 2 + 1,
+                    temperature.size - self.windowsize + 1,
+                )
+
+                logger.debug('GAM:  Entity: ' + str(entity) + ', result shape: ' + str(timesTS.shape) +
+                             ' score shape: ' + str(pred_score.shape))
+
+                # timesI = np.linspace(0, Size - 1, Size)
+                linear_interpolateK = sp.interpolate.interp1d(
+                    timesTS, pred_score, kind="linear", fill_value="extrapolate"
+                )
+
+                # kmeans_scoreI = np.interp(timesI, timesTS, pred_score)
+                gam_scoreI = linear_interpolateK(np.arange(0, temperature.size, 1))
+
+                dfe[self.output_item] = gam_scoreI
 
                 # absolute kmeans_score > 1000 ---> anomaly
 
@@ -870,7 +663,7 @@ class NoDataAnomalyScore(GeneralizedAnomalyScore):
 
 class FFTbasedGeneralizedAnomalyScore(GeneralizedAnomalyScore):
     """
-    Employs GAM on windowed time series data and to compute an anomaly score from proximity to centroid's center points
+    Employs FFT and GAM on windowed time series data to compute an anomaly score from the covariance matrix
     """
 
     def __init__(self, input_item, windowsize, output_item):
