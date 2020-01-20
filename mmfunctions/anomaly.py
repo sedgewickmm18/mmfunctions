@@ -176,15 +176,15 @@ class SpectralAnomalyScore(BaseTransformer):
                     low_stddev = lowsignal_energy.std(ddof=0)
                     high_stddev = highsignal_energy.std(ddof=0)
 
-                    if low_stddev != 0:
-                        lowsignal_energy = (lowsignal_energy - lowsignal_energy.mean())/low_stddev
-                    else:
-                        lowsignal_energy = (lowsignal_energy - lowsignal_energy.mean())
+                    # if low_stddev != 0:
+                    #     lowsignal_energy = (lowsignal_energy - lowsignal_energy.mean())/low_stddev
+                    # else:
+                    lowsignal_energy = (lowsignal_energy - lowsignal_energy.mean())
 
-                    if high_stddev != 0:
-                        highsignal_energy = (highsignal_energy - highsignal_energy.mean())/high_stddev
-                    else:
-                        highsignal_energy = (highsignal_energy - highsignal_energy.mean())
+                    #if high_stddev != 0:
+                    #     highsignal_energy = (highsignal_energy - highsignal_energy.mean())/high_stddev
+                    # else:
+                    highsignal_energy = (highsignal_energy - highsignal_energy.mean())
 
                     twoDimsignal_energy = np.vstack((lowsignal_energy, highsignal_energy)).T
                     logger.debug('lowsignal_energy: ' + str(lowsignal_energy.shape) + ', highsignal_energy:' +
