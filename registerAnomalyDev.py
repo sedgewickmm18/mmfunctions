@@ -49,7 +49,7 @@ credentials = {
 EngineLogging.configure_console_logging(logging.DEBUG)
 
 '''
-The db_schema is the db2_schema name for your client database. If 
+The db_schema is the db2_schema name for your client database. If
 you are using the default schema of your user, there is no need to
 provide a schema.
 '''
@@ -101,10 +101,11 @@ EngineLogging.configure_console_logging(logging.DEBUG)
 
 #db.register_module(functions)
 
-db.register_functions([anomaly.SpectralAnomalyScore])
-db.register_functions([anomaly.KMeansAnomalyScore])
-db.register_functions([anomaly.NoDataAnomalyScore])
-db.register_functions([anomaly.SimpleAnomaly])
-db.register_functions([anomaly.SimpleRegressor])
+#db.register_functions([anomaly.SpectralAnomalyScore])
+#db.register_functions([anomaly.KMeansAnomalyScore])
+#db.register_functions([anomaly.NoDataAnomalyScore])
+#db.register_functions([anomaly.SimpleAnomaly])
+db.register_functions([anomaly.GeneralizedAnomalyScore2])
+db.register_functions([anomaly.FFTbasedGeneralizedAnomalyScore2])
 
 
