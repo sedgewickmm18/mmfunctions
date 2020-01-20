@@ -3,24 +3,14 @@ import datetime as dt
 import sys
 import logging
 import json
-import pandas as pd
-import numpy as np
-from scipy import stats
-from sqlalchemy import Column, Integer, String, Float, DateTime, Boolean, func
-#from iotfunctions.base import BaseTransformer,BaseSimpleAggregator
-#from iotfunctions.bif import SimpleAnomaly
-#from iotfunctions.metadata import EntityType
 from iotfunctions.db import Database
-from iotfunctions import bif
 from mmfunctions import anomaly
-#from iotfunctions import ui
 from iotfunctions.enginelog import EngineLogging
-from mmfunctions import functions
 
-PACKAGE_URL= "https://github.com/sedgewickmm18/mmfunctions"
+PACKAGE_URL = "https://github.com/sedgewickmm18/mmfunctions"
 
 credentials = {
-  "tenantId":"Monitor-Demo",
+  "tenantId" : "Monitor-Demo",
   "db2":{
     "username":"bluadmin",
     "password":"MjZkZTEwN2FjMWY1",
@@ -88,24 +78,6 @@ EngineLogging.configure_console_logging(logging.DEBUG)
 #with open('credentials_as_dev.json', encoding='utf-8') as F:
 #    credentials = json.loads(F.read())
 
-#fn = AggregateItemStats(
-#        input_item_1='x1',
-#        input_item_2='x2',
-#        output_item='y')
-
-#df = fn.execute_local_test(generate_days=1,to_csv=True)
-#print(df)
-
-
-#cols = [
-#    Column('string_1', String(255))
-#        ]
-
-#df = fn.execute_local_test(generate_days = 1,to_csv=True,
-#                           columns = cols)
-
-#db.register_functions([functions.AggregateItemStats])
-
 #db.register_module(functions)
 
 #db.register_functions([anomaly.SpectralAnomalyScore])
@@ -113,7 +85,5 @@ EngineLogging.configure_console_logging(logging.DEBUG)
 #db.register_functions([anomaly.NoDataAnomalyScoreNew])
 #db.register_functions([anomaly.SimpleAnomaly])
 #db.register_functions([anomaly.SimpleRegressor])
-db.register_functions([anomaly.GeneralizedAnomalyScore2])
-db.register_functions([anomaly.FFTbasedGeneralizedAnomalyScore2])
-
+db.register_functions([anomaly.SaliencybasedGeneralizedAnomalyScore])
 

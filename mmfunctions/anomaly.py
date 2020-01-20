@@ -86,6 +86,90 @@ def set_window_size_and_overlap(windowsize, trim_value=2*DefaultWindowSize):
     return trimmed_ws, ws_overlap
 
 
+# Saliency helper functions
+# copied from https://github.com/y-bar/ml-based-anomaly-detection
+#   remove the boring part from an image resp. time series
+def series_filter(values, kernel_size=3):
+    """
+    Filter a time series. Practically, calculated mean value inside kernel size.
+    As math formula, see https://docs.opencv.org/2.4/modules/imgproc/doc/filtering.html.
+    :param values:
+    :param kernel_size:
+    :return: The list of filtered average
+    """
+    filter_values = np.cumsum(values, dtype=float)
+
+    filter_values[kernel_size:] = filter_values[kernel_size:] - filter_values[:-kernel_size]
+    filter_values[kernel_size:] = filter_values[kernel_size:] / kernel_size
+
+    for i in range(1, kernel_size):
+        filter_values[i] /= i + 1
+
+    return filter_values
+
+
+def extrapolate_next(values):
+    """
+    Extrapolates the next value by sum up the slope of the last value with previous values.
+    :param values: a list or numpy array of time-series
+    :return: the next value of time-series
+    """
+
+    last_value = values[-1]
+    slope = [(last_value - v) / i for (i, v) in enumerate(values[::-1])]
+    slope[0] = 0
+    next_values = last_value + np.cumsum(slope)
+
+    return next_values
+
+
+def marge_series(values, extend_num=5, forward=5):
+
+    next_value = extrapolate_next(values)[forward]
+    extension = [next_value] * extend_num
+
+    if isinstance(values, list):
+        marge_values = values + extension
+    else:
+        marge_values = np.append(values, extension)
+    return marge_values
+
+
+# Saliency class
+#  see https://www.inf.uni-hamburg.de/en/inst/ab/cv/research/research1-visual-attention.html
+class Saliency(object):
+    def __init__(self, amp_window_size, series_window_size, score_window_size):
+        self.amp_window_size = amp_window_size
+        self.series_window_size = series_window_size
+        self.score_window_size = score_window_size
+
+    def transform_saliency_map(self, values):
+        """
+        Transform a time-series into spectral residual, which is method in computer vision.
+        For example, See https://docs.opencv.org/master/d8/d65/group__saliency.html
+        :param values: a list or numpy array of float values.
+        :return: silency map and spectral residual
+        """
+
+        freq = np.fft.fft(values)
+        mag = np.sqrt(freq.real ** 2 + freq.imag ** 2)
+
+        # remove the boring part of a timeseries
+        spectral_residual = np.exp(np.log(mag) - series_filter(np.log(mag), self.amp_window_size))
+
+        freq.real = freq.real * spectral_residual / mag
+        freq.imag = freq.imag * spectral_residual / mag
+
+        # and apply inverse fourier transform
+        saliency_map = np.fft.ifft(freq)
+        return saliency_map
+
+    def transform_spectral_residual(self, values):
+        saliency_map = self.transform_saliency_map(values)
+        spectral_residual = np.sqrt(saliency_map.real ** 2 + saliency_map.imag ** 2)
+        return spectral_residual
+
+
 class SpectralAnomalyScore(BaseTransformer):
     '''
     Employs spectral analysis to extract features from the time series data and to compute zscore from it
@@ -173,15 +257,15 @@ class SpectralAnomalyScore(BaseTransformer):
 
                     # compute the elliptic envelope to exploit Minimum Covariance Determinant estimates
                     #    standardizing
-                    low_stddev = lowsignal_energy.std(ddof=0)
-                    high_stddev = highsignal_energy.std(ddof=0)
+                    # low_stddev = lowsignal_energy.std(ddof=0)
+                    # high_stddev = highsignal_energy.std(ddof=0)
 
                     # if low_stddev != 0:
                     #     lowsignal_energy = (lowsignal_energy - lowsignal_energy.mean())/low_stddev
                     # else:
                     lowsignal_energy = (lowsignal_energy - lowsignal_energy.mean())
 
-                    #if high_stddev != 0:
+                    # if high_stddev != 0:
                     #     highsignal_energy = (highsignal_energy - highsignal_energy.mean())/high_stddev
                     # else:
                     highsignal_energy = (highsignal_energy - highsignal_energy.mean())
@@ -713,6 +797,67 @@ class FFTbasedGeneralizedAnomalyScore(GeneralizedAnomalyScore):
                 name="windowsize",
                 datatype=int,
                 description="Window size for FFT feature based Generalized Anomaly analysis - default 12",
+            )
+        )
+
+        # define arguments that behave as function outputs
+        outputs = []
+        outputs.append(
+            UIFunctionOutSingle(
+                name="output_item",
+                datatype=float,
+                description="Anomaly score (FFTbasedGeneralizedAnomalyScore)",
+            )
+        )
+        return (inputs, outputs)
+
+
+class SaliencybasedGeneralizedAnomalyScore(GeneralizedAnomalyScore):
+    """
+    Employs Saliency and GAM on windowed time series data to compute an anomaly score from the covariance matrix
+    """
+
+    def __init__(self, input_item, windowsize, output_item):
+        super().__init__(input_item, windowsize, output_item)
+        self.whoami = 'Saliency'
+        self.saliency = Saliency(windowsize, 0, 0)
+        logger.debug('Saliency')
+
+    def feature_extract(self, temperature):
+
+        logger.debug(self.whoami + ': feature extract')
+
+        temperature_saliency = self.saliency.transform_spectral_residual(temperature)
+
+        slices = skiutil.view_as_windows(
+            temperature_saliency, window_shape=(self.windowsize,), step=self.step
+        )
+        return slices
+
+    def execute(self, df):
+        df_copy = super().execute(df)
+
+        msg = "SaliencybasedGeneralizedAnomalyScore"
+        self.trace_append(msg)
+        return df_copy
+
+    @classmethod
+    def build_ui(cls):
+        # define arguments that behave as function inputs
+        inputs = []
+        inputs.append(
+            UISingleItem(
+                name="input_item",
+                datatype=float,
+                description="Column for feature extraction",
+            )
+        )
+
+        inputs.append(
+            UISingle(
+                name="windowsize",
+                datatype=int,
+                description="Window size for Saliency feature based Generalized Anomaly analysis - default 12",
             )
         )
 
