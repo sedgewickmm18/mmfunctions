@@ -330,15 +330,15 @@ class KMeansAnomalyScore(BaseTransformer):
                 slices = skiutil.view_as_windows(temperature, window_shape=(self.windowsize,), step=self.step)
 
                 if self.windowsize > 1:
-                    n_clus = 40
+                    n_cluster = 40
                 else:
-                    n_clus = 20
+                    n_cluster = 20
 
-                n_clus = np.minimum(n_clus, slices.shape[0] // 2)
+                n_cluster = np.minimum(n_cluster, slices.shape[0] // 2)
 
-                logger.debug('KMeans parms, Clusters: ' + str(n_clus) + ', Slices: ' + str(slices.shape))
+                logger.debug('KMeans parms, Clusters: ' + str(n_cluster) + ', Slices: ' + str(slices.shape))
 
-                cblofwin = CBLOF(n_clusters=n_clus, n_jobs=-1)
+                cblofwin = CBLOF(n_clusters=n_cluster, n_jobs=-1)
                 try:
                     cblofwin.fit(slices)
                 except Exception as e:
