@@ -227,6 +227,7 @@ class SpectralAnomalyScore(BaseTransformer):
             if temperature.size <= self.windowsize:
                 logger.debug(str(temperature.size) + ' <= ' + str(self.windowsize))
                 # df_copy.loc[[entity]] = 0.0001
+                dfe[self.output_item] = 0.0001
             else:
                 logger.debug(str(temperature.size) + str(self.windowsize))
 
@@ -254,6 +255,9 @@ class SpectralAnomalyScore(BaseTransformer):
                                                 lowfrequency_temperature)) + SmallEnergy)
                     highsignal_energy = np.log10(np.maximum(SmallEnergy, np.dot(spectral_density_temperature.T,
                                                  highfrequency_temperature)) + SmallEnergy)
+
+                    lowsignal_energy = np.dot(spectral_density_temperature.T, lowfrequency_temperature)
+                    highsignal_energy = np.dot(spectral_density_temperature.T, highfrequency_temperature)
 
                     # compute the elliptic envelope to exploit Minimum Covariance Determinant estimates
                     #    standardizing
@@ -287,7 +291,7 @@ class SpectralAnomalyScore(BaseTransformer):
                     # ets_zscore = ellEnv.decision_function(twoDimsignal_energy, raw_values=True).copy()
                     ets_zscore = ellEnv.decision_function(twoDimsignal_energy).copy()
 
-                    logger.debug('Spectral z-score max: ' + str(ets_zscore.max()))
+                    logger.debug('Spectral z-score max: ' + str(ets_zscore.max()) + ', min: ' + str(ets_zscore.min()))
 
                     # length of time_series_temperature, signal_energy and ets_zscore is smaller than half the original
                     #   extend it to cover the full original length
