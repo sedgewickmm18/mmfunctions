@@ -289,9 +289,9 @@ class SpectralAnomalyScore(BaseTransformer):
                     dfe[self.output_item] = 0.0004
 
                     # ets_zscore = ellEnv.decision_function(twoDimsignal_energy, raw_values=True).copy()
-                    ets_zscore = ellEnv.decision_function(twoDimsignal_energy).copy()
+                    ets_zscore = np.maximum(ellEnv.decision_function(twoDimsignal_energy).copy(), -0.1)
 
-                    logger.debug('Spectral z-score max: ' + str(ets_zscore.max()) + ', min: ' + str(ets_zscore.min()))
+                    logger.debug('Spectral z-score max: ' + str(ets_zscore.max()))
 
                     # length of time_series_temperature, signal_energy and ets_zscore is smaller than half the original
                     #   extend it to cover the full original length
