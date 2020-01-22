@@ -288,8 +288,8 @@ class SpectralAnomalyScore(BaseTransformer):
                     # compute distance to elliptic envelope
                     dfe[self.output_item] = 0.0004
 
-                    # ets_zscore = ellEnv.decision_function(twoDimsignal_energy, raw_values=True).copy()
-                    ets_zscore = np.maximum(ellEnv.decision_function(twoDimsignal_energy).copy(), -0.1)
+                    #ets_zscore = np.maximum(ellEnv.decision_function(twoDimsignal_energy).copy(), -0.1)
+                    ets_zscore = ellEnv.decision_function(twoDimsignal_energy).copy()
 
                     logger.debug('Spectral z-score max: ' + str(ets_zscore.max()))
 
