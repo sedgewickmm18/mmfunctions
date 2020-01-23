@@ -899,13 +899,18 @@ class SimpleAnomaly(BaseRegressor):
 
     def execute(self, df):
 
-        df = super().execute(df)
-        for i, t in enumerate(self.targets):
-            prediction = self.predictions[i]
-            df['_diff_'] = (df[t] - df[prediction]).abs()
-            alert = AlertHighValue(input_item='_diff_', upper_threshold=self.threshold, alert_name=self.alerts[i])
-            alert.set_entity_type(self.get_entity_type())
-            df = alert.execute(df)
+        try:
+            df_new = super().execute(df)
+            df = df_new
+            for i, t in enumerate(self.targets):
+                prediction = self.predictions[i]
+                df['_diff_'] = (df[t] - df[prediction]).abs()
+                alert = AlertHighValue(input_item='_diff_', upper_threshold=self.threshold, alert_name=self.alerts[i])
+                alert.set_entity_type(self.get_entity_type())
+                df = alert.execute(df)
+        except Exception as e:
+            logger.info('Simple Anomaly failed with: ' + str(e))
+            pass
 
         return df
 
