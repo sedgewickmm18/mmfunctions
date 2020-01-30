@@ -263,7 +263,7 @@ class SpectralAnomalyScore(BaseTransformer):
                     # compute distance to elliptic envelope
                     dfe[self.output_item] = 0.0004
 
-                    #ets_zscore = np.maximum(ellEnv.decision_function(twoDimsignal_energy).copy(), -0.1)
+                    # ets_zscore = np.maximum(ellEnv.decision_function(twoDimsignal_energy).copy(), -0.1)
                     ets_zscore = ellEnv.decision_function(twoDimsignal_energy).copy()
 
                     logger.debug('Spectral z-score max: ' + str(ets_zscore.max()))
@@ -685,12 +685,18 @@ class NoDataAnomalyScore(GeneralizedAnomalyScore):
         # count the timedelta in seconds between two events
         timeSeq = (dfEntity.index.values - dfEntity.index[0].to_datetime64()) / np.timedelta64(1, 's')
 
+        dfe = dfEntity.copy()
+
         # one dimensional time series - named temperature for catchyness
         #   we look at the gradient of the time series timestamps for anomaly detection
-        temperature = np.gradient(timeSeq)
-
-        dfe = dfEntity.copy()
-        dfe[[self.input_item]] = temperature
+        #   might throw an exception - we catch it in the super class !!
+        try:
+            temperature = np.gradient(timeSeq)
+            dfe[[self.input_item]] = temperature
+        except Exception as pe:
+            logger.info("NoData Gradient failed with " + str(pe))
+            dfe[[self.input_input]] = 30000
+            pass
 
         return dfe, temperature
 
