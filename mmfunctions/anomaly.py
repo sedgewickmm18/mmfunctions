@@ -696,6 +696,7 @@ class NoDataAnomalyScore(GeneralizedAnomalyScore):
         except Exception as pe:
             logger.info("NoData Gradient failed with " + str(pe))
             dfe[[self.input_item]] = 30000
+            temperature = dfe[[self.input_item]].values
             pass
 
         return dfe, temperature
