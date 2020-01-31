@@ -12,6 +12,8 @@
 The Built In Functions module contains preinstalled functions
 '''
 
+from collections import OrderedDict
+import re
 import datetime as dt
 import numpy as np
 import scipy as sp
@@ -33,9 +35,10 @@ import logging
 # import warnings
 # import json
 # from sqlalchemy import Column, Integer, String, Float, DateTime, Boolean, func
-from iotfunctions.base import (BaseTransformer, BaseRegressor)
+from iotfunctions.base import (BaseTransformer, BaseRegressor, BaseEvent)
 from iotfunctions.bif import (AlertHighValue)
-from iotfunctions.ui import (UISingle, UIMultiItem, UIFunctionOutSingle, UISingleItem, UIFunctionOutMulti)
+from iotfunctions.ui import (UISingle, UIMultiItem, UIFunctionOutSingle, UISingleItem, UIFunctionOutMulti,
+                             UIExpression)
 
 logger = logging.getLogger(__name__)
 PACKAGE_URL = 'git+https://github.com/sedgewickmm18/mmfunctions.git@'
@@ -858,6 +861,87 @@ class SaliencybasedGeneralizedAnomalyScore(GeneralizedAnomalyScore):
             )
         )
         return (inputs, outputs)
+
+#######################################################################################
+
+
+class AlertExpressionWithFilter(BaseEvent):
+    '''
+    Create alerts that are triggered when data values the expression is True
+    '''
+
+    def __init__(self, expression, dimension_name, alert_name, **kwargs):
+        self.dimension_name = dimension_name
+        self.expression = expression
+        self.alert_name = alert_name
+        super().__init__()
+
+    def _calc(self, df):
+        '''
+        unused
+        '''
+        return df
+
+    def execute(self, df):
+        # c = self._entity_type.get_attributes_dict()
+        df = df.copy()
+        print (df.columns)
+
+        expr = self.expression
+        if '${}' in expr:
+            expr.replace("${}", "df['" + self.dimension_name + "']")
+
+        if '${' in expr:
+            expr = re.sub(r"\$\{(\w+)\}", r"df['\1']", expr)
+            msg = 'Expression converted to %s. ' % expr
+        else:
+            msg = 'Expression (%s). ' % expr
+
+        self.trace_append(msg)
+        df[self.alert_name] = np.where(eval(expr), True, None)
+        return df
+
+    def get_input_items(self):
+        items = self.get_expression_items(self.expression)
+        return items
+
+    @classmethod
+    def build_ui(cls):
+        # define arguments that behave as function inputs
+        inputs = []
+        inputs.append(UISingleItem(name='dimension_name', datatype=str))
+        inputs.append(UIExpression(name='expression',
+                                   description="Define alert expression using pandas systax. \
+                                                Example: df['inlet_temperature']>50. ${pressure} \
+                                                will be substituted with df['pressure'] before evaluation"))
+        # define arguments that behave as function outputs
+        outputs = []
+        outputs.append(UIFunctionOutSingle(name='alert_name', datatype=bool, description='Output of alert function'))
+        return (inputs, outputs)
+
+#######################################################################################
+
+
+class LSTMPredictor(BaseTransformer):
+    '''
+    Sample function uses a regression model based on a stacked LSTM to predict the value
+    of one output variable. It compares the actual value to the smoothed prediction and
+    generates an alert following a non-parametric adaptive approach evaluating the
+    difference between the actual and predicted value.
+    '''
+    def __init__(self, features, targets, predictions):
+        self.features = features
+        self.targets = targets
+        # Name predictions based on targets if predictions is None
+        if predictions is None:
+            predictions = ['predicted_%s' % x for x in self.targets]
+        self.predictions = predictions
+        super().__init__()
+        self._preprocessors = OrderedDict()
+        self.estimators = OrderedDict()
+
+
+#######################################################################################
 
 
 class SimpleAnomaly(BaseRegressor):
