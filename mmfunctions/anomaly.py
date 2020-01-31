@@ -874,6 +874,8 @@ class AlertExpressionWithFilter(BaseEvent):
         self.dimension_name = dimension_name
         self.expression = expression
         self.alert_name = alert_name
+        logger.info('AlertExpressionWithFilter  dim: ' + dimension_name + '  exp: ' + expression + '  alert: ' +
+                    alert_name)
         super().__init__()
 
     def _calc(self, df):
@@ -885,7 +887,7 @@ class AlertExpressionWithFilter(BaseEvent):
     def execute(self, df):
         # c = self._entity_type.get_attributes_dict()
         df = df.copy()
-        print(df.columns)
+        logger.info('AlertExpressionWithFilter  exp: ' + self.expression + '  input: ' + str(df.columns))
 
         expr = self.expression
         if '${}' in expr:
@@ -898,23 +900,26 @@ class AlertExpressionWithFilter(BaseEvent):
             msg = 'Expression (%s). ' % expr
 
         self.trace_append(msg)
+
+        logger.info('AlertExpressionWithFilter  regexp: ' + expr)
+
         df[self.alert_name] = np.where(eval(expr), True, None)
         return df
 
     def get_input_items(self):
         items = self.get_expression_items(self.expression)
+        items = self.dimension_name | items
         return items
 
     @classmethod
     def build_ui(cls):
         # define arguments that behave as function inputs
         inputs = []
+        inputs.append(UISingleItem(name='dimension_name', datatype=str))
         inputs.append(UIExpression(name='expression',
                                    description="Define alert expression using pandas systax. \
                                                 Example: df['inlet_temperature']>50. ${pressure} \
                                                 will be substituted with df['pressure'] before evaluation"))
-
-        inputs.append(UISingleItem(name='dimension_name', datatype=str))
 
         # define arguments that behave as function outputs
         outputs = []
