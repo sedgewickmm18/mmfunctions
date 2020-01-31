@@ -891,7 +891,7 @@ class AlertExpressionWithFilter(BaseEvent):
 
         expr = self.expression
         if '${}' in expr:
-            expr.replace("${}", "df['" + self.dimension_name + "']")
+            expr = expr.replace("${}", "df['" + self.dimension_name + "']")
 
         if '${' in expr:
             expr = re.sub(r"\$\{(\w+)\}", r"df['\1']", expr)
@@ -903,7 +903,13 @@ class AlertExpressionWithFilter(BaseEvent):
 
         logger.info('AlertExpressionWithFilter  regexp: ' + expr)
 
-        df[self.alert_name] = np.where(eval(expr), True, None)
+        try:
+            df[self.alert_name] = np.where(eval(expr), True, None)
+        except Exception as e:
+            logger.info('AlertExpressionWithFilter  eval failed with ' + str(e))
+            df[self.alert_name] = False
+            pass
+
         return df
 
     def get_input_items(self):
@@ -918,8 +924,8 @@ class AlertExpressionWithFilter(BaseEvent):
         inputs.append(UISingleItem(name='dimension_name', datatype=str))
         inputs.append(UIExpression(name='expression',
                                    description="Define alert expression using pandas systax. \
-                                                Example: df['inlet_temperature']>50. ${pressure} \
-                                                will be substituted with df['pressure'] before evaluation"))
+                                                Example: df['inlet_temperature']>50. ${pressure} will be substituted \
+                                                with df['pressure'] before evaluation, ${} with df[<dimension_name>]"))
 
         # define arguments that behave as function outputs
         outputs = []
