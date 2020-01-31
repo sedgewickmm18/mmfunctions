@@ -885,7 +885,7 @@ class AlertExpressionWithFilter(BaseEvent):
     def execute(self, df):
         # c = self._entity_type.get_attributes_dict()
         df = df.copy()
-        print (df.columns)
+        print(df.columns)
 
         expr = self.expression
         if '${}' in expr:
@@ -909,11 +909,13 @@ class AlertExpressionWithFilter(BaseEvent):
     def build_ui(cls):
         # define arguments that behave as function inputs
         inputs = []
-        inputs.append(UISingleItem(name='dimension_name', datatype=str))
         inputs.append(UIExpression(name='expression',
                                    description="Define alert expression using pandas systax. \
                                                 Example: df['inlet_temperature']>50. ${pressure} \
                                                 will be substituted with df['pressure'] before evaluation"))
+
+        inputs.append(UISingleItem(name='dimension_name', datatype=str))
+
         # define arguments that behave as function outputs
         outputs = []
         outputs.append(UIFunctionOutSingle(name='alert_name', datatype=bool, description='Output of alert function'))
