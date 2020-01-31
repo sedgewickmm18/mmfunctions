@@ -907,8 +907,8 @@ class AlertExpressionWithFilter(BaseEvent):
         return df
 
     def get_input_items(self):
-        items = self.get_expression_items(self.expression)
-        items = self.dimension_name | items
+        items = set(self.dimension_name)
+        items = items | self.get_expression_items(self.expression)
         return items
 
     @classmethod
