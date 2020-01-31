@@ -906,8 +906,8 @@ class AlertExpressionWithFilter(BaseEvent):
         logger.info('AlertExpressionWithFilter  regexp: ' + expr)
 
         try:
-            n1 = np.where(df[self.dimension_name] == self.dimension_value, True, False)
-            n2 = np.where(eval(expr), True, False)
+            n1 = np.where(eval(str(expr)), True, False)
+            n2 = np.where(df[self.dimension_name] == self.dimension_value, True, False)
             np_res = np.logical_and(n1, n2)
             logger.info('AlertExpressionWithFilter  shapes ' + n1.shape + ' ' + n2.shape + ' ' + np_res +
                         '  results\n - ' + str(n1) + '\n - ' + str(n2) + '\n - ' + str(np_res))
