@@ -908,8 +908,12 @@ class AlertExpressionWithFilter(BaseEvent):
         expr = "df['PRESSURE'] > 10"
 
         try:
-            n1 = np.where(eval(expr), True, False)
+            evl = eval(expr)
+            logger.info('HHHHHHH')
+            n1 = np.where(evl, True, False)
+            logger.info('IIIIIII')
             n2 = np.where(df[self.dimension_name] == self.dimension_value, True, False)
+            logger.info('JJJJJJJ')
             np_res = np.logical_and(n1, n2)
             logger.info('AlertExpressionWithFilter  shapes ' + n1.shape + ' ' + n2.shape + ' ' + np_res +
                         '  results\n - ' + str(n1) + '\n - ' + str(n2) + '\n - ' + str(np_res))
