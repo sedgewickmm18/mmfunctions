@@ -891,14 +891,12 @@ class AlertExpressionWithFilter(BaseEvent):
         logger.info('AlertExpressionWithFilter  exp: ' + self.expression + '  input: ' + str(df.columns))
 
         expr = self.expression
-        if 'df[' in expr:
-            expr = expr.replace("df[", "df_filtered[")
 
         if '${}' in expr:
-            expr = expr.replace("${}", "df_filtered['" + self.dimension_name + "']")
+            expr = expr.replace("${}", "df['" + self.dimension_name + "']")
 
         if '${' in expr:
-            expr = re.sub(r"\$\{(\w+)\}", r"df_filtered['\1']", expr)
+            expr = re.sub(r"\$\{(\w+)\}", r"df['\1']", expr)
             msg = 'Expression converted to %s. ' % expr
         else:
             msg = 'Expression (%s). ' % expr
@@ -908,9 +906,8 @@ class AlertExpressionWithFilter(BaseEvent):
         logger.info('AlertExpressionWithFilter  regexp: ' + expr)
 
         try:
-            df[self.alert_name] = None
-            df_filtered = df.query(str(self.dimension_name) + '=='  + str(self.dimension_value), inplace=True)
-            df_filtered[self.alert_name] = np.where(eval(expr), True, False)
+            df[self.alert_name] = np.where(df[self.dimension_name] == self.dimension_value, True, False)
+            df[self.alert_name] = df[self.alert_name] & np.where(eval(expr), True, False)
 
         except Exception as e:
             logger.info('AlertExpressionWithFilter  eval failed with ' + str(e))
