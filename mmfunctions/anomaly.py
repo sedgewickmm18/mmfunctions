@@ -905,6 +905,7 @@ class AlertExpressionWithFilter(BaseEvent):
 
         expr = str(expr)
         logger.info('AlertExpressionWithFilter  - after regexp: ' + expr)
+        expr = "df['PRESSURE'] > 10"
 
         try:
             n1 = np.where(eval(expr), True, False)
