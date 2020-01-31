@@ -892,8 +892,8 @@ class AlertExpressionWithFilter(BaseEvent):
 
         expr = self.expression
 
-        if '${}' in expr:
-            expr = expr.replace("${}", "df['" + self.dimension_name + "']")
+        # if '${}' in expr:
+        #    expr = expr.replace("${}", "df['" + self.dimension_name + "']")
 
         if '${' in expr:
             expr = re.sub(r"\$\{(\w+)\}", r"df['\1']", expr)
