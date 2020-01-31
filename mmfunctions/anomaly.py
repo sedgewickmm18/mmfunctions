@@ -870,8 +870,9 @@ class AlertExpressionWithFilter(BaseEvent):
     Create alerts that are triggered when data values the expression is True
     '''
 
-    def __init__(self, expression, dimension_name, alert_name, **kwargs):
+    def __init__(self, expression, dimension_name, dimension_value, alert_name, **kwargs):
         self.dimension_name = dimension_name
+        self.dimension_value = dimension_value
         self.expression = expression
         self.alert_name = alert_name
         logger.info('AlertExpressionWithFilter  dim: ' + dimension_name + '  exp: ' + expression + '  alert: ' +
@@ -890,11 +891,14 @@ class AlertExpressionWithFilter(BaseEvent):
         logger.info('AlertExpressionWithFilter  exp: ' + self.expression + '  input: ' + str(df.columns))
 
         expr = self.expression
+        if 'df[' in expr:
+            expr = expr.replace("df[", "df_filtered[")
+
         if '${}' in expr:
-            expr = expr.replace("${}", "df['" + self.dimension_name + "']")
+            expr = expr.replace("${}", "df_filtered['" + self.dimension_name + "']")
 
         if '${' in expr:
-            expr = re.sub(r"\$\{(\w+)\}", r"df['\1']", expr)
+            expr = re.sub(r"\$\{(\w+)\}", r"df_filtered['\1']", expr)
             msg = 'Expression converted to %s. ' % expr
         else:
             msg = 'Expression (%s). ' % expr
@@ -904,10 +908,13 @@ class AlertExpressionWithFilter(BaseEvent):
         logger.info('AlertExpressionWithFilter  regexp: ' + expr)
 
         try:
-            df[self.alert_name] = np.where(eval(expr), True, None)
+            df[self.alert_name] = None
+            df_filtered = df.query(str(self.dimension_name) + '=='  + str(self.dimension_value), inplace=True)
+            df_filtered[self.alert_name] = np.where(eval(expr), True, False)
+
         except Exception as e:
             logger.info('AlertExpressionWithFilter  eval failed with ' + str(e))
-            df[self.alert_name] = False
+            df[self.alert_name] = None
             pass
 
         return df
@@ -922,6 +929,8 @@ class AlertExpressionWithFilter(BaseEvent):
         # define arguments that behave as function inputs
         inputs = []
         inputs.append(UISingleItem(name='dimension_name', datatype=str))
+        inputs.append(UISingle(name='dimension_value', datatype=str,
+                               description='Dimension Filter Value'))
         inputs.append(UIExpression(name='expression',
                                    description="Define alert expression using pandas systax. \
                                                 Example: df['inlet_temperature']>50. ${pressure} will be substituted \
