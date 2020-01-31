@@ -906,9 +906,9 @@ class AlertExpressionWithFilter(BaseEvent):
         logger.info('AlertExpressionWithFilter  regexp: ' + expr)
 
         try:
-            df[self.alert_name] = np.where(df[self.dimension_name] == self.dimension_value, True, False)
-            logger.info('AlertExpressionWithFilter  result: ' + str(df[self.alert_name]))
-            df[self.alert_name] = df[self.alert_name] & np.where(eval(expr), True, False)
+            df[self.alert_name] = np.logical_and(
+                np.where(df[self.dimension_name] == self.dimension_value, True, False),
+                np.where(eval(expr), True, False))
             logger.info('AlertExpressionWithFilter  final result: ' + str(df[self.alert_name]))
 
         except Exception as e:
