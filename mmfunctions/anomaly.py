@@ -907,7 +907,9 @@ class AlertExpressionWithFilter(BaseEvent):
 
         try:
             df[self.alert_name] = np.where(df[self.dimension_name] == self.dimension_value, True, False)
+            logger.info('AlertExpressionWithFilter  result: ' + str(df[self.alert_name]))
             df[self.alert_name] = df[self.alert_name] & np.where(eval(expr), True, False)
+            logger.info('AlertExpressionWithFilter  final result: ' + str(df[self.alert_name]))
 
         except Exception as e:
             logger.info('AlertExpressionWithFilter  eval failed with ' + str(e))
