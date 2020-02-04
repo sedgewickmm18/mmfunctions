@@ -232,24 +232,19 @@ class SpectralAnomalyScore(BaseTransformer):
                     # highsignal_energy = np.log10(np.maximum(SmallEnergy, np.dot(spectral_density_temperature.T,
                     #                              highfrequency_temperature)) + SmallEnergy)
 
+                    signal_energy = np.dot(spectral_density_temperature.T, frequency_temperature)
                     lowsignal_energy = np.dot(spectral_density_temperature.T, lowfrequency_temperature)
                     highsignal_energy = np.dot(spectral_density_temperature.T, highfrequency_temperature)
+
+                    signal_energy[signal_energy < 0] = 0
                     lowsignal_energy[lowsignal_energy < 0] = 0
                     highsignal_energy[highsignal_energy < 0] = 0
 
                     # compute the elliptic envelope to exploit Minimum Covariance Determinant estimates
                     #    standardizing
-                    # low_stddev = lowsignal_energy.std(ddof=0)
-                    # high_stddev = highsignal_energy.std(ddof=0)
 
-                    # if low_stddev != 0:
-                    #     lowsignal_energy = (lowsignal_energy - lowsignal_energy.mean())/low_stddev
-                    # else:
+                    signal_energy = (signal_energy - signal_energy.mean())
                     lowsignal_energy = (lowsignal_energy - lowsignal_energy.mean())
-
-                    # if high_stddev != 0:
-                    #     highsignal_energy = (highsignal_energy - highsignal_energy.mean())/high_stddev
-                    # else:
                     highsignal_energy = (highsignal_energy - highsignal_energy.mean())
 
                     twoDimsignal_energy = np.vstack((lowsignal_energy, highsignal_energy)).T
@@ -258,16 +253,20 @@ class SpectralAnomalyScore(BaseTransformer):
 
                     # inliers have a score of 1, outliers -1, and 0 indicates an issue with the data
                     dfe[self.output_item] = 0.0002
-                    ellEnv = EllipticEnvelope(random_state=0)
+                    # ellEnv = EllipticEnvelope(random_state=0)
 
-                    dfe[self.output_item] = 0.0003
-                    ellEnv.fit(twoDimsignal_energy)
+                    # dfe[self.output_item] = 0.0003
+                    # ellEnv.fit(twoDimsignal_energy)
 
                     # compute distance to elliptic envelope
-                    dfe[self.output_item] = 0.0004
+                    # dfe[self.output_item] = 0.0004
 
                     # ets_zscore = np.maximum(ellEnv.decision_function(twoDimsignal_energy).copy(), -0.1)
-                    ets_zscore = ellEnv.decision_function(twoDimsignal_energy).copy()
+                    # ets_zscore = ellEnv.decision_function(twoDimsignal_energy).copy()
+                    # ets_zscore = ellEnv.score_samples(twoDimsignal_energy).copy() - ellEnv.offset_
+                    ets_zscore = abs(sp.stats.zscore(signal_energy))
+
+                    # ets_zscore = (-ellEnv.offset_) ** 0.33 - (-ets_zscore) ** 0.33
 
                     logger.debug('Spectral z-score max: ' + str(ets_zscore.max()))
 
