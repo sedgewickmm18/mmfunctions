@@ -986,17 +986,22 @@ class GBMRegressor(BaseEstimatorFunction):
 
     def set_estimators(self):
         # gradient_boosted
-        params = {'n_estimators': [200, 400], 'max_depth': [10, 15, 20],
-                  'num_leaves': [40],
-                  'learning_rate': [0.001, 0.002, 0.005],
-                  'verbosity': [2],
-                  'objective': ['regression']}  # l2 norm
+        if self.params is None:
+            params = {'n_estimators': [200, 400], 'max_depth': [10, 20],
+                      'num_leaves': [50], 'num_trees': [500],
+                      'learning_rate': [0.01, 0.05],
+                      'verbosity': [2],
+                      'early_stopping_round': [3]}  # l2 norm
+        else:
+            params = self.params
         self.estimators['gradient_boosted_regressor'] = (lightgbm.LGBMRegressor, params)
+        logger.info('GBMRegressor start search for best model')
 
     def __init__(self, features, targets, threshold, predictions=None, alerts=None):
         super().__init__(features=features, targets=targets, predictions=predictions)
         if alerts is None:
             alerts = ['%s_alert' % x for x in self.targets]
+        self.params = None   # specify estimator params here
         self.alerts = alerts
         self.threshold = threshold
 
@@ -1012,7 +1017,7 @@ class GBMRegressor(BaseEstimatorFunction):
                 alert.set_entity_type(self.get_entity_type())
                 df = alert.execute(df)
         except Exception as e:
-            logger.info('Simple Anomaly failed with: ' + str(e))
+            logger.info('GBMRegressor failed with: ' + str(e))
             pass
 
         return df
