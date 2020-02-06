@@ -23,11 +23,15 @@ from scipy import signal, fftpack
 # from scipy.stats import energy_distance
 # from sklearn import metrics
 from sklearn.covariance import EllipticEnvelope, MinCovDet
+from sklearn import metrics
 
 #   for KMeans
 #  import skimage as ski
 from skimage import util as skiutil  # for nifty windowing
 from pyod.models.cblof import CBLOF
+
+# for gradient boosting
+import lightgbm
 
 # import re
 import pandas as pd
@@ -35,7 +39,7 @@ import logging
 # import warnings
 # import json
 # from sqlalchemy import Column, Integer, String, Float, DateTime, Boolean, func
-from iotfunctions.base import (BaseTransformer, BaseRegressor, BaseEvent)
+from iotfunctions.base import (BaseTransformer, BaseRegressor, BaseEvent, BaseEstimatorFunction)
 from iotfunctions.bif import (AlertHighValue)
 from iotfunctions.ui import (UISingle, UIMultiItem, UIFunctionOutSingle, UISingleItem, UIFunctionOutMulti,
                              UIExpression)
@@ -968,12 +972,74 @@ class LSTMPredictor(BaseTransformer):
 #######################################################################################
 
 
+class GBMRegressor(BaseEstimatorFunction):
+
+    '''
+    Regressor based on gradient boosting method as provided by lightGBM
+    '''
+    eval_metric = staticmethod(metrics.r2_score)
+
+    # class variables
+    train_if_no_model = True
+    estimators_per_execution = 3
+    num_rounds_per_estimator = 3
+
+    def set_estimators(self):
+        # gradient_boosted
+        params = {'n_estimators': [1000, 2000, 3000, 4000], 'max_depth': [10, 15, 20],
+                  'min_samples_split': [2, 5, 9],
+                  'learning_rate': [0.0001, 0.0002, 0.0005], 'loss': ['huber']}
+        self.estimators['gradient_boosted_regressor'] = (lightgbm.LGBMRegressor, params)
+
+    def __init__(self, features, targets, threshold, predictions=None, alerts=None):
+        super().__init__(features=features, targets=targets, predictions=predictions)
+        if alerts is None:
+            alerts = ['%s_alert' % x for x in self.targets]
+        self.alerts = alerts
+        self.threshold = threshold
+
+    def execute(self, df):
+
+        try:
+            df_new = super().execute(df)
+            df = df_new
+            for i, t in enumerate(self.targets):
+                prediction = self.predictions[i]
+                df['_diff_'] = (df[t] - df[prediction]).abs()
+                alert = AlertHighValue(input_item='_diff_', upper_threshold=self.threshold, alert_name=self.alerts[i])
+                alert.set_entity_type(self.get_entity_type())
+                df = alert.execute(df)
+        except Exception as e:
+            logger.info('Simple Anomaly failed with: ' + str(e))
+            pass
+
+        return df
+
+    @classmethod
+    def build_ui(cls):
+        # define arguments that behave as function inputs
+        inputs = []
+        inputs.append(UIMultiItem(name='features', datatype=float, required=True))
+        inputs.append(UIMultiItem(name='targets', datatype=float, required=True, output_item='predictions',
+                                  is_output_datatype_derived=True))
+        inputs.append(UISingle(name='threshold', datatype=float,
+                               description=('Threshold for firing an alert. Expressed as absolute value not percent.')))
+        # define arguments that behave as function outputs
+        outputs = []
+        outputs.append(
+            UIFunctionOutMulti(name='alerts', datatype=bool, cardinality_from='targets', is_datatype_derived=False, ))
+
+        return (inputs, outputs)
+
+
+
 class SimpleAnomaly(BaseRegressor):
     '''
     Sample function uses a regression model to predict the value of one or more output
     variables. It compares the actual value to the prediction and generates an alert
     when the difference between the actual and predicted value is outside of a threshold.
     '''
+
     # class variables
     train_if_no_model = True
     estimators_per_execution = 3
