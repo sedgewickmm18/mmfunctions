@@ -986,24 +986,30 @@ class GBMRegressor(BaseEstimatorFunction):
 
     def set_estimators(self):
         # gradient_boosted
-        if self.params is None:
-            params = {'n_estimators': [200, 400], 'max_depth': [10, 20],
-                      'num_leaves': [50], 'num_trees': [500],
-                      'learning_rate': [0.01, 0.05],
-                      'verbosity': [2],
-                      'early_stopping_round': [3]}  # l2 norm
-        else:
-            params = self.params
-        self.estimators['gradient_boosted_regressor'] = (lightgbm.LGBMRegressor, params)
+        self.estimators['gradient_boosted_regressor'] = (lightgbm.LGBMRegressor, self.params)
         logger.info('GBMRegressor start search for best model')
 
-    def __init__(self, features, targets, threshold, predictions=None, alerts=None):
+    def __init__(self, features, targets, threshold, predictions=None, alerts=None,
+                 n_estimators=None, num_leaves=None, learning_rate=None): # , max_depth=None):
         super().__init__(features=features, targets=targets, predictions=predictions)
         if alerts is None:
             alerts = ['%s_alert' % x for x in self.targets]
-        self.params = None   # specify estimator params here
         self.alerts = alerts
         self.threshold = threshold
+        # if n_estimators is not None or num_leaves is not None or learning_rate is not None or max_depth is not None:
+        if n_estimators is not None or num_leaves is not None or learning_rate is not None:
+            self.params = {'n_estimators': [n_estimators],
+                           'num_leaves': [num_leaves],
+                           'learning_rate': [learning_rate],
+                           # 'max_depth': [max_depth],
+                           'verbosity': [2],
+                           'early_stopping_round': [3]}  # l2 norm
+        else:
+            self.params = {'n_estimators': [200, 400],
+                           'num_leaves': [50],
+                           'learning_rate': [0.01, 0.05],
+                           'verbosity': [2],
+                           'early_topping_round': [3]}  # l2 norm
 
     def execute(self, df):
 
@@ -1031,6 +1037,10 @@ class GBMRegressor(BaseEstimatorFunction):
                                   is_output_datatype_derived=True))
         inputs.append(UISingle(name='threshold', datatype=float,
                                description=('Threshold for firing an alert. Expressed as absolute value not percent.')))
+        inputs.append(UISingle(name='n_estimators', datatype=int, description=('Max rounds of boosting')))
+        inputs.append(UISingle(name='num_leaves', datatype=int, description=('Max leaves in a boosting tree')))
+        inputs.append(UISingle(name='learning_rate', datatype=float, description=('Learning rate')))
+        # inputs.append(UISingle(name='max_depth', datatype=int, description=('Cut tree to prevent overfitting')))
         # define arguments that behave as function outputs
         outputs = []
         outputs.append(
