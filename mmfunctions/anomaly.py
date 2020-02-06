@@ -986,9 +986,11 @@ class GBMRegressor(BaseEstimatorFunction):
 
     def set_estimators(self):
         # gradient_boosted
-        params = {'n_estimators': [2000, 4000], 'max_depth': [10, 15, 20],
+        params = {'n_estimators': [200, 400], 'max_depth': [10, 15, 20],
                   'num_leaves': [40],
-                  'learning_rate': [0.001, 0.002, 0.005], 'loss': ['huber']}
+                  'learning_rate': [0.001, 0.002, 0.005],
+                  'verbosity': [2],
+                  'objective': ['regression']}  # l2 norm
         self.estimators['gradient_boosted_regressor'] = (lightgbm.LGBMRegressor, params)
 
     def __init__(self, features, targets, threshold, predictions=None, alerts=None):
