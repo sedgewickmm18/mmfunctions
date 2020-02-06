@@ -22,7 +22,7 @@ import scipy as sp
 from scipy import signal, fftpack
 # from scipy.stats import energy_distance
 # from sklearn import metrics
-from sklearn.covariance import EllipticEnvelope, MinCovDet
+from sklearn.covariance import MinCovDet
 from sklearn import metrics
 
 #   for KMeans
@@ -987,7 +987,7 @@ class GBMRegressor(BaseEstimatorFunction):
     def set_estimators(self):
         # gradient_boosted
         params = {'n_estimators': [1000, 2000, 3000, 4000], 'max_depth': [10, 15, 20],
-                  'min_samples_split': [2, 5, 9],
+                  'num_leaves': [40],
                   'learning_rate': [0.0001, 0.0002, 0.0005], 'loss': ['huber']}
         self.estimators['gradient_boosted_regressor'] = (lightgbm.LGBMRegressor, params)
 
@@ -1030,7 +1030,6 @@ class GBMRegressor(BaseEstimatorFunction):
             UIFunctionOutMulti(name='alerts', datatype=bool, cardinality_from='targets', is_datatype_derived=False, ))
 
         return (inputs, outputs)
-
 
 
 class SimpleAnomaly(BaseRegressor):
