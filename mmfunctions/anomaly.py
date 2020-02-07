@@ -990,7 +990,7 @@ class GBMRegressor(BaseEstimatorFunction):
         logger.info('GBMRegressor start search for best model')
 
     def __init__(self, features, targets, threshold, predictions=None, alerts=None,
-                 n_estimators=None, num_leaves=None, learning_rate=None): # , max_depth=None):
+                 n_estimators=None, num_leaves=None, learning_rate=None, max_depth=None):
         super().__init__(features=features, targets=targets, predictions=predictions)
         if alerts is None:
             alerts = ['%s_alert' % x for x in self.targets]
@@ -1001,7 +1001,7 @@ class GBMRegressor(BaseEstimatorFunction):
             self.params = {'n_estimators': [n_estimators],
                            'num_leaves': [num_leaves],
                            'learning_rate': [learning_rate],
-                           # 'max_depth': [max_depth],
+                           'max_depth': [max_depth],
                            'verbosity': [2],
                            'early_stopping_round': [3]}  # l2 norm
         else:
@@ -1040,7 +1040,7 @@ class GBMRegressor(BaseEstimatorFunction):
         inputs.append(UISingle(name='n_estimators', datatype=int, description=('Max rounds of boosting')))
         inputs.append(UISingle(name='num_leaves', datatype=int, description=('Max leaves in a boosting tree')))
         inputs.append(UISingle(name='learning_rate', datatype=float, description=('Learning rate')))
-        # inputs.append(UISingle(name='max_depth', datatype=int, description=('Cut tree to prevent overfitting')))
+        inputs.append(UISingle(name='max_depth', datatype=int, description=('Cut tree to prevent overfitting')))
         # define arguments that behave as function outputs
         outputs = []
         outputs.append(
