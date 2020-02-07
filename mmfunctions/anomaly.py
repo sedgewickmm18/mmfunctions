@@ -981,8 +981,8 @@ class GBMRegressor(BaseEstimatorFunction):
 
     # class variables
     train_if_no_model = True
-    estimators_per_execution = 3
-    num_rounds_per_estimator = 3
+    estimators_per_execution = 1
+    num_rounds_per_estimator = 1
 
     def set_estimators(self):
         # gradient_boosted
@@ -1004,9 +1004,9 @@ class GBMRegressor(BaseEstimatorFunction):
                            'max_depth': [max_depth],
                            'verbosity': [2]}
         else:
-            self.params = {'n_estimators': [200, 400],
+            self.params = {'n_estimators': [500],
                            'num_leaves': [50],
-                           'learning_rate': [0.01, 0.05],
+                           'learning_rate': [0.001],
                            'verbosity': [2]}
 
     def execute(self, df):
