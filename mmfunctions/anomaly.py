@@ -1002,14 +1002,12 @@ class GBMRegressor(BaseEstimatorFunction):
                            'num_leaves': [num_leaves],
                            'learning_rate': [learning_rate],
                            'max_depth': [max_depth],
-                           'verbosity': [2],
-                           'early_stopping_round': [3]}  # l2 norm
+                           'verbosity': [2]}
         else:
             self.params = {'n_estimators': [200, 400],
                            'num_leaves': [50],
                            'learning_rate': [0.01, 0.05],
-                           'verbosity': [2],
-                           'early_topping_round': [3]}  # l2 norm
+                           'verbosity': [2]}
 
     def execute(self, df):
 
