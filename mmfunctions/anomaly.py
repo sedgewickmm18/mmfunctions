@@ -986,7 +986,7 @@ class GBMRegressor(BaseEstimatorFunction):
 
     def set_estimators(self):
         # gradient_boosted
-        self.estimators['gradient_boosted_regressor'] = (lightgbm.LGBMRegressor, self.params)
+        self.estimators['light_gradient_boosted_regressor'] = (lightgbm.LGBMRegressor, self.params)
         logger.info('GBMRegressor start search for best model')
 
     def __init__(self, features, targets, threshold, predictions=None, alerts=None,
@@ -1008,11 +1008,17 @@ class GBMRegressor(BaseEstimatorFunction):
                            'num_leaves': [50],
                            'learning_rate': [0.001],
                            'verbosity': [2]}
+        self.stop_auto_improve_at = -2
 
     def execute(self, df):
 
         try:
             df_new = super().execute(df)
+        except Exception as e:
+            logger.info('GBMRegressor failed with: ' + str(e))
+            pass
+
+        try:
             df = df_new
             for i, t in enumerate(self.targets):
                 prediction = self.predictions[i]
@@ -1020,8 +1026,8 @@ class GBMRegressor(BaseEstimatorFunction):
                 alert = AlertHighValue(input_item='_diff_', upper_threshold=self.threshold, alert_name=self.alerts[i])
                 alert.set_entity_type(self.get_entity_type())
                 df = alert.execute(df)
-        except Exception as e:
-            logger.info('GBMRegressor failed with: ' + str(e))
+        except Exception as e4:
+            logger.info('GBMRegressor eval failed with: ' + str(e4))
             pass
 
         return df
