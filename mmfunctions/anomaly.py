@@ -509,7 +509,7 @@ class GeneralizedAnomalyScore(BaseTransformer):
     Employs GAM on windowed time series data to compute an anomaly score from the covariance matrix
     """
 
-    def __init__(self, input_item, windowsize, dampening, output_item):
+    def __init__(self, input_item, windowsize, output_item):
         super().__init__()
         logger.debug(input_item)
 
@@ -526,7 +526,7 @@ class GeneralizedAnomalyScore(BaseTransformer):
         # assume 1 per sec for now
         self.frame_rate = 1
 
-        self.dampening = dampening   # dampen anomaly score
+        self.dampening = 1 # dampening - dampen anomaly score
 
         self.output_item = output_item
 
@@ -714,7 +714,7 @@ class NoDataAnomalyScore(GeneralizedAnomalyScore):
       gaps in time series data and to compute the elliptic envelope from it
     '''
     def __init__(self, input_item, windowsize, output_item):
-        super().__init__(input_item, windowsize, 1, output_item)
+        super().__init__(input_item, windowsize, output_item)
         self.whoami = 'NoData'
         logger.debug('NoData')
 
@@ -782,7 +782,7 @@ class FFTbasedGeneralizedAnomalyScore(GeneralizedAnomalyScore):
     """
 
     def __init__(self, input_item, windowsize, output_item):
-        super().__init__(input_item, windowsize, 1, output_item)
+        super().__init__(input_item, windowsize, output_item)
         self.whoami = 'FFT'
         logger.debug('FFT')
 
@@ -847,6 +847,7 @@ class FFTbasedGeneralizedAnomalyScore2(GeneralizedAnomalyScore):
     def __init__(self, input_item, windowsize, dampening, output_item):
         super().__init__(input_item, windowsize, dampening, output_item)
         self.whoami = 'FFT'
+        self.dampening = dampening
         logger.debug('FFT')
 
     def feature_extract(self, temperature):
@@ -916,7 +917,7 @@ class SaliencybasedGeneralizedAnomalyScore(GeneralizedAnomalyScore):
     """
 
     def __init__(self, input_item, windowsize, output_item):
-        super().__init__(input_item, windowsize, 1, output_item)
+        super().__init__(input_item, windowsize, output_item)
         self.whoami = 'Saliency'
         self.saliency = Saliency(windowsize, 0, 0)
         logger.debug('Saliency')
