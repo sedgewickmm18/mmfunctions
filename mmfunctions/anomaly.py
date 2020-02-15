@@ -845,7 +845,7 @@ class FFTbasedGeneralizedAnomalyScore2(GeneralizedAnomalyScore):
     """
 
     def __init__(self, input_item, windowsize, dampening, output_item):
-        super().__init__(input_item, windowsize, dampening, output_item)
+        super().__init__(input_item, windowsize, output_item)
         self.whoami = 'FFT'
         self.dampening = dampening
         logger.debug('FFT')
