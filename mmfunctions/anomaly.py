@@ -96,7 +96,10 @@ def dampen_anomaly_score(array, dampening):
     if dampening is None:
         dampening = 0.9  # gradient dampening
 
-    if dampening >= 1 | dampening < 0.01:
+    if dampening >= 1:
+        return array
+
+    if dampening < 0.01:
         return array
 
     # TODO error testing for arrays of size <= 1
