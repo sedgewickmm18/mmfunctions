@@ -1,5 +1,5 @@
 # *****************************************************************************
-# © Copyright IBM Corp. 2018.  All Rights Reserved.
+# © Copyright IBM Corp. 2018-2020.  All Rights Reserved.
 #
 # This program and the accompanying materials
 # are made available under the terms of the Apache V2.0
@@ -12,7 +12,6 @@
 The Built In Functions module contains preinstalled functions
 '''
 
-from collections import OrderedDict
 import re
 import datetime as dt
 import numpy as np
@@ -21,9 +20,8 @@ import scipy as sp
 #  for Spectral Analysis
 from scipy import signal, fftpack
 # from scipy.stats import energy_distance
-# from sklearn import metrics
-from sklearn.covariance import MinCovDet
 from sklearn import metrics
+from sklearn.covariance import MinCovDet
 
 #   for KMeans
 #  import skimage as ski
@@ -91,6 +89,38 @@ def set_window_size_and_overlap(windowsize, trim_value=2*DefaultWindowSize):
         ws_overlap = trimmed_ws - np.maximum(trimmed_ws // DefaultWindowSize, 1)
 
     return trimmed_ws, ws_overlap
+
+
+def dampen_anomaly_score(array, dampening):
+
+    if dampening is None:
+        dampening = 0.9  # gradient dampening
+
+    if dampening >= 1 | dampening < 0.01:
+        return array
+
+    # TODO error testing for arrays of size <= 1
+    if array.size <= 1:
+        return array
+
+    gradient = np.gradient(array)
+
+    # dampened
+    grad_damp = np.float_power(abs(gradient), dampening) * np.sign(gradient)
+
+    # reconstruct (dampened) anomaly score by discrete integration
+    integral = []
+    x = array[0]
+    for x_el in np.nditer(grad_damp):
+        x = x + x_el
+        integral.append(x)
+
+    # shift array slightly to the right to position anomaly score
+    array_damp = np.roll(np.asarray(integral), 1)
+    array_damp[0] = array_damp[1]
+
+    # normalize
+    return array_damp / dampening / 2
 
 
 # Saliency helper functions
@@ -479,7 +509,7 @@ class GeneralizedAnomalyScore(BaseTransformer):
     Employs GAM on windowed time series data to compute an anomaly score from the covariance matrix
     """
 
-    def __init__(self, input_item, windowsize, output_item):
+    def __init__(self, input_item, windowsize, dampening, output_item):
         super().__init__()
         logger.debug(input_item)
 
@@ -495,6 +525,8 @@ class GeneralizedAnomalyScore(BaseTransformer):
 
         # assume 1 per sec for now
         self.frame_rate = 1
+
+        self.dampening = dampening   # dampen anomaly score
 
         self.output_item = output_item
 
@@ -614,6 +646,8 @@ class GeneralizedAnomalyScore(BaseTransformer):
                 # kmeans_scoreI = np.interp(timesI, timesTS, pred_score)
                 gam_scoreI = linear_interpolateK(np.arange(0, temperature.size, 1))
 
+                dampen_anomaly_score(gam_scoreI, self.dampening)
+
                 dfe[self.output_item] = gam_scoreI
 
                 # absolute kmeans_score > 1000 ---> anomaly
@@ -680,7 +714,7 @@ class NoDataAnomalyScore(GeneralizedAnomalyScore):
       gaps in time series data and to compute the elliptic envelope from it
     '''
     def __init__(self, input_item, windowsize, output_item):
-        super().__init__(input_item, windowsize, output_item)
+        super().__init__(input_item, windowsize, 1, output_item)
         self.whoami = 'NoData'
         logger.debug('NoData')
 
@@ -748,7 +782,7 @@ class FFTbasedGeneralizedAnomalyScore(GeneralizedAnomalyScore):
     """
 
     def __init__(self, input_item, windowsize, output_item):
-        super().__init__(input_item, windowsize, output_item)
+        super().__init__(input_item, windowsize, 1, output_item)
         self.whoami = 'FFT'
         logger.debug('FFT')
 
@@ -805,13 +839,84 @@ class FFTbasedGeneralizedAnomalyScore(GeneralizedAnomalyScore):
         return (inputs, outputs)
 
 
+class FFTbasedGeneralizedAnomalyScore2(GeneralizedAnomalyScore):
+    """
+    Employs FFT and GAM on windowed time series data to compute an anomaly score from the covariance matrix
+    """
+
+    def __init__(self, input_item, windowsize, dampening, output_item):
+        super().__init__(input_item, windowsize, dampening, output_item)
+        self.whoami = 'FFT'
+        logger.debug('FFT')
+
+    def feature_extract(self, temperature):
+
+        logger.debug(self.whoami + ': feature extract')
+
+        slices_ = skiutil.view_as_windows(
+            temperature, window_shape=(self.windowsize,), step=self.step
+        )
+        slicelist = []
+        for slice in slices_:
+            slicelist.append(fftpack.rfft(slice))
+
+        # return np.array(slicelist)
+        return np.stack(slicelist, axis=0)
+
+    def execute(self, df):
+        df_copy = super().execute(df)
+
+        msg = "FFTbasedGeneralizedAnomalyScore"
+        self.trace_append(msg)
+        return df_copy
+
+    @classmethod
+    def build_ui(cls):
+        # define arguments that behave as function inputs
+        inputs = []
+        inputs.append(
+            UISingleItem(
+                name="input_item",
+                datatype=float,
+                description="Column for feature extraction",
+            )
+        )
+
+        inputs.append(
+            UISingle(
+                name="windowsize",
+                datatype=int,
+                description="Window size for FFT feature based Generalized Anomaly analysis - default 12",
+            )
+        )
+
+        inputs.append(
+            UISingle(
+                name="dampening",
+                datatype=float,
+                description="Moderate anomaly scores (value <= 1, default 1)",
+            )
+        )
+
+        # define arguments that behave as function outputs
+        outputs = []
+        outputs.append(
+            UIFunctionOutSingle(
+                name="output_item",
+                datatype=float,
+                description="Anomaly score (FFTbasedGeneralizedAnomalyScore)",
+            )
+        )
+        return (inputs, outputs)
+
+
 class SaliencybasedGeneralizedAnomalyScore(GeneralizedAnomalyScore):
     """
     Employs Saliency and GAM on windowed time series data to compute an anomaly score from the covariance matrix
     """
 
     def __init__(self, input_item, windowsize, output_item):
-        super().__init__(input_item, windowsize, output_item)
+        super().__init__(input_item, windowsize, 1, output_item)
         self.whoami = 'Saliency'
         self.saliency = Saliency(windowsize, 0, 0)
         logger.debug('Saliency')
@@ -946,28 +1051,6 @@ class AlertExpressionWithFilter(BaseEvent):
         outputs = []
         outputs.append(UIFunctionOutSingle(name='alert_name', datatype=bool, description='Output of alert function'))
         return (inputs, outputs)
-
-#######################################################################################
-
-
-class LSTMPredictor(BaseTransformer):
-    '''
-    Sample function uses a regression model based on a stacked LSTM to predict the value
-    of one output variable. It compares the actual value to the smoothed prediction and
-    generates an alert following a non-parametric adaptive approach evaluating the
-    difference between the actual and predicted value.
-    '''
-    def __init__(self, features, targets, predictions):
-        self.features = features
-        self.targets = targets
-        # Name predictions based on targets if predictions is None
-        if predictions is None:
-            predictions = ['predicted_%s' % x for x in self.targets]
-        self.predictions = predictions
-        super().__init__()
-        self._preprocessors = OrderedDict()
-        self.estimators = OrderedDict()
-
 
 #######################################################################################
 
