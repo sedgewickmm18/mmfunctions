@@ -50,6 +50,20 @@ FrequencySplit = 0.3
 DefaultWindowSize = 12
 SmallEnergy = 0.0000001
 
+KMeans_normalizer = 100 / 1.3
+Spectral_normalizer = 100 / 2.8
+FFT_normalizer = 1
+Saliency_normalizer = 1
+Generalized_normalizer = 1 / 300
+
+if dt.datetime(2020,3,1) > dt.datetime.now():
+    KMeans_normalizer = 1
+    Spectral_normalizer = 1
+    FFT_normalizer = 1
+    Saliency_normalizer = 1
+    Generalized_normalizer = 1
+
+
 
 def custom_resampler(array_like):
     # initialize
@@ -301,7 +315,7 @@ class SpectralAnomalyScore(BaseTransformer):
                     # ets_zscore = np.maximum(ellEnv.decision_function(twoDimsignal_energy).copy(), -0.1)
                     # ets_zscore = ellEnv.decision_function(twoDimsignal_energy).copy()
                     # ets_zscore = ellEnv.score_samples(twoDimsignal_energy).copy() - ellEnv.offset_
-                    ets_zscore = abs(sp.stats.zscore(signal_energy))
+                    ets_zscore = abs(sp.stats.zscore(signal_energy)) * Spectral_normalizer
 
                     # ets_zscore = (-ellEnv.offset_) ** 0.33 - (-ets_zscore) ** 0.33
 
@@ -448,7 +462,7 @@ class KMeansAnomalyScore(BaseTransformer):
                     self.trace_append('KMeans failed with' + str(e))
                     continue
 
-                pred_score = cblofwin.decision_scores_.copy()
+                pred_score = cblofwin.decision_scores_.copy() * KMeans_normalizer
 
                 # length of time_series_temperature, signal_energy and ets_zscore is smaller than half the original
                 #   extend it to cover the full original length
@@ -533,6 +547,8 @@ class GeneralizedAnomalyScore(BaseTransformer):
 
         self.output_item = output_item
 
+        self.normalizer = Generalized_normalizer
+
     def prepare_data(self, dfEntity):
 
         logger.debug(self.whoami + ': prepare Data')
@@ -604,7 +620,7 @@ class GeneralizedAnomalyScore(BaseTransformer):
                     mcd.fit(slices)
 
                     # pred_score = NN.decision_function(slices).copy()
-                    pred_score = mcd.mahalanobis(slices).copy()
+                    pred_score = mcd.mahalanobis(slices).copy() * self.normalizer
 
                 except ValueError as ve:
 
@@ -718,7 +734,10 @@ class NoDataAnomalyScore(GeneralizedAnomalyScore):
     '''
     def __init__(self, input_item, windowsize, output_item):
         super().__init__(input_item, windowsize, output_item)
+
         self.whoami = 'NoData'
+        self.normalizer = 1
+
         logger.debug('NoData')
 
     def prepare_data(self, dfEntity):
@@ -786,7 +805,10 @@ class FFTbasedGeneralizedAnomalyScore(GeneralizedAnomalyScore):
 
     def __init__(self, input_item, windowsize, output_item):
         super().__init__(input_item, windowsize, output_item)
+
         self.whoami = 'FFT'
+        self.normalizer = FFT_normalizer
+
         logger.debug('FFT')
 
     def feature_extract(self, temperature):
@@ -849,8 +871,11 @@ class FFTbasedGeneralizedAnomalyScore2(GeneralizedAnomalyScore):
 
     def __init__(self, input_item, windowsize, dampening, output_item):
         super().__init__(input_item, windowsize, output_item)
-        self.whoami = 'FFT'
+
+        self.whoami = 'FFT dampen'
         self.dampening = dampening
+        self.normalizer = FFT_normalizer / dampening
+
         logger.debug('FFT')
 
     def feature_extract(self, temperature):
@@ -921,8 +946,11 @@ class SaliencybasedGeneralizedAnomalyScore(GeneralizedAnomalyScore):
 
     def __init__(self, input_item, windowsize, output_item):
         super().__init__(input_item, windowsize, output_item)
+
         self.whoami = 'Saliency'
         self.saliency = Saliency(windowsize, 0, 0)
+        self.normalizer = Saliency_normalizer
+
         logger.debug('Saliency')
 
     def feature_extract(self, temperature):
