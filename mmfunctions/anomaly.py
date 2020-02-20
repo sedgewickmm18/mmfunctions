@@ -80,11 +80,16 @@ def custom_resampler(array_like):
 def min_delta(df):
     # minimal time delta for merging
 
+    if df.index.size > 1:
+        df2 = df.copy()
+        df2.index = df2.index.droplevel(list(range(1, df.index.size)))
+    else:
+        df2 = df
+
     try:
-        mindelta = df.index.to_series().diff().min()
+        mindelta = df2.index.to_series().diff().min()
     except Exception as e:
         logger.debug('Min Delta error: ' + str(e))
-        print(df.index.to_series())
         mindelta = pd.Timedelta('5 seconds')
 
     if mindelta == dt.timedelta(seconds=0) or pd.isnull(mindelta):
@@ -554,10 +559,20 @@ class GeneralizedAnomalyScore(BaseTransformer):
         logger.debug(self.whoami + ': prepare Data')
 
         # interpolate gaps - data imputation
+        if dfEntity.index.size > 1:
+            index_names = dfEntity.index.names
+            dfe = dfEntity.reset_index(level=list(range(1, dfEntity.index.size)))
+        else:
+            index_names = None
+            dfe = dfEntity
+
         dfe = dfEntity.interpolate(method="time")
 
         # one dimensional time series - named temperature for catchyness
         temperature = dfe[[self.input_item]].fillna(0).to_numpy().reshape(-1,)
+
+        if index_names is not None:
+            dfe = dfe.reset_index().set_index(index_names)
 
         return dfe, temperature
 
@@ -1174,6 +1189,7 @@ class GBMRegressor(BaseEstimatorFunction):
     @classmethod
     def get_input_items(cls):
         return ['features', 'targets', 'threshold']
+
 
 class SimpleAnomaly(BaseRegressor):
     '''
