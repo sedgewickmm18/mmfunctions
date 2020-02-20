@@ -562,7 +562,7 @@ class GeneralizedAnomalyScore(BaseTransformer):
         # interpolate gaps - data imputation
         if dfEntity.index.size > 1:
             index_names = dfEntity.index.names
-            dfe = dfEntity.reset_index(level=list(range(1, dfEntity.index.size-1)))
+            dfe = dfEntity.reset_index().set_index(index_names[0])
         else:
             index_names = None
             dfe = dfEntity
