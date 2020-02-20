@@ -56,13 +56,12 @@ FFT_normalizer = 1
 Saliency_normalizer = 1
 Generalized_normalizer = 1 / 300
 
-if dt.datetime(2020,3,1) > dt.datetime.now():
+if dt.datetime(2020, 3, 1) > dt.datetime.now():
     KMeans_normalizer = 1
     Spectral_normalizer = 1
     FFT_normalizer = 1
     Saliency_normalizer = 1
     Generalized_normalizer = 1
-
 
 
 def custom_resampler(array_like):
@@ -85,6 +84,7 @@ def min_delta(df):
         mindelta = df.index.to_series().diff().min()
     except Exception as e:
         logger.debug('Min Delta error: ' + str(e))
+        print(df.index.to_series())
         mindelta = pd.Timedelta('5 seconds')
 
     if mindelta == dt.timedelta(seconds=0) or pd.isnull(mindelta):
@@ -543,7 +543,7 @@ class GeneralizedAnomalyScore(BaseTransformer):
         # assume 1 per sec for now
         self.frame_rate = 1
 
-        self.dampening = 1 # dampening - dampen anomaly score
+        self.dampening = 1  # dampening - dampen anomaly score
 
         self.output_item = output_item
 
@@ -1156,10 +1156,14 @@ class GBMRegressor(BaseEstimatorFunction):
                                   is_output_datatype_derived=True))
         inputs.append(UISingle(name='threshold', datatype=float,
                                description=('Threshold for firing an alert. Expressed as absolute value not percent.')))
-        inputs.append(UISingle(name='n_estimators', datatype=int, description=('Max rounds of boosting')))
-        inputs.append(UISingle(name='num_leaves', datatype=int, description=('Max leaves in a boosting tree')))
-        inputs.append(UISingle(name='learning_rate', datatype=float, description=('Learning rate')))
-        inputs.append(UISingle(name='max_depth', datatype=int, description=('Cut tree to prevent overfitting')))
+        inputs.append(UISingle(name='n_estimators', datatype=int, required=False,
+                               description=('Max rounds of boosting')))
+        inputs.append(UISingle(name='num_leaves', datatype=int, required=False,
+                               description=('Max leaves in a boosting tree')))
+        inputs.append(UISingle(name='learning_rate', datatype=float, required=False,
+                               description=('Learning rate')))
+        inputs.append(UISingle(name='max_depth', datatype=int, required=False,
+                               description=('Cut tree to prevent overfitting')))
         # define arguments that behave as function outputs
         outputs = []
         outputs.append(
@@ -1167,6 +1171,9 @@ class GBMRegressor(BaseEstimatorFunction):
 
         return (inputs, outputs)
 
+    @classmethod
+    def get_input_items(cls):
+        return ['features', 'targets', 'threshold']
 
 class SimpleAnomaly(BaseRegressor):
     '''
