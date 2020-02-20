@@ -567,7 +567,10 @@ class GeneralizedAnomalyScore(BaseTransformer):
             index_names = None
             dfe = dfEntity
 
-        dfe = dfEntity.interpolate(method="time")
+        try:
+            dfe = dfe.interpolate(method="time")
+        except Exception as e:
+            logger.error('Prepare data error: ' + str(e))
 
         # one dimensional time series - named temperature for catchyness
         temperature = dfe[[self.input_item]].fillna(0).to_numpy().reshape(-1,)
