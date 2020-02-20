@@ -80,7 +80,7 @@ def custom_resampler(array_like):
 def min_delta(df):
     # minimal time delta for merging
 
-    if df.index.size > 1:
+    if len(df.index.names) > 1:
         df2 = df.copy()
         print(df.index.size)
         df2.index = df2.index.droplevel(list(range(1, df.index.size-1)))
@@ -560,7 +560,7 @@ class GeneralizedAnomalyScore(BaseTransformer):
         logger.debug(self.whoami + ': prepare Data')
 
         # interpolate gaps - data imputation
-        if dfEntity.index.size > 1:
+        if len(dfEntity.index.names) > 1:
             index_names = dfEntity.index.names
             dfe = dfEntity.reset_index().set_index(index_names[0])
         else:
