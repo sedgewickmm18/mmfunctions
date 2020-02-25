@@ -56,13 +56,6 @@ FFT_normalizer = 1
 Saliency_normalizer = 1
 Generalized_normalizer = 1 / 300
 
-if dt.datetime(2020, 3, 1) > dt.datetime.now():
-    KMeans_normalizer = 1
-    Spectral_normalizer = 1
-    FFT_normalizer = 1
-    Saliency_normalizer = 1
-    Generalized_normalizer = 1
-
 
 def custom_resampler(array_like):
     # initialize
