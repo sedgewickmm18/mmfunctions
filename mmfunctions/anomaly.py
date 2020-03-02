@@ -200,7 +200,7 @@ class SpectralAnomalyScore2(BaseTransformer):
     '''
     Employs spectral analysis to extract features from the time series data and to compute zscore from it
     '''
-    def __init__(self, input_item, windowsize, output_item):
+    def __init__(self, input_item, windowsize, output_item, signal_energy):
         super().__init__()
         logger.debug(input_item)
         self.input_item = input_item
@@ -212,6 +212,7 @@ class SpectralAnomalyScore2(BaseTransformer):
         self.frame_rate = 1
 
         self.output_item = output_item
+        self.signal_energy = signal_energy
 
     def execute(self, df):
 
