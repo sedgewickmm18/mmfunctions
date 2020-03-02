@@ -258,6 +258,7 @@ class SpectralAnomalyScore2(BaseTransformer):
                 logger.debug(str(temperature.size) + str(self.windowsize))
 
                 dfe[self.output_item] = 0.00001
+                dfe[self.signal_energy] = 0.00001
                 try:
                     # Fourier transform:
                     #   frequency, time, spectral density
@@ -303,7 +304,7 @@ class SpectralAnomalyScore2(BaseTransformer):
                     logger.error('Spectral failed with ' + str(e))
 
                 # absolute zscore > 3 ---> anomaly
-                dfe_orig = pd.merge_asof(dfe_orig, dfe[self.output_item],
+                dfe_orig = pd.merge_asof(dfe_orig, dfe[[self.output_item, self.signal_energy]],
                                          left_index=True, right_index=True, direction='nearest', tolerance=mindelta)
 
                 if self.output_item+'_y' in dfe_orig:
@@ -312,11 +313,13 @@ class SpectralAnomalyScore2(BaseTransformer):
                     zScoreII = dfe_orig[self.output_item].to_numpy()
                 else:
                     zScoreII = dfe_orig[self.input_item].to_numpy()
+                signalII = dfe_orig[self.signal_energy+'_y'].to_numpy()
 
                 idx = pd.IndexSlice
                 df_copy.loc[idx[entity, :], self.output_item] = zScoreII
+                df_copy.loc[idx[entity, :], self.signal_energy] = signalII
 
-        msg = 'SpectralAnomalyScore'
+        msg = 'SpectralAnomalyScore2'
         self.trace_append(msg)
 
         return (df_copy)
