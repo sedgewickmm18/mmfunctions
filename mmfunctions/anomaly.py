@@ -196,6 +196,162 @@ class Saliency(object):
         return spectral_residual
 
 
+class SpectralAnomalyScore2(BaseTransformer):
+    '''
+    Employs spectral analysis to extract features from the time series data and to compute zscore from it
+    '''
+    def __init__(self, input_item, windowsize, output_item):
+        super().__init__()
+        logger.debug(input_item)
+        self.input_item = input_item
+
+        # use 12 by default
+        self.windowsize, self.windowoverlap = set_window_size_and_overlap(windowsize)
+
+        # assume 1 per sec for now
+        self.frame_rate = 1
+
+        self.output_item = output_item
+
+    def execute(self, df):
+
+        df_copy = df.copy()
+        entities = np.unique(df.index.levels[0])
+        logger.debug(str(entities))
+
+        df_copy[self.output_item] = 0
+        # df_copy.sort_index()   # NoOp
+
+        for entity in entities:
+            # per entity - copy for later inplace operations
+            dfe = df_copy.loc[[entity]].dropna(how='all')
+            dfe_orig = df_copy.loc[[entity]].copy()
+
+            # get rid of entityid part of the index
+            # do it inplace as we copied the data before
+            dfe.reset_index(level=[0], inplace=True)
+            dfe.sort_index(inplace=True)
+            dfe_orig.reset_index(level=[0], inplace=True)
+            dfe_orig.sort_index(inplace=True)
+
+            # minimal time delta for merging
+            mindelta = min_delta(dfe_orig)
+
+            logger.debug('Timedelta:' + str(mindelta))
+
+            #  interpolate gaps - data imputation
+            # Size = dfe[[self.input_item]].fillna(0).to_numpy().size
+            dfe = dfe.interpolate(method='time')
+
+            # one dimensional time series - named temperature for catchyness
+            temperature = dfe[[self.input_item]].fillna(0).to_numpy().reshape(-1,)
+
+            logger.debug('Module Spectral, Entity: ' + str(entity) + ', Input: ' + str(self.input_item) +
+                         ', Windowsize: ' + str(self.windowsize) + ', Output: ' + str(self.output_item) +
+                         ', Overlap: ' + str(self.windowoverlap) + ', Inputsize: ' + str(temperature.size))
+
+            if temperature.size <= self.windowsize:
+                logger.debug(str(temperature.size) + ' <= ' + str(self.windowsize))
+                dfe[self.output_item] = 0.0001
+            else:
+                logger.debug(str(temperature.size) + str(self.windowsize))
+
+                dfe[self.output_item] = 0.00001
+                try:
+                    # Fourier transform:
+                    #   frequency, time, spectral density
+                    frequency_temperature, time_series_temperature, spectral_density_temperature = signal.spectrogram(
+                        temperature, fs=self.frame_rate, window='hanning',
+                        nperseg=self.windowsize, noverlap=self.windowoverlap,
+                        detrend=False, scaling='spectrum')
+
+                    # cut off freqencies too low to fit into the window
+                    frequency_temperatureb = (frequency_temperature > 2/self.windowsize).astype(int)
+                    frequency_temperature = frequency_temperature * frequency_temperatureb
+                    frequency_temperature[frequency_temperature == 0] = 1 / self.windowsize
+
+                    signal_energy = np.dot(spectral_density_temperature.T, frequency_temperature)
+                    # signal_logenergy = np.log10(np.maximum(SmallEnergy, signal_energy))
+
+                    signal_energy[signal_energy < 0] = 0
+
+                    # compute the elliptic envelope to exploit Minimum Covariance Determinant estimates
+                    #    standardizing
+
+                    signal_energy = (signal_energy - signal_energy.mean())
+
+                    dfe[self.output_item] = 0.0002
+
+                    ets_zscore = abs(sp.stats.zscore(signal_energy)) * Spectral_normalizer
+                    logger.debug('Spectral z-score max: ' + str(ets_zscore.max()))
+
+                    # length of time_series_temperature, signal_energy and ets_zscore is smaller than half the original
+                    #   extend it to cover the full original length
+                    dfe[self.output_item] = 0.0005
+                    linear_interpolate = sp.interpolate.interp1d(
+                        time_series_temperature, ets_zscore, kind='linear', fill_value='extrapolate')
+
+                    dfe[self.output_item] = linear_interpolate(np.arange(0, temperature.size, 1))
+
+                    linear_interpol_signal = sp.interpolate.interp1d(
+                        time_series_temperature, signal_energy, kind='linear', fill_value='extrapolate')
+
+                    dfe[self.signal_energy] = linear_interpol_signal(np.arange(0, temperature.size, 1))
+
+                except Exception as e:
+                    logger.error('Spectral failed with ' + str(e))
+
+                # absolute zscore > 3 ---> anomaly
+                dfe_orig = pd.merge_asof(dfe_orig, dfe[self.output_item],
+                                         left_index=True, right_index=True, direction='nearest', tolerance=mindelta)
+
+                if self.output_item+'_y' in dfe_orig:
+                    zScoreII = dfe_orig[self.output_item+'_y'].to_numpy()
+                elif self.output_item in dfe_orig:
+                    zScoreII = dfe_orig[self.output_item].to_numpy()
+                else:
+                    zScoreII = dfe_orig[self.input_item].to_numpy()
+
+                idx = pd.IndexSlice
+                df_copy.loc[idx[entity, :], self.output_item] = zScoreII
+
+        msg = 'SpectralAnomalyScore'
+        self.trace_append(msg)
+
+        return (df_copy)
+
+    @classmethod
+    def build_ui(cls):
+
+        # define arguments that behave as function inputs
+        inputs = []
+        inputs.append(UISingleItem(
+                name='input_item',
+                datatype=float,
+                description='Column for feature extraction'
+                                              ))
+
+        inputs.append(UISingle(
+                name='windowsize',
+                datatype=int,
+                description='Window size for spectral analysis - default 12'
+                                              ))
+
+        # define arguments that behave as function outputs
+        outputs = []
+        outputs.append(UIFunctionOutSingle(
+                name='output_item',
+                datatype=float,
+                description='Spectral anomaly score (z-Score)'
+                ))
+        outputs.append(UIFunctionOutSingle(
+                name='signal_energy',
+                datatype=float,
+                description='Signal energy'
+                ))
+        return (inputs, outputs)
+
+
 class SpectralAnomalyScore(BaseTransformer):
     '''
     Employs spectral analysis to extract features from the time series data and to compute zscore from it
