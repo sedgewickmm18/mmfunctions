@@ -280,7 +280,7 @@ class SpectralAnomalyScore2(BaseTransformer):
                     # compute the elliptic envelope to exploit Minimum Covariance Determinant estimates
                     #    standardizing
 
-                    signal_energy = (signal_energy - signal_energy.mean())
+                    # signal_energy = (signal_energy - signal_energy.mean())
 
                     dfe[self.output_item] = 0.0002
 
@@ -307,13 +307,19 @@ class SpectralAnomalyScore2(BaseTransformer):
                 dfe_orig = pd.merge_asof(dfe_orig, dfe[[self.output_item, self.signal_energy]],
                                          left_index=True, right_index=True, direction='nearest', tolerance=mindelta)
 
+                print(dfe_orig.head(3))
+
                 if self.output_item+'_y' in dfe_orig:
                     zScoreII = dfe_orig[self.output_item+'_y'].to_numpy()
                 elif self.output_item in dfe_orig:
                     zScoreII = dfe_orig[self.output_item].to_numpy()
                 else:
                     zScoreII = dfe_orig[self.input_item].to_numpy()
-                signalII = dfe_orig[self.signal_energy+'_y'].to_numpy()
+
+                if self.signal_energy+'_y' in dfe_orig:
+                    signalII = dfe_orig[self.signal_energy+'_y'].to_numpy()
+                else:
+                    signalII = dfe_orig[self.signal_energy].to_numpy()
 
                 idx = pd.IndexSlice
                 df_copy.loc[idx[entity, :], self.output_item] = zScoreII
