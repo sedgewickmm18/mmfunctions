@@ -1289,6 +1289,7 @@ class GBMRegressor(BaseEstimatorFunction):
             alerts = ['%s_alert' % x for x in self.targets]
         self.alerts = alerts
         self.threshold = threshold
+        self.auto_train = False
         # if n_estimators is not None or num_leaves is not None or learning_rate is not None or max_depth is not None:
         if n_estimators is not None or num_leaves is not None or learning_rate is not None:
             self.params = {'n_estimators': [n_estimators],
