@@ -48,7 +48,7 @@ _IS_PREINSTALLED = False
 
 FrequencySplit = 0.3
 DefaultWindowSize = 12
-SmallEnergy = 0.0000001
+SmallEnergy = 1e-20
 
 KMeans_normalizer = 100 / 1.3
 Spectral_normalizer = 100 / 2.8
@@ -200,7 +200,7 @@ class SpectralAnomalyScore2(BaseTransformer):
     '''
     Employs spectral analysis to extract features from the time series data and to compute zscore from it
     '''
-    def __init__(self, input_item, windowsize, output_item, signal_energy):
+    def __init__(self, input_item, windowsize, output_item, signal_energy, inv_zscore):
         super().__init__()
         logger.debug(input_item)
         self.input_item = input_item
@@ -213,6 +213,7 @@ class SpectralAnomalyScore2(BaseTransformer):
 
         self.output_item = output_item
         self.signal_energy = signal_energy
+        self.inv_zscore = inv_zscore
 
     def execute(self, df):
 
@@ -259,13 +260,15 @@ class SpectralAnomalyScore2(BaseTransformer):
 
                 dfe[self.output_item] = 0.00001
                 dfe[self.signal_energy] = 0.00001
+                dfe[self.inv_zscore] = 0.00001
+
                 try:
                     # Fourier transform:
                     #   frequency, time, spectral density
                     frequency_temperature, time_series_temperature, spectral_density_temperature = signal.spectrogram(
                         temperature, fs=self.frame_rate, window='hanning',
                         nperseg=self.windowsize, noverlap=self.windowoverlap,
-                        detrend=False, scaling='spectrum')
+                        detrend='l', scaling='spectrum')
 
                     # cut off freqencies too low to fit into the window
                     frequency_temperatureb = (frequency_temperature > 2/self.windowsize).astype(int)
@@ -273,19 +276,19 @@ class SpectralAnomalyScore2(BaseTransformer):
                     frequency_temperature[frequency_temperature == 0] = 1 / self.windowsize
 
                     signal_energy = np.dot(spectral_density_temperature.T, frequency_temperature)
-                    # signal_logenergy = np.log10(np.maximum(SmallEnergy, signal_energy))
 
-                    signal_energy[signal_energy < 0] = 0
+                    # np.linalg.norm(spectral_density_temperature, axis=0)
 
-                    # compute the elliptic envelope to exploit Minimum Covariance Determinant estimates
-                    #    standardizing
-
-                    # signal_energy = (signal_energy - signal_energy.mean())
+                    signal_energy[signal_energy < SmallEnergy] = SmallEnergy
+                    inv_signal_energy = np.divide(np.ones(signal_energy.size), signal_energy)
 
                     dfe[self.output_item] = 0.0002
 
                     ets_zscore = abs(sp.stats.zscore(signal_energy)) * Spectral_normalizer
-                    logger.debug('Spectral z-score max: ' + str(ets_zscore.max()))
+                    inv_zscore = abs(sp.stats.zscore(inv_signal_energy))
+
+                    logger.debug('Spectral z-score max: ' + str(ets_zscore.max()) +
+                                 ',   Spectral inv z-score max: ' + str(inv_zscore.max()))
 
                     # length of time_series_temperature, signal_energy and ets_zscore is smaller than half the original
                     #   extend it to cover the full original length
@@ -293,18 +296,23 @@ class SpectralAnomalyScore2(BaseTransformer):
                     linear_interpolate = sp.interpolate.interp1d(
                         time_series_temperature, ets_zscore, kind='linear', fill_value='extrapolate')
 
-                    dfe[self.output_item] = linear_interpolate(np.arange(0, temperature.size, 1))
+                    dfe[self.output_item] = abs(linear_interpolate(np.arange(0, temperature.size, 1)))
 
                     linear_interpol_signal = sp.interpolate.interp1d(
                         time_series_temperature, signal_energy, kind='linear', fill_value='extrapolate')
 
-                    dfe[self.signal_energy] = linear_interpol_signal(np.arange(0, temperature.size, 1))
+                    dfe[self.signal_energy] = abs(linear_interpol_signal(np.arange(0, temperature.size, 1)))
+
+                    linear_interpol_inv_zscore = sp.interpolate.interp1d(
+                        time_series_temperature, inv_zscore, kind='linear', fill_value='extrapolate')
+
+                    dfe[self.inv_zscore] = abs(linear_interpol_inv_zscore(np.arange(0, temperature.size, 1)))
 
                 except Exception as e:
                     logger.error('Spectral failed with ' + str(e))
 
                 # absolute zscore > 3 ---> anomaly
-                dfe_orig = pd.merge_asof(dfe_orig, dfe[[self.output_item, self.signal_energy]],
+                dfe_orig = pd.merge_asof(dfe_orig, dfe[[self.output_item, self.signal_energy, self.inv_zscore]],
                                          left_index=True, right_index=True, direction='nearest', tolerance=mindelta)
 
                 print(dfe_orig.head(3))
@@ -321,9 +329,15 @@ class SpectralAnomalyScore2(BaseTransformer):
                 else:
                     signalII = dfe_orig[self.signal_energy].to_numpy()
 
+                if self.inv_zscore+'_y' in dfe_orig:
+                    inv_zscoreII = dfe_orig[self.inv_zscore+'_y'].to_numpy()
+                else:
+                    inv_zscoreII = dfe_orig[self.inv_zscore].to_numpy()
+
                 idx = pd.IndexSlice
                 df_copy.loc[idx[entity, :], self.output_item] = zScoreII
                 df_copy.loc[idx[entity, :], self.signal_energy] = signalII
+                df_copy.loc[idx[entity, :], self.inv_zscore] = inv_zscoreII
 
         msg = 'SpectralAnomalyScore2'
         self.trace_append(msg)
@@ -358,6 +372,11 @@ class SpectralAnomalyScore2(BaseTransformer):
                 name='signal_energy',
                 datatype=float,
                 description='Signal energy'
+                ))
+        outputs.append(UIFunctionOutSingle(
+                name='inv_zscore',
+                datatype=float,
+                description='zScore of inverted signal energy'
                 ))
         return (inputs, outputs)
 
@@ -1282,13 +1301,10 @@ class GBMRegressor(BaseEstimatorFunction):
         self.estimators['light_gradient_boosted_regressor'] = (lightgbm.LGBMRegressor, self.params)
         logger.info('GBMRegressor start search for best model')
 
-    def __init__(self, features, targets, threshold, predictions=None, alerts=None,
+    def __init__(self, features, targets, predictions=None,
                  n_estimators=None, num_leaves=None, learning_rate=None, max_depth=None):
         super().__init__(features=features, targets=targets, predictions=predictions)
-        if alerts is None:
-            alerts = ['%s_alert' % x for x in self.targets]
-        self.alerts = alerts
-        self.threshold = threshold
+        self.experiments_per_execution = 1
         self.auto_train = False
         # if n_estimators is not None or num_leaves is not None or learning_rate is not None or max_depth is not None:
         if n_estimators is not None or num_leaves is not None or learning_rate is not None:
@@ -1306,25 +1322,29 @@ class GBMRegressor(BaseEstimatorFunction):
 
     def execute(self, df):
 
-        try:
-            df_new = super().execute(df)
-        except Exception as e:
-            logger.info('GBMRegressor failed with: ' + str(e))
-            pass
+        df_copy = df.copy()
+        entities = np.unique(df_copy.index.levels[0])
+        logger.debug(str(entities))
 
-        try:
-            df = df_new
-            for i, t in enumerate(self.targets):
-                prediction = self.predictions[i]
-                df['_diff_'] = (df[t] - df[prediction]).abs()
-                alert = AlertHighValue(input_item='_diff_', upper_threshold=self.threshold, alert_name=self.alerts[i])
-                alert.set_entity_type(self.get_entity_type())
-                df = alert.execute(df)
-        except Exception as e4:
-            logger.info('GBMRegressor eval failed with: ' + str(e4))
-            pass
+        missing_cols = [x for x in self.predictions if x not in df_copy.columns]
+        for m in missing_cols:
+            df_copy[m] = None
 
-        return df
+        for entity in entities:
+            # per entity - copy for later inplace operations
+            # dfe = df_copy.loc[[entity]].dropna(how='all')
+            # dfe = df_copy.loc[[entity]].copy()
+            # try:
+                dfe = super()._execute(df_copy.loc[[entity]], entity)
+                print(df_copy.columns)
+                # for c in self.predictions:
+                df_copy.loc[entity, self.predictions] = dfe[self.predictions]
+                # df_copy = df_copy.loc[[entity]] = dfe
+                print(df_copy.columns)
+            # except Exception as e:
+                # logger.info('GBMRegressor for entity ' + str(entity) + ' failed with: ' + str(e))
+                # continue
+        return df_copy
 
     @classmethod
     def build_ui(cls):
@@ -1333,8 +1353,6 @@ class GBMRegressor(BaseEstimatorFunction):
         inputs.append(UIMultiItem(name='features', datatype=float, required=True))
         inputs.append(UIMultiItem(name='targets', datatype=float, required=True, output_item='predictions',
                                   is_output_datatype_derived=True))
-        inputs.append(UISingle(name='threshold', datatype=float,
-                               description=('Threshold for firing an alert. Expressed as absolute value not percent.')))
         inputs.append(UISingle(name='n_estimators', datatype=int, required=False,
                                description=('Max rounds of boosting')))
         inputs.append(UISingle(name='num_leaves', datatype=int, required=False,
@@ -1345,14 +1363,11 @@ class GBMRegressor(BaseEstimatorFunction):
                                description=('Cut tree to prevent overfitting')))
         # define arguments that behave as function outputs
         outputs = []
-        outputs.append(
-            UIFunctionOutMulti(name='alerts', datatype=bool, cardinality_from='targets', is_datatype_derived=False, ))
-
         return (inputs, outputs)
 
     @classmethod
     def get_input_items(cls):
-        return ['features', 'targets', 'threshold']
+        return ['features', 'targets']
 
 
 class SimpleAnomaly(BaseRegressor):
