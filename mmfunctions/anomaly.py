@@ -50,7 +50,8 @@ FrequencySplit = 0.3
 DefaultWindowSize = 12
 SmallEnergy = 1e-20
 
-KMeans_normalizer = 100 / 1.3
+# KMeans_normalizer = 100 / 1.3
+KMeans_normalizer = 1
 Spectral_normalizer = 100 / 2.8
 FFT_normalizer = 1
 Saliency_normalizer = 1
