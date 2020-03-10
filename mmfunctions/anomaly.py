@@ -399,6 +399,8 @@ class SpectralAnomalyScore(BaseTransformer):
 
         self.output_item = output_item
 
+        self.whoami = 'Spectral'
+
     def execute(self, df):
 
         df_copy = df.copy()
@@ -586,6 +588,8 @@ class KMeansAnomalyScore(BaseTransformer):
         self.frame_rate = 1
 
         self.output_item = output_item
+
+        self.whoami = 'KMeans'
 
     def prepare_data(self, dfEntity):
 
