@@ -587,6 +587,31 @@ class KMeansAnomalyScore(BaseTransformer):
 
         self.output_item = output_item
 
+    def prepare_data(self, dfEntity):
+
+        logger.debug(self.whoami + ': prepare Data')
+
+        # interpolate gaps - data imputation
+        if len(dfEntity.index.names) > 1:
+            index_names = dfEntity.index.names
+            dfe = dfEntity.reset_index().set_index(index_names[0])
+        else:
+            index_names = None
+            dfe = dfEntity
+
+        try:
+            dfe = dfe.interpolate(method="time")
+        except Exception as e:
+            logger.error('Prepare data error: ' + str(e))
+
+        # one dimensional time series - named temperature for catchyness
+        temperature = dfe[[self.input_item]].fillna(0).to_numpy().reshape(-1,)
+
+        if index_names is not None:
+            dfe = dfe.reset_index().set_index(index_names)
+
+        return dfe, temperature
+
     def execute(self, df):
 
         df_copy = df.copy()
@@ -613,12 +638,9 @@ class KMeansAnomalyScore(BaseTransformer):
 
             logger.debug('Timedelta:' + str(mindelta))
 
-            #  interpolate gaps - data imputation
-            # Size = dfe[[self.input_item]].fillna(0).to_numpy().size
-            dfe = dfe.interpolate(method='time')
-
-            # one dimensional time series - named temperature for catchyness
-            temperature = dfe[[self.input_item]].fillna(0).to_numpy().reshape(-1,)
+            # interpolate gaps - data imputation by default
+            #   for missing data detection we look at the timestamp gradient instead
+            dfe, temperature = self.prepare_data(dfe)
 
             logger.debug('Module KMeans, Entity: ' + str(entity) + ', Input: ' + str(self.input_item) +
                          ', Windowsize: ' + str(self.windowsize) + ', Output: ' + str(self.output_item) +
