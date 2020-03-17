@@ -1,0 +1,15 @@
+language: python
+python:
+  - "3.6"
+# command to install dependencies
+install:
+  - pip install nose pylint
+  - pip install .
+# command to run tests
+script:
+  - nosetests --nocapture
+#  - find . -name "*.py" -exec pylint -E --disable=import-error '{}' +
+branches:
+  only:
+  - master
+  - development

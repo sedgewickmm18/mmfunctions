@@ -197,11 +197,11 @@ class Saliency(object):
         return spectral_residual
 
 
-class SpectralAnomalyScore2(BaseTransformer):
+class SpectralAnomalyScore(BaseTransformer):
     '''
     Employs spectral analysis to extract features from the time series data and to compute zscore from it
     '''
-    def __init__(self, input_item, windowsize, output_item, signal_energy, inv_zscore):
+    def __init__(self, input_item, windowsize, output_item):
         super().__init__()
         logger.debug(input_item)
         self.input_item = input_item
@@ -213,8 +213,35 @@ class SpectralAnomalyScore2(BaseTransformer):
         self.frame_rate = 1
 
         self.output_item = output_item
-        self.signal_energy = signal_energy
-        self.inv_zscore = inv_zscore
+
+        self.inv_zscore = None
+
+        self.whoami = 'Spectral'
+
+    def prepare_data(self, dfEntity):
+
+        logger.debug(self.whoami + ': prepare Data')
+
+        # interpolate gaps - data imputation
+        if len(dfEntity.index.names) > 1:
+            index_names = dfEntity.index.names
+            dfe = dfEntity.reset_index().set_index(index_names[0])
+        else:
+            index_names = None
+            dfe = dfEntity
+
+        try:
+            dfe = dfe.interpolate(method="time")
+        except Exception as e:
+            logger.error('Prepare data error: ' + str(e))
+
+        # one dimensional time series - named temperature for catchyness
+        temperature = dfe[[self.input_item]].fillna(0).to_numpy().reshape(-1,)
+
+        if index_names is not None:
+            dfe = dfe.reset_index().set_index(index_names)
+
+        return dfe, temperature
 
     def execute(self, df):
 
@@ -242,12 +269,12 @@ class SpectralAnomalyScore2(BaseTransformer):
 
             logger.debug('Timedelta:' + str(mindelta))
 
-            #  interpolate gaps - data imputation
-            # Size = dfe[[self.input_item]].fillna(0).to_numpy().size
-            dfe = dfe.interpolate(method='time')
-
             # one dimensional time series - named temperature for catchyness
             temperature = dfe[[self.input_item]].fillna(0).to_numpy().reshape(-1,)
+
+            # interpolate gaps - data imputation by default
+            #   for missing data detection we look at the timestamp gradient instead
+            dfe, temperature = self.prepare_data(dfe)
 
             logger.debug('Module Spectral, Entity: ' + str(entity) + ', Input: ' + str(self.input_item) +
                          ', Windowsize: ' + str(self.windowsize) + ', Output: ' + str(self.output_item) +
@@ -260,8 +287,8 @@ class SpectralAnomalyScore2(BaseTransformer):
                 logger.debug(str(temperature.size) + str(self.windowsize))
 
                 dfe[self.output_item] = 0.00001
-                dfe[self.signal_energy] = 0.00001
-                dfe[self.inv_zscore] = 0.00001
+                if self.inv_zscore is not None:
+                    dfe[self.inv_zscore] = 0.00001
 
                 try:
                     # Fourier transform:
@@ -299,21 +326,17 @@ class SpectralAnomalyScore2(BaseTransformer):
 
                     dfe[self.output_item] = abs(linear_interpolate(np.arange(0, temperature.size, 1)))
 
-                    linear_interpol_signal = sp.interpolate.interp1d(
-                        time_series_temperature, signal_energy, kind='linear', fill_value='extrapolate')
+                    if self.inv_zscore is not None:
+                        linear_interpol_inv_zscore = sp.interpolate.interp1d(
+                            time_series_temperature, inv_zscore, kind='linear', fill_value='extrapolate')
 
-                    dfe[self.signal_energy] = abs(linear_interpol_signal(np.arange(0, temperature.size, 1)))
-
-                    linear_interpol_inv_zscore = sp.interpolate.interp1d(
-                        time_series_temperature, inv_zscore, kind='linear', fill_value='extrapolate')
-
-                    dfe[self.inv_zscore] = abs(linear_interpol_inv_zscore(np.arange(0, temperature.size, 1)))
+                        dfe[self.inv_zscore] = abs(linear_interpol_inv_zscore(np.arange(0, temperature.size, 1)))
 
                 except Exception as e:
                     logger.error('Spectral failed with ' + str(e))
 
                 # absolute zscore > 3 ---> anomaly
-                dfe_orig = pd.merge_asof(dfe_orig, dfe[[self.output_item, self.signal_energy, self.inv_zscore]],
+                dfe_orig = pd.merge_asof(dfe_orig, dfe[[self.output_item, self.inv_zscore]],
                                          left_index=True, right_index=True, direction='nearest', tolerance=mindelta)
 
                 print(dfe_orig.head(3))
@@ -325,218 +348,22 @@ class SpectralAnomalyScore2(BaseTransformer):
                 else:
                     zScoreII = dfe_orig[self.input_item].to_numpy()
 
-                if self.signal_energy+'_y' in dfe_orig:
-                    signalII = dfe_orig[self.signal_energy+'_y'].to_numpy()
-                else:
-                    signalII = dfe_orig[self.signal_energy].to_numpy()
-
-                if self.inv_zscore+'_y' in dfe_orig:
-                    inv_zscoreII = dfe_orig[self.inv_zscore+'_y'].to_numpy()
-                else:
-                    inv_zscoreII = dfe_orig[self.inv_zscore].to_numpy()
-
-                idx = pd.IndexSlice
-                df_copy.loc[idx[entity, :], self.output_item] = zScoreII
-                df_copy.loc[idx[entity, :], self.signal_energy] = signalII
-                df_copy.loc[idx[entity, :], self.inv_zscore] = inv_zscoreII
-
-        msg = 'SpectralAnomalyScore2'
-        self.trace_append(msg)
-
-        return (df_copy)
-
-    @classmethod
-    def build_ui(cls):
-
-        # define arguments that behave as function inputs
-        inputs = []
-        inputs.append(UISingleItem(
-                name='input_item',
-                datatype=float,
-                description='Column for feature extraction'
-                                              ))
-
-        inputs.append(UISingle(
-                name='windowsize',
-                datatype=int,
-                description='Window size for spectral analysis - default 12'
-                                              ))
-
-        # define arguments that behave as function outputs
-        outputs = []
-        outputs.append(UIFunctionOutSingle(
-                name='output_item',
-                datatype=float,
-                description='Spectral anomaly score (z-Score)'
-                ))
-        outputs.append(UIFunctionOutSingle(
-                name='signal_energy',
-                datatype=float,
-                description='Signal energy'
-                ))
-        outputs.append(UIFunctionOutSingle(
-                name='inv_zscore',
-                datatype=float,
-                description='zScore of inverted signal energy'
-                ))
-        return (inputs, outputs)
-
-
-class SpectralAnomalyScore(BaseTransformer):
-    '''
-    Employs spectral analysis to extract features from the time series data and to compute zscore from it
-    '''
-    def __init__(self, input_item, windowsize, output_item):
-        super().__init__()
-        logger.debug(input_item)
-        self.input_item = input_item
-
-        # use 12 by default
-        self.windowsize, self.windowoverlap = set_window_size_and_overlap(windowsize)
-
-        # assume 1 per sec for now
-        self.frame_rate = 1
-
-        self.output_item = output_item
-
-        self.whoami = 'Spectral'
-
-    def execute(self, df):
-
-        df_copy = df.copy()
-        entities = np.unique(df.index.levels[0])
-        logger.debug(str(entities))
-
-        df_copy[self.output_item] = 0
-        # df_copy.sort_index()   # NoOp
-
-        for entity in entities:
-            # per entity - copy for later inplace operations
-            dfe = df_copy.loc[[entity]].dropna(how='all')
-            dfe_orig = df_copy.loc[[entity]].copy()
-
-            # get rid of entityid part of the index
-            # do it inplace as we copied the data before
-            dfe.reset_index(level=[0], inplace=True)
-            dfe.sort_index(inplace=True)
-            dfe_orig.reset_index(level=[0], inplace=True)
-            dfe_orig.sort_index(inplace=True)
-
-            # minimal time delta for merging
-            mindelta = min_delta(dfe_orig)
-
-            logger.debug('Timedelta:' + str(mindelta))
-
-            #  interpolate gaps - data imputation
-            # Size = dfe[[self.input_item]].fillna(0).to_numpy().size
-            dfe = dfe.interpolate(method='time')
-
-            # one dimensional time series - named temperature for catchyness
-            temperature = dfe[[self.input_item]].fillna(0).to_numpy().reshape(-1,)
-
-            logger.debug('Module Spectral, Entity: ' + str(entity) + ', Input: ' + str(self.input_item) +
-                         ', Windowsize: ' + str(self.windowsize) + ', Output: ' + str(self.output_item) +
-                         ', Overlap: ' + str(self.windowoverlap) + ', Inputsize: ' + str(temperature.size))
-
-            if temperature.size <= self.windowsize:
-                logger.debug(str(temperature.size) + ' <= ' + str(self.windowsize))
-                # df_copy.loc[[entity]] = 0.0001
-                dfe[self.output_item] = 0.0001
-            else:
-                logger.debug(str(temperature.size) + str(self.windowsize))
-
-                dfe[self.output_item] = 0.0007
-                try:
-                    # Fourier transform:
-                    #   frequency, time, spectral density
-                    frequency_temperature, time_series_temperature, spectral_density_temperature = signal.spectrogram(
-                        temperature, fs=self.frame_rate, window='hanning',
-                        nperseg=self.windowsize, noverlap=self.windowoverlap,
-                        detrend=False, scaling='spectrum')
-
-                    # cut off freqencies too low to fit into the window
-                    frequency_temperatureb = (frequency_temperature > 2/self.windowsize).astype(int)
-                    frequency_temperature = frequency_temperature * frequency_temperatureb
-                    frequency_temperature[frequency_temperature == 0] = 1 / self.windowsize
-
-                    highfrequency_temperature = frequency_temperature.copy()
-                    lowfrequency_temperature = frequency_temperature.copy()
-                    highfrequency_temperature[highfrequency_temperature <= FrequencySplit] = 0
-                    lowfrequency_temperature[lowfrequency_temperature > FrequencySplit] = 0
-
-                    # Compute energy = frequency * spectral density over time in decibel
-                    # lowsignal_energy = np.log10(np.maximum(SmallEnergy, np.dot(spectral_density_temperature.T,
-                    #                             lowfrequency_temperature)) + SmallEnergy)
-                    # highsignal_energy = np.log10(np.maximum(SmallEnergy, np.dot(spectral_density_temperature.T,
-                    #                              highfrequency_temperature)) + SmallEnergy)
-
-                    signal_energy = np.dot(spectral_density_temperature.T, frequency_temperature)
-                    lowsignal_energy = np.dot(spectral_density_temperature.T, lowfrequency_temperature)
-                    highsignal_energy = np.dot(spectral_density_temperature.T, highfrequency_temperature)
-
-                    signal_energy[signal_energy < 0] = 0
-                    lowsignal_energy[lowsignal_energy < 0] = 0
-                    highsignal_energy[highsignal_energy < 0] = 0
-
-                    # compute the elliptic envelope to exploit Minimum Covariance Determinant estimates
-                    #    standardizing
-
-                    signal_energy = (signal_energy - signal_energy.mean())
-                    lowsignal_energy = (lowsignal_energy - lowsignal_energy.mean())
-                    highsignal_energy = (highsignal_energy - highsignal_energy.mean())
-
-                    twoDimsignal_energy = np.vstack((lowsignal_energy, highsignal_energy)).T
-                    logger.debug('lowsignal_energy: ' + str(lowsignal_energy.shape) + ', highsignal_energy:' +
-                                 str(highsignal_energy.shape) + 'input' + str(twoDimsignal_energy.shape))
-
-                    # inliers have a score of 1, outliers -1, and 0 indicates an issue with the data
-                    dfe[self.output_item] = 0.0002
-                    # ellEnv = EllipticEnvelope(random_state=0)
-
-                    # dfe[self.output_item] = 0.0003
-                    # ellEnv.fit(twoDimsignal_energy)
-
-                    # compute distance to elliptic envelope
-                    # dfe[self.output_item] = 0.0004
-
-                    # ets_zscore = np.maximum(ellEnv.decision_function(twoDimsignal_energy).copy(), -0.1)
-                    # ets_zscore = ellEnv.decision_function(twoDimsignal_energy).copy()
-                    # ets_zscore = ellEnv.score_samples(twoDimsignal_energy).copy() - ellEnv.offset_
-                    ets_zscore = abs(sp.stats.zscore(signal_energy)) * Spectral_normalizer
-
-                    # ets_zscore = (-ellEnv.offset_) ** 0.33 - (-ets_zscore) ** 0.33
-
-                    logger.debug('Spectral z-score max: ' + str(ets_zscore.max()))
-
-                    # length of time_series_temperature, signal_energy and ets_zscore is smaller than half the original
-                    #   extend it to cover the full original length
-                    dfe[self.output_item] = 0.0005
-                    linear_interpolate = sp.interpolate.interp1d(
-                        time_series_temperature, ets_zscore, kind='linear', fill_value='extrapolate')
-
-                    dfe[self.output_item] = 0.0006
-                    zscoreI = linear_interpolate(np.arange(0, temperature.size, 1))
-
-                    dfe[self.output_item] = zscoreI
-
-                except Exception as e:
-                    logger.error('Spectral failed with ' + str(e))
-
-                # absolute zscore > 3 ---> anomaly
-                dfe_orig = pd.merge_asof(dfe_orig, dfe[self.output_item],
-                                         left_index=True, right_index=True, direction='nearest', tolerance=mindelta)
-
-                if self.output_item+'_y' in dfe_orig:
-                    zScoreII = dfe_orig[self.output_item+'_y'].to_numpy()
-                elif self.output_item in dfe_orig:
-                    zScoreII = dfe_orig[self.output_item].to_numpy()
-                else:
-                    zScoreII = dfe_orig[self.input_item].to_numpy()
+                if self.inv_zscore is not None:
+                    if self.inv_zscore+'_y' in dfe_orig:
+                        inv_zscoreII = dfe_orig[self.inv_zscore+'_y'].to_numpy()
+                    else:
+                        inv_zscoreII = dfe_orig[self.inv_zscore].to_numpy()
 
                 idx = pd.IndexSlice
                 df_copy.loc[idx[entity, :], self.output_item] = zScoreII
 
-        msg = 'SpectralAnomalyScore'
+                if self.inv_zscore is not None:
+                    df_copy.loc[idx[entity, :], self.inv_zscore] = inv_zscoreII
+
+        if self.inv_zscore is not None:
+            msg = 'SpectralAnomalyScoreExt'
+        else:
+            msg = 'SpectralAnomalyScore'
         self.trace_append(msg)
 
         return (df_copy)
@@ -564,6 +391,52 @@ class SpectralAnomalyScore(BaseTransformer):
                 name='output_item',
                 datatype=float,
                 description='Spectral anomaly score (elliptic envelope)'
+                ))
+        return (inputs, outputs)
+
+
+class SpectralAnomalyScoreExt(SpectralAnomalyScore):
+    '''
+    Employs spectral analysis to extract features from the time series data and to compute zscore from it
+    '''
+    def __init__(self, input_item, windowsize, output_item, inv_zscore):
+        super(input_item, windowsize, output_item).__init__()
+        logger.debug(input_item)
+
+        self.inv_zscore = inv_zscore
+
+    def execute(self, df):
+
+        return super.execute(df)
+
+    @classmethod
+    def build_ui(cls):
+
+        # define arguments that behave as function inputs
+        inputs = []
+        inputs.append(UISingleItem(
+                name='input_item',
+                datatype=float,
+                description='Column for feature extraction'
+                                              ))
+
+        inputs.append(UISingle(
+                name='windowsize',
+                datatype=int,
+                description='Window size for spectral analysis - default 12'
+                                              ))
+
+        # define arguments that behave as function outputs
+        outputs = []
+        outputs.append(UIFunctionOutSingle(
+                name='output_item',
+                datatype=float,
+                description='Spectral anomaly score (z-Score)'
+                ))
+        outputs.append(UIFunctionOutSingle(
+                name='inv_zscore',
+                datatype=float,
+                description='zScore of inverted signal energy'
                 ))
         return (inputs, outputs)
 
@@ -1234,13 +1107,14 @@ class AlertExpressionWithFilter(BaseEvent):
     Create alerts that are triggered when data values the expression is True
     '''
 
-    def __init__(self, expression, dimension_name, dimension_value, alert_name, **kwargs):
+    def __init__(self, expression, dimension_name, dimension_value, pulse_trigger, alert_name, **kwargs):
         self.dimension_name = dimension_name
         self.dimension_value = dimension_value
         self.expression = expression
+        self.pulse_trigger = pulse_trigger
         self.alert_name = alert_name
         logger.info('AlertExpressionWithFilter  dim: ' + dimension_name + '  exp: ' + expression + '  alert: ' +
-                    alert_name)
+                    alert_name + '  pulsed: ' + str(pulse_trigger))
         super().__init__()
 
     def _calc(self, df):
@@ -1273,8 +1147,17 @@ class AlertExpressionWithFilter(BaseEvent):
         try:
             evl = eval(expr)
             n1 = np.where(evl, True, False)
+            if pulse_trigger:
+                # walk through all subsequences starting with the longest
+                # and replace all True with True, False, False, ...
+                for i in range(n1.size, 2, -1):
+                    for j in range(0, i-1):
+                        if np.all(n1[j:i]):
+                            n1[j+1:i] = np.zeros(i-j-1, dtype=bool)
+
             n2 = np.where(df[self.dimension_name] == self.dimension_value, True, False)
             np_res = np.logical_and(n1, n2)
+
             logger.info('AlertExpressionWithFilter  shapes ' + str(n1.shape) + ' ' + str(n2.shape) + ' ' +
                         str(np_res.shape) + '  results\n - ' + str(n1) + '\n - ' + str(n2) + '\n - ' + str(np_res))
             df[self.alert_name] = np_res
@@ -1302,6 +1185,9 @@ class AlertExpressionWithFilter(BaseEvent):
                                    description="Define alert expression using pandas systax. \
                                                 Example: df['inlet_temperature']>50. ${pressure} will be substituted \
                                                 with df['pressure'] before evaluation, ${} with df[<dimension_name>]"))
+        inputs.append(UISingleItem(name='Pulse',
+                                   description="If true only generate alerts on crossing the threshold",
+                                   datatype=bool))
 
         # define arguments that behave as function outputs
         outputs = []
@@ -1472,381 +1358,3 @@ class SimpleRegressor(BaseRegressor):
         inputs.append(UIMultiItem(name='targets', datatype=float, required=True, output_item='predictions',
                                   is_output_datatype_derived=True))
         return (inputs, [])
-
-
-class AnomalyGeneratorExtremeValue(BaseTransformer):
-    '''
-    This function generates extreme anomaly.
-    '''
-
-    def __init__(self, input_item, factor, size, output_item):
-        self.input_item = input_item
-        self.output_item = output_item
-        self.factor = int(factor)
-        self.size = int(size)
-        super().__init__()
-
-    def execute(self, df):
-
-        logger.debug('Dataframe shape {}'.format(df.shape))
-
-        entity_type = self.get_entity_type()
-        derived_metric_table_name = 'DM_' + entity_type.logical_name
-        schema = entity_type._db_schema
-
-        # store and initialize the counts by entity id
-        # db = self.get_db()
-        db = self._entity_type.db
-
-        raw_dataframe = None
-        try:
-            query, table = db.query(derived_metric_table_name, schema, column_names='KEY', filters={'KEY': self.output_item})
-            raw_dataframe = db.get_query_data(query)
-            key = '_'.join([derived_metric_table_name, self.output_item])
-            logger.debug('Check for key {} in derived metric table {}'.format(self.output_item, raw_dataframe.shape))
-        except Exception as e:
-            logger.error('Checking for derived metric table %s failed with %s.' % (str(self.output_item), str(e)))
-            key = str(derived_metric_table_name) + str(self.output_item)
-            pass
-
-        if raw_dataframe is not None and raw_dataframe.empty:
-            # delete old counts if present
-            db.model_store.delete_model(key)
-            logger.debug('Intialize count for first run')
-
-        counts_by_entity_id = None
-        try:
-            counts_by_entity_id = db.model_store.retrieve_model(key)
-        except Exception as e2:
-            logger.error('Counts by entity id not yet initialized - error: ' + str(e2))
-            pass
-
-        if counts_by_entity_id is None:
-            counts_by_entity_id = {}
-        logger.debug('Initial Grp Counts {}'.format(counts_by_entity_id))
-
-        # mark Anomalies
-        entity_id = df.index.names[0]
-        print(entity_id)
-        timeseries = df.reset_index()
-        timeseries[self.output_item] = timeseries[self.input_item]
-
-        df_copy = df.copy()
-        df_copy[self.output_item] = df_copy[self.input_item]
-        entities = np.unique(df_copy.index.levels[0])
-        for entity in entities:
-            dfe = df_copy.loc[[entity]]
-            a = dfe[self.output_item].values  # reference to make life easier
-            if a.size < self.factor:
-                logger.info('Entity ' + entity + ' has not enough values to inject an extreme value anomaly')
-                continue
-
-            a1 = a[:(a.size - a.size % self.factor)]
-            a1 = np.reshape(a1, (-1, self.factor)).T
-            b = np.random.choice([-1, 1], a1.shape[1])
-            print(self.factor, '\n', dfe[self.output_item].values.shape, '\n',
-                  a1.shape, '\n', a1[0].shape, '\n', b.shape)
-
-            # use 'local' standard deviation if it exceeds 1 to make sure we're generating an anomaly
-            stdvec = np.maximum(np.std(a1, axis=0), np.ones(a1[0].size)) * self.size
-            a1[0] = np.multiply(a1[0], np.multiply(b, stdvec))
-
-            # np.copyto(a,a1)
-            a[:(a.size - a.size % self.factor)] = a1.T.flatten()
-            idx = pd.IndexSlice
-            df_copy.loc[idx[entity, :], self.output_item] = a
-
-        # df_grpby = timeseries.groupby('id')
-        df_grpby = timeseries.groupby(entity_id)
-        for grp in df_grpby.__iter__():
-
-            entity_grp_id = grp[0]
-            df_entity_grp = grp[1]
-            logger.debug('Group {} Indexes {}'.format(grp[0], df_entity_grp.index))
-
-            count = 0
-            # local_std = df_entity_grp.iloc[:10][self.input_item].std()
-            if entity_grp_id in counts_by_entity_id:
-                count = counts_by_entity_id[entity_grp_id]
-
-            counts_by_entity_id[entity_grp_id] = count + len(df_entity_grp.index) % self.factor
-
-        logger.debug('Final Grp Counts {}'.format(counts_by_entity_id))
-
-        # save the group counts to db
-        try:
-            db.model_store.store_model(key, counts_by_entity_id)
-        except Exception as e3:
-            logger.error('Counts by entity id cannot be stored - error: ' + str(e3))
-            pass
-
-        # timeseries.set_index(df.index.names, inplace=True)
-        # return timeseries
-        return df_copy
-
-    @classmethod
-    def build_ui(cls):
-        inputs = []
-        inputs.append(UISingleItem(
-                name='input_item',
-                datatype=float,
-                description='Item to base anomaly on'
-                                              ))
-
-        inputs.append(UISingle(
-                name='factor',
-                datatype=int,
-                description='Frequency of anomaly e.g. A value of 3 will create anomaly every 3 datapoints',
-                default=5
-                                              ))
-
-        inputs.append(UISingle(
-                name='size',
-                datatype=int,
-                description='Size of extreme anomalies to be created. e.g. 10 will create 10x size extreme \
-                             anomaly compared to the normal variance', default=10
-                                              ))
-
-        outputs = []
-        outputs.append(UIFunctionOutSingle(
-                name='output_item',
-                datatype=float,
-                description='Generated Item With Extreme anomalies'
-                ))
-        return (inputs, outputs)
-
-
-class AnomalyGeneratorNoData(BaseTransformer):
-    '''
-    This function generates nodata anomaly.
-    '''
-
-    def __init__(self, input_item, width, factor, output_item):
-        self.input_item = input_item
-        self.output_item = output_item
-        self.width = int(width)
-        self.factor = int(factor)
-        super().__init__()
-
-    def execute(self, df):
-
-        logger.debug('Dataframe shape {}'.format(df.shape))
-
-        entity_type = self.get_entity_type()
-        derived_metric_table_name = 'DM_'+entity_type.logical_name
-        schema = entity_type._db_schema
-
-        # store and initialize the counts by entity id
-        # db = self.get_db()
-        db = self._entity_type.db
-        query, table = db.query(derived_metric_table_name, schema, column_names='KEY', filters={'KEY': self.output_item})
-        raw_dataframe = db.get_query_data(query)
-        logger.debug('Check for key {} in derived metric table {}'.format(self.output_item, raw_dataframe.shape))
-        key = '_'.join([derived_metric_table_name, self.output_item])
-
-        if raw_dataframe is not None and raw_dataframe.empty:
-            # delete old counts if present
-            db.model_store.delete_model(key)
-            logger.debug('Intialize count for first run')
-
-        counts_by_entity_id = db.model_store.retrieve_model(key)
-        if counts_by_entity_id is None:
-            counts_by_entity_id = {}
-        logger.debug('Initial Grp Counts {}'.format(counts_by_entity_id))
-
-        # mark Anomalies
-        timeseries = df.reset_index()
-        timeseries[self.output_item] = timeseries[self.input_item]
-        df_grpby = timeseries.groupby('id')
-        for grp in df_grpby.__iter__():
-
-            entity_grp_id = grp[0]
-            df_entity_grp = grp[1]
-            logger.debug('Group {} Indexes {}'.format(grp[0], df_entity_grp.index))
-
-            count = 0
-            width = self.width
-            if entity_grp_id in counts_by_entity_id:
-                count = counts_by_entity_id[entity_grp_id][0]
-                width = counts_by_entity_id[entity_grp_id][1]
-
-            mark_anomaly = False
-            for grp_row_index in df_entity_grp.index:
-                count += 1
-
-                if width != self.width or count % self.factor == 0:
-                    # start marking points
-                    mark_anomaly = True
-
-                if mark_anomaly:
-                    timeseries[self.output_item].iloc[grp_row_index] = np.NaN
-                    width -= 1
-                    logger.debug('Anomaly Index Value{}'.format(grp_row_index))
-
-                if width == 0:
-                    # end marking points
-                    mark_anomaly = False
-                    # update values
-                    width = self.width
-                    count = 0
-
-            counts_by_entity_id[entity_grp_id] = (count, width)
-
-        logger.debug('Final Grp Counts {}'.format(counts_by_entity_id))
-
-        # save the group counts to db
-        db.model_store.store_model(key, counts_by_entity_id)
-
-        timeseries.set_index(df.index.names, inplace=True)
-        return timeseries
-
-    @classmethod
-    def build_ui(cls):
-        inputs = []
-        inputs.append(UISingleItem(
-                name='input_item',
-                datatype=float,
-                description='Item to base anomaly on'
-                                              ))
-
-        inputs.append(UISingle(
-                name='factor',
-                datatype=int,
-                description='Frequency of anomaly e.g. A value of 3 will create anomaly every 3 datapoints',
-                default=10
-                                              ))
-
-        inputs.append(UISingle(
-                name='width',
-                datatype=int,
-                description='Width of the anomaly created',
-                default=5
-                                              ))
-
-        outputs = []
-        outputs.append(UIFunctionOutSingle(
-                name='output_item',
-                datatype=float,
-                description='Generated Item With NoData anomalies'
-                ))
-        return (inputs, outputs)
-
-
-class AnomalyGeneratorFlatline(BaseTransformer):
-    '''
-    This function generates flatline anomaly.
-    '''
-
-    def __init__(self, input_item, width, factor, output_item):
-        self.input_item = input_item
-        self.output_item = output_item
-        self.width = int(width)
-        self.factor = int(factor)
-        super().__init__()
-
-    def execute(self, df):
-
-        logger.debug('Dataframe shape {}'.format(df.shape))
-
-        entity_type = self.get_entity_type()
-        derived_metric_table_name = 'DM_'+entity_type.logical_name
-        schema = entity_type._db_schema
-
-        # store and initialize the counts by entity id
-        # db = self.get_db()
-        db = self._entity_type.db
-        query, table = db.query(derived_metric_table_name, schema, column_names='KEY', filters={'KEY': self.output_item})
-        raw_dataframe = db.get_query_data(query)
-        logger.debug('Check for key column {} in derived metric table {}'.format(self.output_item, raw_dataframe.shape))
-        key = '_'.join([derived_metric_table_name, self.output_item])
-
-        if raw_dataframe is not None and raw_dataframe.empty:
-            # delete old counts if present
-            db.model_store.delete_model(key)
-            logger.debug('Intialize count for first run')
-
-        counts_by_entity_id = db.model_store.retrieve_model(key)
-        if counts_by_entity_id is None:
-            counts_by_entity_id = {}
-        logger.debug('Initial Grp Counts {}'.format(counts_by_entity_id))
-
-        # mark Anomalies
-        timeseries = df.reset_index()
-        timeseries[self.output_item] = timeseries[self.input_item]
-        df_grpby = timeseries.groupby('id')
-        for grp in df_grpby.__iter__():
-
-            entity_grp_id = grp[0]
-            df_entity_grp = grp[1]
-            logger.debug('Group {} Indexes {}'.format(grp[0], df_entity_grp.index))
-
-            count = 0
-            width = self.width
-            local_mean = df_entity_grp.iloc[:10][self.input_item].mean()
-            if entity_grp_id in counts_by_entity_id:
-                count = counts_by_entity_id[entity_grp_id][0]
-                width = counts_by_entity_id[entity_grp_id][1]
-                if count != 0:
-                    local_mean = counts_by_entity_id[entity_grp_id][2]
-
-            mark_anomaly = False
-            for grp_row_index in df_entity_grp.index:
-                count += 1
-
-                if width != self.width or count % self.factor == 0:
-                    # start marking points
-                    mark_anomaly = True
-
-                if mark_anomaly:
-                    timeseries[self.output_item].iloc[grp_row_index] = local_mean
-                    width -= 1
-                    logger.debug('Anomaly Index Value{}'.format(grp_row_index))
-
-                if width == 0:
-                    # end marking points
-                    mark_anomaly = False
-                    # update values
-                    width = self.width
-                    count = 0
-                    local_mean = df_entity_grp.iloc[:10][self.input_item].mean()
-
-            counts_by_entity_id[entity_grp_id] = (count, width, local_mean)
-
-        logger.debug('Final Grp Counts {}'.format(counts_by_entity_id))
-
-        # save the group counts to db
-        db.model_store.store_model(key, counts_by_entity_id)
-
-        timeseries.set_index(df.index.names, inplace=True)
-        return timeseries
-
-    @classmethod
-    def build_ui(cls):
-        inputs = []
-        inputs.append(UISingleItem(
-                name='input_item',
-                datatype=float,
-                description='Item to base anomaly on'
-                                              ))
-
-        inputs.append(UISingle(
-                name='factor',
-                datatype=int,
-                description='Frequency of anomaly e.g. A value of 3 will create anomaly every 3 datapoints',
-                default=10
-                                              ))
-
-        inputs.append(UISingle(
-                name='width',
-                datatype=int,
-                description='Width of the anomaly created',
-                default=5
-                                              ))
-
-        outputs = []
-        outputs.append(UIFunctionOutSingle(
-                name='output_item',
-                datatype=float,
-                description='Generated Item With Flatline anomalies'
-                ))
-        return (inputs, outputs)
