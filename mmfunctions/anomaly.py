@@ -336,7 +336,11 @@ class SpectralAnomalyScore(BaseTransformer):
                     logger.error('Spectral failed with ' + str(e))
 
                 # absolute zscore > 3 ---> anomaly
-                dfe_orig = pd.merge_asof(dfe_orig, dfe[[self.output_item, self.inv_zscore]],
+                if self.inv_zscore is not None:
+                    col_list = [self.output_item, self.inv_zscore]
+                else:
+                    col_list = [self.output_item]
+                dfe_orig = pd.merge_asof(dfe_orig, dfe[col_list],
                                          left_index=True, right_index=True, direction='nearest', tolerance=mindelta)
 
                 print(dfe_orig.head(3))
