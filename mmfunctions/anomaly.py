@@ -1107,14 +1107,13 @@ class AlertExpressionWithFilter(BaseEvent):
     Create alerts that are triggered when data values the expression is True
     '''
 
-    def __init__(self, expression, dimension_name, dimension_value, pulse_trigger, alert_name, **kwargs):
+    def __init__(self, expression, dimension_name, dimension_value, alert_name, **kwargs):
         self.dimension_name = dimension_name
         self.dimension_value = dimension_value
         self.expression = expression
-        self.pulse_trigger = pulse_trigger
+        self.pulse_trigger = None
         self.alert_name = alert_name
-        logger.info('AlertExpressionWithFilter  dim: ' + dimension_name + '  exp: ' + expression + '  alert: ' +
-                    alert_name + '  pulsed: ' + str(pulse_trigger))
+        logger.info('AlertExpressionWithFilter  dim: ' + dimension_name + '  exp: ' + expression + '  alert: ' + alert_name)
         super().__init__()
 
     def _calc(self, df):
@@ -1147,7 +1146,7 @@ class AlertExpressionWithFilter(BaseEvent):
         try:
             evl = eval(expr)
             n1 = np.where(evl, True, False)
-            if pulse_trigger:
+            if self.pulse_trigger:
                 # walk through all subsequences starting with the longest
                 # and replace all True with True, False, False, ...
                 for i in range(n1.size, 2, -1):
@@ -1185,7 +1184,45 @@ class AlertExpressionWithFilter(BaseEvent):
                                    description="Define alert expression using pandas systax. \
                                                 Example: df['inlet_temperature']>50. ${pressure} will be substituted \
                                                 with df['pressure'] before evaluation, ${} with df[<dimension_name>]"))
-        inputs.append(UISingleItem(name='Pulse',
+
+        # define arguments that behave as function outputs
+        outputs = []
+        outputs.append(UIFunctionOutSingle(name='alert_name', datatype=bool, description='Output of alert function'))
+        return (inputs, outputs)
+
+
+class AlertExpressionWithFilterExt(AlertExpressionWithFilter):
+    '''
+    Create alerts that are triggered when data values the expression is True
+    '''
+
+    def __init__(self, expression, dimension_name, dimension_value, pulse_trigger, alert_name, **kwargs):
+        super().__init__(self, expression, dimension_name, dimension_value, alert_name, **kwargs)
+        self.pulse_trigger = pulse_trigger
+        logger.info('AlertExpressionWithFilterExt  dim: ' + self.dimension_name + '  exp: ' + self.expression + '  alert: ' +
+                    self.alert_name + '  pulsed: ' + str(pulse_trigger))
+
+    def _calc(self, df):
+        '''
+        unused
+        '''
+        return df
+
+    def execute(self, df):
+        return super.execute(df)
+
+    @classmethod
+    def build_ui(cls):
+        # define arguments that behave as function inputs
+        inputs = []
+        inputs.append(UISingleItem(name='dimension_name', datatype=str))
+        inputs.append(UISingle(name='dimension_value', datatype=str,
+                               description='Dimension Filter Value'))
+        inputs.append(UIExpression(name='expression',
+                                   description="Define alert expression using pandas systax. \
+                                                Example: df['inlet_temperature']>50. ${pressure} will be substituted \
+                                                with df['pressure'] before evaluation, ${} with df[<dimension_name>]"))
+        inputs.append(UISingleItem(name='pulse_trigger',
                                    description="If true only generate alerts on crossing the threshold",
                                    datatype=bool))
 
