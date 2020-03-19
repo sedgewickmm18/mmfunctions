@@ -197,6 +197,26 @@ class Saliency(object):
         return spectral_residual
 
 
+def merge_score(dfEntity, dfEntityOrig, column_name, score, mindelta):
+    '''
+    Fit interpolated score to original entity slice of the full dataframe
+    '''
+
+    # equip score with time values
+    dfEntity[column_name] = score
+
+    # merge
+    dfEntityOrig = pd.merge_asof(dfEntityOrig, dfEntity[column_name],
+                                 left_index=True, right_index=True, direction='nearest', tolerance=mindelta)
+
+    if column_name + '_y' in dfEntityOrig:
+        merged_score = dfEntityOrig[column_name + '_y'].to_numpy()
+    else:
+        merged_score = dfEntityOrig[column_name].to_numpy()
+
+    return merged_score
+
+
 class SpectralAnomalyScore(BaseTransformer):
     '''
     Employs spectral analysis to extract features from the time series data and to compute zscore from it
@@ -404,14 +424,14 @@ class SpectralAnomalyScoreExt(SpectralAnomalyScore):
     Employs spectral analysis to extract features from the time series data and to compute zscore from it
     '''
     def __init__(self, input_item, windowsize, output_item, inv_zscore):
-        super(input_item, windowsize, output_item).__init__()
+        super().__init__(input_item, windowsize, output_item)
         logger.debug(input_item)
 
         self.inv_zscore = inv_zscore
 
     def execute(self, df):
 
-        return super.execute(df)
+        return super().execute(df)
 
     @classmethod
     def build_ui(cls):
@@ -563,18 +583,7 @@ class KMeansAnomalyScore(BaseTransformer):
 
                 kmeans_scoreI = linear_interpolateK(np.arange(0, temperature.size, 1))
 
-                dfe[self.output_item] = kmeans_scoreI
-
-                # absolute kmeans_score > 1000 ---> anomaly
-                dfe_orig = pd.merge_asof(dfe_orig, dfe[self.output_item],
-                                         left_index=True, right_index=True, direction='nearest', tolerance=mindelta)
-
-                if self.output_item+'_y' in dfe_orig:
-                    zScoreII = dfe_orig[self.output_item+'_y'].to_numpy()
-                elif self.output_item in dfe_orig:
-                    zScoreII = dfe_orig[self.output_item].to_numpy()
-                else:
-                    zScoreII = dfe_orig[self.input_item].to_numpy()
+                zScoreII = merge_score(dfe, dfe_orig, self.output_item, kmeans_scoreI, mindelta)
 
                 idx = pd.IndexSlice
                 df_copy.loc[idx[entity, :], self.output_item] = zScoreII
@@ -1213,7 +1222,7 @@ class AlertExpressionWithFilterExt(AlertExpressionWithFilter):
         return df
 
     def execute(self, df):
-        return super.execute(df)
+        return super().execute(df)
 
     @classmethod
     def build_ui(cls):
