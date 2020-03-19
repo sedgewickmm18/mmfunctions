@@ -1126,7 +1126,7 @@ class AlertExpressionWithFilter(BaseEvent):
         self.expression = expression
         self.pulse_trigger = None
         self.alert_name = alert_name
-        logger.info('AlertExpressionWithFilter  dim: ' + dimension_name + '  exp: ' + expression + '  alert: ' + alert_name)
+        logger.info('AlertExpressionWithFilter  dim: ' + str(dimension_name) + '  exp: ' + str(expression) + '  alert: ' + str(alert_name))
         super().__init__()
 
     def _calc(self, df):
@@ -1158,7 +1158,15 @@ class AlertExpressionWithFilter(BaseEvent):
 
         try:
             evl = eval(expr)
-            n1 = np.where(evl, True, False)
+            n1 = np.where(evl, 1, 0)
+            if self.dimension_name is None or self.dimension_value is None or \
+               len(self.dimension_name) == 0 or len(self.dimension_value) == 0:
+                n2 = n1
+                np_res = n1
+            else:
+                n2 = np.where(df[self.dimension_name] == self.dimension_value, 1, 0)
+                np_res = np.multiply(n1, n2)
+
             if self.pulse_trigger:
                 # walk through all subsequences starting with the longest
                 # and replace all True with True, False, False, ...
@@ -1166,9 +1174,7 @@ class AlertExpressionWithFilter(BaseEvent):
                     for j in range(0, i-1):
                         if np.all(n1[j:i]):
                             n1[j+1:i] = np.zeros(i-j-1, dtype=bool)
-
-            n2 = np.where(df[self.dimension_name] == self.dimension_value, True, False)
-            np_res = np.logical_and(n1, n2)
+                            n1[j] = i-j  # keep track of sequence length
 
             logger.info('AlertExpressionWithFilter  shapes ' + str(n1.shape) + ' ' + str(n2.shape) + ' ' +
                         str(np_res.shape) + '  results\n - ' + str(n1) + '\n - ' + str(n2) + '\n - ' + str(np_res))
@@ -1210,10 +1216,10 @@ class AlertExpressionWithFilterExt(AlertExpressionWithFilter):
     '''
 
     def __init__(self, expression, dimension_name, dimension_value, pulse_trigger, alert_name, **kwargs):
-        super().__init__(self, expression, dimension_name, dimension_value, alert_name, **kwargs)
+        super().__init__(expression, dimension_name, dimension_value, alert_name, **kwargs)
         self.pulse_trigger = pulse_trigger
-        logger.info('AlertExpressionWithFilterExt  dim: ' + self.dimension_name + '  exp: ' + self.expression + '  alert: ' +
-                    self.alert_name + '  pulsed: ' + str(pulse_trigger))
+        logger.info('AlertExpressionWithFilterExt  dim: ' + str(dimension_name) + '  exp: ' + str(expression) + '  alert: ' +
+                    str(alert_name) + '  pulsed: ' + str(pulse_trigger))
 
     def _calc(self, df):
         '''
@@ -1222,7 +1228,9 @@ class AlertExpressionWithFilterExt(AlertExpressionWithFilter):
         return df
 
     def execute(self, df):
-        return super().execute(df)
+        df = super().execute(df)
+        logger.info('AlertExpressionWithFilterExt  generated columns: ' + str(df.columns))
+        return df
 
     @classmethod
     def build_ui(cls):
