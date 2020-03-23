@@ -30,7 +30,7 @@ PACKAGE_URL = 'git+https://github.com/sedgewickmm18/mmfunctions.git@'
 _IS_PREINSTALLED = False
 
 
-def injectAnomaly(input_array, factor = None, size = None, width = None):
+def injectAnomaly(input_array, factor=None, size=None, width=None):
 
     # Create NaN padding for reshaping
     # nan_arr = np.repeat(np.nan, factor - input_array.size % factor)
@@ -53,9 +53,12 @@ def injectAnomaly(input_array, factor = None, size = None, width = None):
         # Mark Extreme anomalies
         a1[0] = np.multiply(a1[0], np.multiply(np.random.choice([-1, 1], a1.shape[1]), stdvec * size))
     else:
+        val = np.nan
+        if size is not None:
+            val = a1[0]
         out_width = width
         for i in range(1, width):
-            a1[i] = np.nan
+            a1[i] = val
 
     # Flattening back to 1D array
     output_array = input_array.copy()
@@ -260,8 +263,8 @@ class AnomalyGeneratorNoData(BaseTransformer):
                 width = counts_by_entity_id[entity_grp_id][1]
 
             # Start index based on counts and factor
-            if width == self.width:
-                width = 0
+            if width == 0:
+                width = self.width
                 count += 1
 
             if count == 0 or count % self.factor == 0:
@@ -403,26 +406,51 @@ class AnomalyGeneratorFlatline(BaseTransformer):
                 if count != 0:
                     local_mean = counts_by_entity_id[entity_grp_id][2]
 
-            mark_anomaly = False
-            for grp_row_index in df_entity_grp.index:
+            # Start index based on counts and factor
+            if width == 0:
+                width = self.width
                 count += 1
 
-                if width != self.width or count % self.factor == 0:
-                    # start marking points
-                    mark_anomaly = True
+            if count == 0 or count % self.factor == 0:
+                strt_idx = 0
+            else:
+                strt_idx = self.factor - count % self.factor
 
-                if mark_anomaly:
-                    timeseries[self.output_item].iloc[grp_row_index] = local_mean
-                    width -= 1
-                    # logger.debug('Anomaly Index Value{}'.format(grp_row_index))
+            # Prepare numpy array for marking anomalies
+            actual = df_entity_grp[self.output_item].values
+            a = actual[strt_idx:]
 
-                if width == 0:
-                    # end marking points
-                    mark_anomaly = False
-                    # update values
-                    width = self.width
-                    count = 0
-                    local_mean = df_entity_grp.iloc[:10][self.input_item].mean()
+            if a.size < self.factor:
+                logger.info('Not enough new data points to generate more anomalies')
+                continue   # try next time with more data points
+
+            # Update group counts for storage
+            count += actual.size
+            counts_by_entity_id[entity_grp_id] = count
+
+            width, a2 = injectAnomaly(a, factor=self.factor, size=0, width=self.width)
+
+            if False:
+                mark_anomaly = False
+                for grp_row_index in df_entity_grp.index:
+                    count += 1
+
+                    if width != self.width or count % self.factor == 0:
+                        # start marking points
+                        mark_anomaly = True
+
+                    if mark_anomaly:
+                        timeseries[self.output_item].iloc[grp_row_index] = local_mean
+                        width -= 1
+                        # logger.debug('Anomaly Index Value{}'.format(grp_row_index))
+
+                    if width == 0:
+                        # end marking points
+                        mark_anomaly = False
+                        # update values
+                        width = self.width
+                        count = 0
+                        local_mean = df_entity_grp.iloc[:10][self.input_item].mean()
 
             counts_by_entity_id[entity_grp_id] = (count, width, local_mean)
 
