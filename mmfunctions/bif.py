@@ -12,20 +12,18 @@
 The Built In Functions module contains preinstalled functions
 '''
 
-import datetime as dt
-import time
-from collections import OrderedDict
+# import datetime as dt
+# import time
+# from collections import OrderedDict
 import numpy as np
-import re
-import pandas as pd
+# import re
+# import pandas as pd
 import logging
-import warnings
-from sqlalchemy import String
+# import warnings
+# from sqlalchemy import String
 
-from iotfunctions.base import (BaseTransformer, BaseRegressor, BaseEvent, BaseEstimatorFunction)
-from iotfunctions.bif import (AlertHighValue)
-from iotfunctions.ui import (UISingle, UIMultiItem, UIFunctionOutSingle, UISingleItem, UIFunctionOutMulti,
-                             UIExpression)
+from iotfunctions.base import (BaseTransformer)
+from iotfunctions.ui import (UISingle, UIFunctionOutSingle, UISingleItem)
 
 logger = logging.getLogger(__name__)
 PACKAGE_URL = 'git+https://github.com/sedgewickmm18/mmfunctions.git@'
@@ -138,7 +136,7 @@ class AnomalyGeneratorExtremeValue(BaseTransformer):
             try:
                 timeseries.loc[df_entity_grp.index, self.output_item] = final
             except Exception as ee:
-                logger.error('Could not set anomaly because of ' + str(ee))
+                logger.error('Could not set anomaly because of ' + str(ee) + '\nSizes are ' + str(final.shape) + ',' + str(actual.shape))
                 pass
 
         logger.debug('Final Grp Counts {}'.format(counts_by_entity_id))
