@@ -386,10 +386,13 @@ class AnomalyGeneratorFlatline(BaseTransformer):
             width = self.width
             local_mean = df_entity_grp.iloc[:10][self.input_item].mean()
             if entity_grp_id in counts_by_entity_id:
-                count = counts_by_entity_id[entity_grp_id][0]
-                width = counts_by_entity_id[entity_grp_id][1]
-                if count != 0:
-                    local_mean = counts_by_entity_id[entity_grp_id][2]
+                try:
+                    count = counts_by_entity_id[entity_grp_id][0]
+                    width = counts_by_entity_id[entity_grp_id][1]
+                    if count != 0:
+                        local_mean = counts_by_entity_id[entity_grp_id][2]
+                except:
+                    pass
 
             # Start index based on counts and factor
             if width == 0:
