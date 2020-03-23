@@ -30,7 +30,7 @@ PACKAGE_URL = 'git+https://github.com/sedgewickmm18/mmfunctions.git@'
 _IS_PREINSTALLED = False
 
 
-def injectAnomaly(input_array, factor = None, size = None, anomaly = None):
+def injectAnomaly(input_array, factor = None, size = None, width = None):
 
     # Create NaN padding for reshaping
     nan_arr = np.repeat(np.nan, factor - input_array.size % factor)
@@ -40,7 +40,8 @@ def injectAnomaly(input_array, factor = None, size = None, anomaly = None):
     # Final numpy array to be transformed into 2d array
     a1 = np.reshape(a_reshape_arr, (-1, factor)).T
 
-    if anomaly is None:
+    out_width = 0
+    if width is None:
         # Calculate 'local' standard deviation if it exceeds 1 to generate anomalies
         std = np.std(a1, axis=0)
         stdvec = np.maximum(np.where(np.isnan(std), 1, std), np.ones(a1[0].size))
@@ -48,13 +49,16 @@ def injectAnomaly(input_array, factor = None, size = None, anomaly = None):
         # Mark Extreme anomalies
         a1[0] = np.multiply(a1[0], np.multiply(np.random.choice([-1, 1], a1.shape[1]), stdvec * size))
     else:
-        a1.shape[1] = anomaly
+        out_width = width
+        for i in range(1, width):
+            a1[i] = np.nan
 
     # Flattening back to 1D array
     output_array = a1.T.flatten()
     # Removing NaN padding
     output_array = output_array[~np.isnan(output_array)]
-    return output_array
+
+    return out_width, output_array
 
 
 class AnomalyGeneratorExtremeValue(BaseTransformer):
@@ -140,7 +144,7 @@ class AnomalyGeneratorExtremeValue(BaseTransformer):
             count += actual.size
             counts_by_entity_id[entity_grp_id] = count
 
-            a2 = injectAnomaly(a, factor=self.factor, size=self.size)
+            _, a2 = injectAnomaly(a, factor=self.factor, size=self.size)
 
             # Adding the missing elements to create final array
             final = np.append(actual[:strt_idx], a2)
@@ -249,25 +253,50 @@ class AnomalyGeneratorNoData(BaseTransformer):
                 count = counts_by_entity_id[entity_grp_id][0]
                 width = counts_by_entity_id[entity_grp_id][1]
 
-            mark_anomaly = False
-            for grp_row_index in df_entity_grp.index:
+            # Start index based on counts and factor
+            if width == self.width:
+                width = 0
                 count += 1
 
-                if width != self.width or count % self.factor == 0:
-                    # start marking points
-                    mark_anomaly = True
+            if count == 0 or count % self.factor == 0:
+                strt_idx = 0
+            else:
+                strt_idx = self.factor - count % self.factor
 
-                if mark_anomaly:
-                    timeseries[self.output_item].iloc[grp_row_index] = np.NaN
-                    width -= 1
-                    # logger.debug('Anomaly Index Value{}'.format(grp_row_index))
+            # Prepare numpy array for marking anomalies
+            actual = df_entity_grp[self.output_item].values
+            a = actual[strt_idx:]
 
-                if width == 0:
-                    # end marking points
-                    mark_anomaly = False
-                    # update values
-                    width = self.width
-                    count = 0
+            if a.size < self.factor:
+                logger.info('Not enough new data points to generate more anomalies')
+                continue   # try next time with more data points
+
+            # Update group counts for storage
+            count += actual.size
+            counts_by_entity_id[entity_grp_id] = count
+
+            width, a2 = injectAnomaly(a, factor=self.factor, size=self.size, width=self.width)
+
+            if False:
+                mark_anomaly = False
+                for grp_row_index in df_entity_grp.index:
+                    count += 1
+
+                    if width != self.width or count % self.factor == 0:
+                        # start marking points
+                        mark_anomaly = True
+
+                    if mark_anomaly:
+                        timeseries[self.output_item].iloc[grp_row_index] = np.NaN
+                        width -= 1
+                        # logger.debug('Anomaly Index Value{}'.format(grp_row_index))
+
+                    if width == 0:
+                        # end marking points
+                        mark_anomaly = False
+                        # update values
+                        width = self.width
+                        count = 0
 
             counts_by_entity_id[entity_grp_id] = (count, width)
 
