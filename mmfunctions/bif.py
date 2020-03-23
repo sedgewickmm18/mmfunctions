@@ -369,7 +369,7 @@ class AnomalyGeneratorFlatline(BaseTransformer):
                 if mark_anomaly:
                     timeseries[self.output_item].iloc[grp_row_index] = local_mean
                     width -= 1
-                    logger.debug('Anomaly Index Value{}'.format(grp_row_index))
+                    # logger.debug('Anomaly Index Value{}'.format(grp_row_index))
 
                 if width == 0:
                     # end marking points
