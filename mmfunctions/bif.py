@@ -145,13 +145,13 @@ class AnomalyGeneratorExtremeValue(BaseTransformer):
             actual = df_entity_grp[self.output_item].values
             a = actual[strt_idx:]
 
-            if a.size < self.factor:
-                logger.info('Not enough new data points to generate more anomalies')
-                continue   # try next time with more data points
-
             # Update group counts for storage
             count += actual.size
             counts_by_entity_id[entity_grp_id] = count
+
+            if a.size < self.factor:
+                logger.warning('Not enough new data points to generate more anomalies')
+                continue   # try next time with more data points
 
             _, a2 = injectAnomaly(a, factor=self.factor, size=self.size)
 
@@ -276,36 +276,15 @@ class AnomalyGeneratorNoData(BaseTransformer):
             actual = df_entity_grp[self.output_item].values
             a = actual[strt_idx:]
 
-            if a.size < self.factor:
-                logger.info('Not enough new data points to generate more anomalies')
-                continue   # try next time with more data points
-
             # Update group counts for storage
             count += actual.size
             counts_by_entity_id[entity_grp_id] = count
 
+            if a.size < self.factor:
+                logger.warning('Not enough new data points to generate more anomalies')
+                continue   # try next time with more data points
+
             width, a2 = injectAnomaly(a, factor=self.factor, width=self.width)
-
-            if False:
-                mark_anomaly = False
-                for grp_row_index in df_entity_grp.index:
-                    count += 1
-
-                    if width != self.width or count % self.factor == 0:
-                        # start marking points
-                        mark_anomaly = True
-
-                    if mark_anomaly:
-                        timeseries[self.output_item].iloc[grp_row_index] = np.NaN
-                        width -= 1
-                        # logger.debug('Anomaly Index Value{}'.format(grp_row_index))
-
-                    if width == 0:
-                        # end marking points
-                        mark_anomaly = False
-                        # update values
-                        width = self.width
-                        count = 0
 
             counts_by_entity_id[entity_grp_id] = (count, width)
 
@@ -420,37 +399,15 @@ class AnomalyGeneratorFlatline(BaseTransformer):
             actual = df_entity_grp[self.output_item].values
             a = actual[strt_idx:]
 
-            if a.size < self.factor:
-                logger.info('Not enough new data points to generate more anomalies')
-                continue   # try next time with more data points
-
             # Update group counts for storage
             count += actual.size
             counts_by_entity_id[entity_grp_id] = count
 
+            if a.size < self.factor:
+                logger.warning('Not enough new data points to generate more anomalies')
+                continue   # try next time with more data points
+
             width, a2 = injectAnomaly(a, factor=self.factor, size=0, width=self.width)
-
-            if False:
-                mark_anomaly = False
-                for grp_row_index in df_entity_grp.index:
-                    count += 1
-
-                    if width != self.width or count % self.factor == 0:
-                        # start marking points
-                        mark_anomaly = True
-
-                    if mark_anomaly:
-                        timeseries[self.output_item].iloc[grp_row_index] = local_mean
-                        width -= 1
-                        # logger.debug('Anomaly Index Value{}'.format(grp_row_index))
-
-                    if width == 0:
-                        # end marking points
-                        mark_anomaly = False
-                        # update values
-                        width = self.width
-                        count = 0
-                        local_mean = df_entity_grp.iloc[:10][self.input_item].mean()
 
             counts_by_entity_id[entity_grp_id] = (count, width, local_mean)
 
