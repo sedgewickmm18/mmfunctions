@@ -275,7 +275,7 @@ class AnomalyGeneratorNoData(BaseTransformer):
             count += actual.size
             counts_by_entity_id[entity_grp_id] = count
 
-            width, a2 = injectAnomaly(a, factor=self.factor, size=self.size, width=self.width)
+            width, a2 = injectAnomaly(a, factor=self.factor, width=self.width)
 
             if False:
                 mark_anomaly = False
