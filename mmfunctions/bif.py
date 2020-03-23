@@ -262,8 +262,11 @@ class AnomalyGeneratorNoData(BaseTransformer):
             count = 0
             width = self.width
             if entity_grp_id in counts_by_entity_id:
-                count = counts_by_entity_id[entity_grp_id][0]
-                width = counts_by_entity_id[entity_grp_id][1]
+                try:
+                    count = counts_by_entity_id[entity_grp_id][0]
+                    width = counts_by_entity_id[entity_grp_id][1]
+                except:
+                    pass
 
             # Start index based on counts and factor
             if width == 0:
