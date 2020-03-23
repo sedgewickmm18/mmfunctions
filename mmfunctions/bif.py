@@ -44,7 +44,6 @@ def injectAnomaly(input_array, factor=None, size=None, width=None):
     # Final numpy array to be transformed into 2d array
     a1 = np.reshape(a_reshape_arr, (-1, factor)).T
 
-    out_width = 0
     if width is None:
         # Calculate 'local' standard deviation if it exceeds 1 to generate anomalies
         std = np.std(a1, axis=0)
@@ -56,7 +55,6 @@ def injectAnomaly(input_array, factor=None, size=None, width=None):
         val = np.nan
         if size is not None:
             val = a1[0]
-        out_width = width
         for i in range(1, width):
             a1[i] = val
 
@@ -67,7 +65,63 @@ def injectAnomaly(input_array, factor=None, size=None, width=None):
     # Removing NaN padding
     # output_array = output_array[~np.isnan(output_array)]
 
-    return out_width, output_array
+    # return size of unprocessed data and processed data
+    return input_array.size-lim_size, output_array
+
+class AnomalyGenerator(BaseTransformer):
+
+    def __init__(self):
+        self.count = None   # allow to set count != 0 for unit testing
+        self.key = None
+        super().__init__()
+
+    def execute(self, df):
+        logger.debug('AnomalyGenerator class')
+        return df
+
+    def check_and_init_key(self, entity_type):
+
+        derived_metric_table_name = 'DM_' + entity_type.logical_name
+        schema = entity_type._db_schema
+
+        # store and initialize the counts by entity id
+        db = self._entity_type.db
+
+        raw_dataframe = None
+
+        try:
+            query, table = db.query(derived_metric_table_name, schema, column_names='KEY', filters={'KEY': self.output_item})
+            raw_dataframe = db.get_query_data(query)
+            self.key = '_'.join([derived_metric_table_name, self.output_item])
+            logger.debug('Check for key {} in derived metric table {}'.format(self.output_item, raw_dataframe.shape))
+        except Exception as e:
+            logger.error('Checking for derived metric table %s failed with %s.' % (str(self.output_item), str(e)))
+            self.key = str(derived_metric_table_name) + str(self.output_item)
+            pass
+
+        if raw_dataframe is not None and raw_dataframe.empty:
+            # delete old counts if present
+            db.model_store.delete_model(self.key)
+            logger.debug('Reintialize count')
+
+        counts_by_entity_id = None
+        try:
+            counts_by_entity_id = db.model_store.retrieve_model(self.key)
+        except Exception as e2:
+            counts_by_entity_id = self.count
+            logger.error('Counts by entity id not yet initialized - error: ' + str(e2))
+            pass
+
+        return counts_by_entity_id
+
+    def save_key(self, counts_by_entity_id):
+        db = self._entity_type.db
+        try:
+            db.model_store.store_model(self.key, counts_by_entity_id)
+        except Exception as e3:
+            logger.error('Counts by entity id cannot be stored - error: ' + str(e3))
+            pass
+        return
 
 
 class AnomalyGeneratorExtremeValue(BaseTransformer):
@@ -88,39 +142,7 @@ class AnomalyGeneratorExtremeValue(BaseTransformer):
         logger.debug('Dataframe shape {}'.format(df.shape))
 
         entity_type = self.get_entity_type()
-        derived_metric_table_name = 'DM_' + entity_type.logical_name
-        schema = entity_type._db_schema
-
-        # store and initialize the counts by entity id
-        db = self._entity_type.db
-
-        raw_dataframe = None
-        try:
-            query, table = db.query(derived_metric_table_name, schema, column_names='KEY', filters={'KEY': self.output_item})
-            raw_dataframe = db.get_query_data(query)
-            key = '_'.join([derived_metric_table_name, self.output_item])
-            logger.debug('Check for key {} in derived metric table {}'.format(self.output_item, raw_dataframe.shape))
-        except Exception as e:
-            logger.error('Checking for derived metric table %s failed with %s.' % (str(self.output_item), str(e)))
-            key = str(derived_metric_table_name) + str(self.output_item)
-            pass
-
-        if raw_dataframe is not None and raw_dataframe.empty:
-            # delete old counts if present
-            db.model_store.delete_model(key)
-            logger.debug('Reintialize count')
-
-        counts_by_entity_id = None
-        try:
-            counts_by_entity_id = db.model_store.retrieve_model(key)
-        except Exception as e2:
-            counts_by_entity_id = self.count
-            logger.error('Counts by entity id not yet initialized - error: ' + str(e2))
-            pass
-
-        if counts_by_entity_id is None:
-            counts_by_entity_id = {}
-        logger.debug('Initial Grp Counts {}'.format(counts_by_entity_id))
+        counts_by_entity_id = super().check_and_init_key(entity_type)
 
         timeseries = df.reset_index()
         timeseries[self.output_item] = timeseries[self.input_item]
@@ -148,15 +170,15 @@ class AnomalyGeneratorExtremeValue(BaseTransformer):
             actual = df_entity_grp[self.output_item].values
             a = actual[strt_idx:]
 
-            # Update group counts for storage
-            count += actual.size
-            counts_by_entity_id[entity_grp_id] = count
-
             if a.size < self.factor:
                 logger.warning('Not enough new data points to generate more anomalies - ' + str(actual.shape))
                 continue   # try next time with more data points
 
-            _, a2 = injectAnomaly(a, factor=self.factor, size=self.size)
+            rest, a2 = injectAnomaly(a, factor=self.factor, size=self.size)
+
+            # Update group counts for storage
+            count += actual.size
+            counts_by_entity_id[entity_grp_id] = count
 
             # Adding the missing elements to create final array
             final = np.append(actual[:strt_idx], a2)
@@ -170,11 +192,7 @@ class AnomalyGeneratorExtremeValue(BaseTransformer):
         logger.debug('Final Grp Counts {}'.format(counts_by_entity_id))
 
         # save the group counts to db
-        try:
-            db.model_store.store_model(key, counts_by_entity_id)
-        except Exception as e3:
-            logger.error('Counts by entity id cannot be stored - error: ' + str(e3))
-            pass
+        super().save_key(counts_by_entity_id)
 
         timeseries.set_index(df.index.names, inplace=True)
         return timeseries
