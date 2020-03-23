@@ -33,9 +33,13 @@ _IS_PREINSTALLED = False
 def injectAnomaly(input_array, factor = None, size = None, width = None):
 
     # Create NaN padding for reshaping
-    nan_arr = np.repeat(np.nan, factor - input_array.size % factor)
+    # nan_arr = np.repeat(np.nan, factor - input_array.size % factor)
+
     # Prepare numpy array to reshape
-    a_reshape_arr = np.append(input_array, nan_arr)
+    # a_reshape_arr = np.append(input_array, nan_arr)
+
+    lim_size = input_array.size - input_array.size % factor
+    a_reshape_arr = input_array[:lim_size]
 
     # Final numpy array to be transformed into 2d array
     a1 = np.reshape(a_reshape_arr, (-1, factor)).T
@@ -54,9 +58,11 @@ def injectAnomaly(input_array, factor = None, size = None, width = None):
             a1[i] = np.nan
 
     # Flattening back to 1D array
-    output_array = a1.T.flatten()
+    output_array = input_array.copy()
+    output_array[0:lim_size] = a1.T.flatten()
+
     # Removing NaN padding
-    output_array = output_array[~np.isnan(output_array)]
+    # output_array = output_array[~np.isnan(output_array)]
 
     return out_width, output_array
 
