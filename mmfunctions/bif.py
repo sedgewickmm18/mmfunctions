@@ -124,6 +124,7 @@ class AnomalyGeneratorExtremeValue(BaseTransformer):
 
         timeseries = df.reset_index()
         timeseries[self.output_item] = timeseries[self.input_item]
+
         df_grpby = timeseries.groupby('id')
         for grp in df_grpby.__iter__():
 
@@ -141,6 +142,8 @@ class AnomalyGeneratorExtremeValue(BaseTransformer):
             else:
                 strt_idx = self.factor - count % self.factor
 
+            logger.debug('Initial Grp Counts {}'.format(counts_by_entity_id))
+
             # Prepare numpy array for marking anomalies
             actual = df_entity_grp[self.output_item].values
             a = actual[strt_idx:]
@@ -150,7 +153,7 @@ class AnomalyGeneratorExtremeValue(BaseTransformer):
             counts_by_entity_id[entity_grp_id] = count
 
             if a.size < self.factor:
-                logger.warning('Not enough new data points to generate more anomalies')
+                logger.warning('Not enough new data points to generate more anomalies - ' + str(actual.shape))
                 continue   # try next time with more data points
 
             _, a2 = injectAnomaly(a, factor=self.factor, size=self.size)
@@ -281,7 +284,7 @@ class AnomalyGeneratorNoData(BaseTransformer):
             counts_by_entity_id[entity_grp_id] = count
 
             if a.size < self.factor:
-                logger.warning('Not enough new data points to generate more anomalies')
+                logger.warning('Not enough new data points to generate more anomalies - ' + str(actual.shape))
                 continue   # try next time with more data points
 
             width, a2 = injectAnomaly(a, factor=self.factor, width=self.width)
@@ -404,7 +407,7 @@ class AnomalyGeneratorFlatline(BaseTransformer):
             counts_by_entity_id[entity_grp_id] = count
 
             if a.size < self.factor:
-                logger.warning('Not enough new data points to generate more anomalies')
+                logger.warning('Not enough new data points to generate more anomalies - ' + str(a.shape))
                 continue   # try next time with more data points
 
             width, a2 = injectAnomaly(a, factor=self.factor, size=0, width=self.width)
