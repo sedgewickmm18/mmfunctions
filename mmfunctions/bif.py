@@ -30,6 +30,33 @@ PACKAGE_URL = 'git+https://github.com/sedgewickmm18/mmfunctions.git@'
 _IS_PREINSTALLED = False
 
 
+def injectAnomaly(input_array, factor = None, size = None, anomaly = None):
+
+    # Create NaN padding for reshaping
+    nan_arr = np.repeat(np.nan, factor - input_array.size % factor)
+    # Prepare numpy array to reshape
+    a_reshape_arr = np.append(input_array, nan_arr)
+
+    # Final numpy array to be transformed into 2d array
+    a1 = np.reshape(a_reshape_arr, (-1, factor)).T
+
+    if anomaly is None:
+        # Calculate 'local' standard deviation if it exceeds 1 to generate anomalies
+        std = np.std(a1, axis=0)
+        stdvec = np.maximum(np.where(np.isnan(std), 1, std), np.ones(a1[0].size))
+
+        # Mark Extreme anomalies
+        a1[0] = np.multiply(a1[0], np.multiply(np.random.choice([-1, 1], a1.shape[1]), stdvec * size))
+    else:
+        a1.shape[1] = anomaly
+
+    # Flattening back to 1D array
+    output_array = a1.T.flatten()
+    # Removing NaN padding
+    output_array = output_array[~np.isnan(output_array)]
+    return output_array
+
+
 class AnomalyGeneratorExtremeValue(BaseTransformer):
     '''
     This function generates extreme anomaly.
@@ -113,23 +140,8 @@ class AnomalyGeneratorExtremeValue(BaseTransformer):
             count += actual.size
             counts_by_entity_id[entity_grp_id] = count
 
-            # Create NaN padding for reshaping
-            nan_arr = np.repeat(np.nan, self.factor - a.size % self.factor)
-            # Prepare numpy array to reshape
-            a_reshape_arr = np.append(a, nan_arr)
-            # Final numpy array to be transformed
-            a1 = np.reshape(a_reshape_arr, (-1, self.factor)).T
+            a2 = injectAnomaly(a, factor=self.factor, size=self.size)
 
-            # Calculate 'local' standard deviation if it exceeds 1 to generate anomalies
-            std = np.std(a1, axis=0)
-            stdvec = np.maximum(np.where(np.isnan(std), 1, std), np.ones(a1[0].size))
-            # Mark Extreme anomalies
-            a1[0] = np.multiply(a1[0], np.multiply(np.random.choice([-1, 1], a1.shape[1]), stdvec * self.size))
-            # Flattening back to 1D array
-
-            a2 = a1.T.flatten()
-            # Removing NaN padding
-            a2 = a2[~np.isnan(a2)]
             # Adding the missing elements to create final array
             final = np.append(actual[:strt_idx], a2)
             # Set values in the original dataframe
