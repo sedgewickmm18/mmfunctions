@@ -77,7 +77,7 @@ def min_delta(df):
     if len(df.index.names) > 1:
         df2 = df.copy()
         print(df.index.size)
-        df2.index = df2.index.droplevel(list(range(1, df.index.size-1)))
+        df2.index = df2.index.droplevel(list(range(1, df.index.nlevels-1)))
     else:
         df2 = df
 
