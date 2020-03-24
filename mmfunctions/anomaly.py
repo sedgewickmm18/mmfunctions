@@ -77,7 +77,10 @@ def min_delta(df):
     if len(df.index.names) > 1:
         df2 = df.copy()
         print(df.index.size)
-        df2.index = df2.index.droplevel(list(range(2, df.index.nlevels-1)).insert(0, 0))
+        logger.debug('min delta aggregation' + str(df.index.names) + '\n' +
+                     df.index.get_level_values(0) + ', ' + df.index.get_level_values(1))
+        error
+        df2.index = df2.index.droplevel(list(range(0, df.index.nlevels-1)).insert(0, 0))
     else:
         df2 = df
 
