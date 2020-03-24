@@ -72,14 +72,15 @@ class AnomalyGenerator(BaseTransformer):
         idx = offset
 
         if a.size >= self.factor:
-            lim_size = a.size - input_array.size % self.factor
+            lim_size = a.size - a.size % self.factor
             a_reshape_arr = a[:lim_size].copy()
 
             # Final numpy array to be transformed into 2d array
             try:
                 a1 = np.reshape(a_reshape_arr, (-1, self.factor)).T
             except Exception as e:
-                logger.error('InjectAnomaly: reshape failed with ' + str(e) + ' ' + str(a_reshape_arr.shape))
+                logger.error('InjectAnomaly: reshape failed with ' + str(e) + ' ' + str(input_array.shape) + ',' +
+                             str(lim_size) + ',' + str(offset))
 
             if anomaly_extreme:
                 # Calculate 'local' standard deviation if it exceeds 1 to generate anomalies
