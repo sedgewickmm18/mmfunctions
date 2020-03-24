@@ -113,11 +113,15 @@ class AnomalyGenerator(BaseTransformer):
 
         # handle the rest of the array
         if not anomaly_extreme:
-            if filler is not None:
+            if filler is None:
+                filler = input_array[idx]
+
+            # this is not correct - a correct implementation would have to keep track of the filler on disk unless it's NaN
+            try:
                 output_array[idx:idx + min(output_array.size - idx, self.width)] = filler
-            else:
-                # this is not correct - a correct implementation would have to keep track of the filler on disk
-                output_array[idx:idx + min(output_array.size - idx, self.width)] = output_array[idx]
+            except Exception as e1:
+                logger.error('InjectAnomaly filling up fails with ' + str(e1) + ' for ' + str(filler))
+
             remainder = self.width - min(output_array.size - idx, self.width)
 
         offset = input_array.size - idx
