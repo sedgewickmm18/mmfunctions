@@ -31,14 +31,19 @@ _IS_PREINSTALLED = False
 
 
 #
+#                       | first |           main            | last|
 #
-# input array     A + + | + + + A + + + + A + + + + A ...
+# input array     A + + | + + + A + + + + A + + + + A ..... A + + | +
 #
-#        previous run   |   next run
+#        previous run   |   next run                              |  future run
 #
 #                 offset|               where to start with the next anomaly
 #
 #                       | remainder       what's left of width to be filled
+#  TODO
+#  - save filler used in previous run for correct flatline generation
+#  - save timestamp to support overlapping data/backtrack
+#
 
 class AnomalyGenerator(BaseTransformer):
 
