@@ -174,12 +174,12 @@ class AnomalyGeneratorExtremeValue(BaseTransformer):
     '''
 
     def __init__(self, input_item, factor, size, output_item):
+        super().__init__()
         self.input_item = input_item
         self.output_item = output_item
         self.factor = int(factor)
         self.size = int(size)
         self.count = None   # allow to set count != 0 for unit testing
-        super().__init__()
 
     def execute(self, df):
 
@@ -187,7 +187,7 @@ class AnomalyGeneratorExtremeValue(BaseTransformer):
 
         # initialize per entity offset and remainder
         entity_type = self.get_entity_type()
-        super().check_and_init_key(entity_type)
+        self.check_and_init_key(entity_type)
 
         timeseries = df.reset_index()
         timeseries[self.output_item] = timeseries[self.input_item]
@@ -200,13 +200,13 @@ class AnomalyGeneratorExtremeValue(BaseTransformer):
 
             # Initialize group counts, counts contain an offset and a remainder
             #  to determine where to start and how (and whether) to fill the offset
-            offset, remainder = super().extractOffset(entity_grp_id)
+            offset, remainder = self.extractOffset(entity_grp_id)
 
             logger.debug('Initial Grp Counts {}'.format(self.counts_by_entity_id))
 
             # Prepare numpy array for marking anomalies
             actual = df_entity_grp[self.output_item].values
-            offset, remainder, output_array = super().injectAnomaly(actual, offset=offset, remainder=remainder, anomaly_extreme=True)
+            offset, remainder, output_array = self.injectAnomaly(actual, offset=offset, remainder=remainder, anomaly_extreme=True)
 
             # Update group counts for storage
             self.counts_by_entity_id[entity_grp_id] = (offset, remainder)
@@ -224,7 +224,7 @@ class AnomalyGeneratorExtremeValue(BaseTransformer):
         logger.debug('Final Grp Counts {}'.format(self.counts_by_entity_id))
 
         # save the group counts to db
-        super().save_key()
+        self.save_key()
 
         timeseries.set_index(df.index.names, inplace=True)
         return timeseries
@@ -267,18 +267,19 @@ class AnomalyGeneratorNoData(BaseTransformer):
     '''
 
     def __init__(self, input_item, width, factor, output_item):
+        super().__init__()
         self.input_item = input_item
         self.output_item = output_item
         self.width = int(width)
         self.factor = int(factor)
-        super().__init__()
+        self.count = None   # allow to set count != 0 for unit testing
 
     def execute(self, df):
 
         logger.debug('Dataframe shape {}'.format(df.shape))
 
         entity_type = self.get_entity_type()
-        super().check_and_init_key(entity_type)
+        self.check_and_init_key(entity_type)
 
         # mark Anomalies
         timeseries = df.reset_index()
@@ -291,14 +292,14 @@ class AnomalyGeneratorNoData(BaseTransformer):
 
             # Initialize group counts, counts contain an offset and a remainder
             #  to determine where to start and how (and whether) to fill the offset
-            offset, remainder = super().extractOffset(entity_grp_id)
+            offset, remainder = self.extractOffset(entity_grp_id)
 
             logger.debug('Group {} Indexes {}'.format(grp[0], df_entity_grp.index))
 
             # Prepare numpy array for marking anomalies
             actual = df_entity_grp[self.output_item].values
-            offset, remainder, output_array = super().injectAnomaly(actual, offset=offset, remainder=remainder,
-                                                                    filler=np.nan, anomaly_extreme=False)
+            offset, remainder, output_array = self.injectAnomaly(actual, offset=offset, remainder=remainder,
+                                                                 filler=np.nan, anomaly_extreme=False)
 
             self.counts_by_entity_id[entity_grp_id] = (offset, remainder)
 
@@ -314,7 +315,7 @@ class AnomalyGeneratorNoData(BaseTransformer):
         logger.debug('Final Grp Counts {}'.format(self.counts_by_entity_id))
 
         # save the group counts to db
-        super().save_key()
+        self.save_key()
 
         timeseries.set_index(df.index.names, inplace=True)
         return timeseries
@@ -357,18 +358,19 @@ class AnomalyGeneratorFlatline(BaseTransformer):
     '''
 
     def __init__(self, input_item, width, factor, output_item):
+        super().__init__()
         self.input_item = input_item
         self.output_item = output_item
         self.width = int(width)
         self.factor = int(factor)
-        super().__init__()
+        self.count = None   # allow to set count != 0 for unit testing
 
     def execute(self, df):
 
         logger.debug('Dataframe shape {}'.format(df.shape))
 
         entity_type = self.get_entity_type()
-        super().check_and_init_key(entity_type)
+        self.check_and_init_key(entity_type)
         logger.debug('Initial Grp Counts {}'.format(self.counts_by_entity_id))
 
         # mark Anomalies
@@ -382,14 +384,14 @@ class AnomalyGeneratorFlatline(BaseTransformer):
 
             # Initialize group counts, counts contain an offset and a remainder
             #  to determine where to start and how (and whether) to fill the offset
-            offset, remainder = super().extractOffset(entity_grp_id)
+            offset, remainder = self.extractOffset(entity_grp_id)
 
             logger.debug('Initial Grp Counts {}'.format(self.counts_by_entity_id))
 
             # Prepare numpy array for marking anomalies
             actual = df_entity_grp[self.output_item].values
-            remainder, offset, output_array = super().injectAnomaly(actual, offset=offset, remainder=remainder,
-                                                                    filler=None, anomaly_extreme=True)
+            remainder, offset, output_array = self.injectAnomaly(actual, offset=offset, remainder=remainder,
+                                                                 filler=None, anomaly_extreme=True)
 
             # Update group counts for storage
             self.counts_by_entity_id[entity_grp_id] = (offset, remainder)
@@ -406,7 +408,7 @@ class AnomalyGeneratorFlatline(BaseTransformer):
         logger.debug('Final Grp Counts {}'.format(self.counts_by_entity_id))
 
         # save the group counts to db
-        super().save_key()
+        self.save_key()
 
         timeseries.set_index(df.index.names, inplace=True)
         return timeseries
