@@ -71,6 +71,8 @@ class AnomalyGenerator(BaseTransformer):
         if input_array.size < offset:
             logger.info('Not enough new data points to generate more anomalies - ' + str(input_array.shape))
             offset -= input_array.size
+            logger.debug('InjectAnomaly: >>>entity ' + entity_name + ', Size: ' + str(input_array.size) + ', Offset: ' +
+                         str(offset) + ', Remainder: ' + str(remainder))
             return offset, remainder, output_array
 
         # now treat the longer part of the array first (starting from offset)
@@ -80,6 +82,8 @@ class AnomalyGenerator(BaseTransformer):
 
         if a.size >= self.factor:
             lim_size = a.size - a.size % self.factor
+            logger.debug('InjectAnomaly:  Main:   entity ' + entity_name + ', a-Size: ' + str(a.size) + ', Lim: ' +
+                          str(lim_size) + ', Factor: ' + str(self.factor))
             a_reshape_arr = a[:lim_size].copy()
 
             # Final numpy array to be transformed into 2d array
