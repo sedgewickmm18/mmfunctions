@@ -114,10 +114,10 @@ class AnomalyGenerator(BaseTransformer):
         # handle the rest of the array
         if not anomaly_extreme:
             if filler is not None:
-                output_array[idx:min(output_array.size - idx, self.width)] = filler
+                output_array[idx:idx + min(output_array.size - idx, self.width)] = filler
             else:
                 # this is not correct - a correct implementation would have to keep track of the filler on disk
-                output_array[idx:min(output_array.size - idx, self.width)] = output_array[idx]
+                output_array[idx:idx + min(output_array.size - idx, self.width)] = output_array[idx]
             remainder = self.width - min(output_array.size - idx, self.width)
 
         offset = input_array.size - idx
