@@ -59,8 +59,8 @@ class AnomalyGenerator(BaseTransformer):
     def injectAnomaly(self, input_array, offset=None, remainder=None, entity_name='', filler=None, anomaly_extreme=None):
 
         output_array = input_array.copy()
-        logger.debug('InjectAnomaly: <<<entity ' + entity_name + ', Size: ' + input_array.size + ', Offset: ' + offset +
-                     ', Remainder: ' + remainder)
+        logger.debug('InjectAnomaly: <<<entity ' + entity_name + ', Size: ' + str(input_array.size) + ', Offset: ' +
+                     str(offset) + ', Remainder: ' + str(remainder))
 
         # start with part before the first anomaly
         if not anomaly_extreme:
@@ -118,8 +118,8 @@ class AnomalyGenerator(BaseTransformer):
 
         offset = input_array.size - idx
 
-        logger.debug('InjectAnomaly: >>>entity ' + entity_name + ', Size: ' + input_array.size + ', Offset: ' + offset +
-                     ', Remainder: ' + remainder)
+        logger.debug('InjectAnomaly: >>>entity ' + entity_name + ', Size: ' + str(input_array.size) + ', Offset: ' +
+                     str(offset) + ', Remainder: ' + str(remainder))
 
         return offset, remainder, output_array
 
