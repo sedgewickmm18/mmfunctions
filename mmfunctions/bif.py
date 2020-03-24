@@ -65,7 +65,7 @@ class AnomalyGenerator(BaseTransformer):
         # start with part before the first anomaly
         if not anomaly_extreme:
             output_array[0:min(input_array.size, remainder)] = filler
-        remainder -= remainder - min(input_array.size, remainder)
+        remainder -= min(input_array.size, remainder)
 
         # just move the offset a bit
         if input_array.size < offset:
@@ -83,7 +83,7 @@ class AnomalyGenerator(BaseTransformer):
         if a.size >= self.factor:
             lim_size = a.size - a.size % self.factor
             logger.debug('InjectAnomaly:  Main:   entity ' + entity_name + ', a-Size: ' + str(a.size) + ', Lim: ' +
-                          str(lim_size) + ', Factor: ' + str(self.factor))
+                         str(lim_size) + ', Factor: ' + str(self.factor))
             a_reshape_arr = a[:lim_size].copy()
 
             # Final numpy array to be transformed into 2d array
