@@ -167,13 +167,13 @@ class AnomalyGenerator(BaseTransformer):
     def extractOffset(self, entity_grp_id):
         offset = 0
         remainder = 0
-        if entity_grp_id in self.counts_by_entity_id:
-            try:
+        try:
+            if entity_grp_id in self.counts_by_entity_id:
                 offset = self.counts_by_entity_id[entity_grp_id][0]
                 remainder = self.counts_by_entity_id[entity_grp_id][1]
-            except Exception as e:
-                logger.info('No proper offset and remainder ' + str(e))
-                pass
+        except Exception as e:
+            logger.info('No proper offset and remainder ' + str(e))
+            pass
         return offset, remainder
 
 
