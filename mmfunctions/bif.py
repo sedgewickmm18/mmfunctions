@@ -56,14 +56,16 @@ class AnomalyGenerator(BaseTransformer):
         self.counts_by_entity_id = None
         super().__init__()
 
-    def injectAnomaly(self, input_array, offset=None, remainder=None, filler=None, anomaly_extreme=None):
+    def injectAnomaly(self, input_array, offset=None, remainder=None, entity_name='', filler=None, anomaly_extreme=None):
 
         output_array = input_array.copy()
+        logger.debug('InjectAnomaly: <<<entity ' + entity_name + ', Size: ' + input_array.size + ', Offset: ' + offset +
+                     ', Remainder: ' + remainder)
 
         # start with part before the first anomaly
         if not anomaly_extreme:
             output_array[0:min(input_array.size, remainder)] = filler
-        remainder -= min(input_array.size, remainder)
+        remainder -= remainder - min(input_array.size, remainder)
 
         # just move the offset a bit
         if input_array.size < offset:
@@ -115,6 +117,9 @@ class AnomalyGenerator(BaseTransformer):
             remainder = self.width - min(output_array.size - idx, self.width)
 
         offset = input_array.size - idx
+
+        logger.debug('InjectAnomaly: >>>entity ' + entity_name + ', Size: ' + input_array.size + ', Offset: ' + offset +
+                     ', Remainder: ' + remainder)
 
         return offset, remainder, output_array
 
@@ -219,7 +224,8 @@ class AnomalyGeneratorExtremeValue(AnomalyGenerator):
 
             # Prepare numpy array for marking anomalies
             actual = df_entity_grp[self.output_item].values
-            offset, remainder, output_array = self.injectAnomaly(actual, offset=offset, remainder=remainder, anomaly_extreme=True)
+            offset, remainder, output_array = self.injectAnomaly(actual, offset=offset, remainder=remainder,
+                                                                 entity_name=entity_grp_id, anomaly_extreme=True)
 
             # Update group counts for storage
             self.counts_by_entity_id[entity_grp_id] = (offset, remainder)
@@ -312,7 +318,7 @@ class AnomalyGeneratorNoData(AnomalyGenerator):
             # Prepare numpy array for marking anomalies
             actual = df_entity_grp[self.output_item].values
             offset, remainder, output_array = self.injectAnomaly(actual, offset=offset, remainder=remainder,
-                                                                 filler=np.nan, anomaly_extreme=False)
+                                                                 entity_name=entity_grp_id, filler=np.nan, anomaly_extreme=False)
 
             self.counts_by_entity_id[entity_grp_id] = (offset, remainder)
 
@@ -404,7 +410,7 @@ class AnomalyGeneratorFlatline(AnomalyGenerator):
             # Prepare numpy array for marking anomalies
             actual = df_entity_grp[self.output_item].values
             remainder, offset, output_array = self.injectAnomaly(actual, offset=offset, remainder=remainder,
-                                                                 filler=None, anomaly_extreme=True)
+                                                                 entity_name=entity_grp_id, filler=None, anomaly_extreme=False)
 
             # Update group counts for storage
             self.counts_by_entity_id[entity_grp_id] = (offset, remainder)
