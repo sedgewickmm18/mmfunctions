@@ -168,7 +168,7 @@ class AnomalyGenerator(BaseTransformer):
         return offset, remainder
 
 
-class AnomalyGeneratorExtremeValue(BaseTransformer):
+class AnomalyGeneratorExtremeValue(AnomalyGenerator):
     '''
     This function generates extreme anomaly.
     '''
@@ -261,7 +261,7 @@ class AnomalyGeneratorExtremeValue(BaseTransformer):
         return (inputs, outputs)
 
 
-class AnomalyGeneratorNoData(BaseTransformer):
+class AnomalyGeneratorNoData(AnomalyGenerator):
     '''
     This function generates nodata anomaly.
     '''
@@ -352,7 +352,7 @@ class AnomalyGeneratorNoData(BaseTransformer):
         return (inputs, outputs)
 
 
-class AnomalyGeneratorFlatline(BaseTransformer):
+class AnomalyGeneratorFlatline(AnomalyGenerator):
     '''
     This function generates flatline anomaly.
     '''
