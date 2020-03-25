@@ -76,9 +76,9 @@ def min_delta(df):
 
     if len(df.index.names) > 1:
         df2 = df.copy()
-        # log_str = 'min delta aggregation' + str(df.index.names))
+        # log_str = 'min delta aggregation' + str(df.index.names)
         # for i in range(0, df.index.nlevels):
-        #    log_str += '\n' + str(df.index.get_level_values(i))
+        #     log_str += '\n' + str(df.index.get_level_values(i))
         # logger.debug(log_str)
         df2.index = df2.index.droplevel(list(range(1, df.index.nlevels)))
     else:
@@ -92,7 +92,8 @@ def min_delta(df):
 
     if mindelta == dt.timedelta(seconds=0) or pd.isnull(mindelta):
         mindelta = pd.Timedelta('5 seconds')
-    return mindelta
+
+    return mindelta, df2
 
 
 def set_window_size_and_overlap(windowsize, trim_value=2*DefaultWindowSize):
@@ -245,7 +246,7 @@ class SpectralAnomalyScore(BaseTransformer):
 
         logger.debug(self.whoami + ': prepare Data')
 
-        # interpolate gaps - data imputation
+        # operate on simple timestamp index
         if len(dfEntity.index.names) > 1:
             index_names = dfEntity.index.names
             dfe = dfEntity.reset_index().set_index(index_names[0])
@@ -253,6 +254,7 @@ class SpectralAnomalyScore(BaseTransformer):
             index_names = None
             dfe = dfEntity
 
+        # interpolate gaps - data imputation
         try:
             dfe = dfe.interpolate(method="time")
         except Exception as e:
@@ -260,9 +262,6 @@ class SpectralAnomalyScore(BaseTransformer):
 
         # one dimensional time series - named temperature for catchyness
         temperature = dfe[[self.input_item]].fillna(0).to_numpy().reshape(-1,)
-
-        if index_names is not None:
-            dfe = dfe.reset_index().set_index(index_names)
 
         return dfe, temperature
 
@@ -288,9 +287,9 @@ class SpectralAnomalyScore(BaseTransformer):
             dfe_orig.sort_index(inplace=True)
 
             # minimal time delta for merging
-            mindelta = min_delta(dfe_orig)
+            mindelta, dfe_orig = min_delta(dfe_orig)
 
-            logger.debug('Timedelta:' + str(mindelta))
+            logger.debug('Timedelta:' + str(mindelta) + ' Index: ' + str(dfe_orig.index))
 
             # one dimensional time series - named temperature for catchyness
             temperature = dfe[[self.input_item]].fillna(0).to_numpy().reshape(-1,)
@@ -313,6 +312,8 @@ class SpectralAnomalyScore(BaseTransformer):
                 if self.inv_zscore is not None:
                     dfe[self.inv_zscore] = 0.00001
 
+                zScoreII = None
+                inv_zScoreII = None
                 try:
                     # Fourier transform:
                     #   frequency, time, spectral density
@@ -347,45 +348,24 @@ class SpectralAnomalyScore(BaseTransformer):
                     linear_interpolate = sp.interpolate.interp1d(
                         time_series_temperature, ets_zscore, kind='linear', fill_value='extrapolate')
 
-                    dfe[self.output_item] = abs(linear_interpolate(np.arange(0, temperature.size, 1)))
+                    zScoreII = merge_score(dfe, dfe_orig, self.output_item,
+                                           abs(linear_interpolate(np.arange(0, temperature.size, 1))), mindelta)
 
                     if self.inv_zscore is not None:
                         linear_interpol_inv_zscore = sp.interpolate.interp1d(
                             time_series_temperature, inv_zscore, kind='linear', fill_value='extrapolate')
 
-                        dfe[self.inv_zscore] = abs(linear_interpol_inv_zscore(np.arange(0, temperature.size, 1)))
+                        inv_zScoreII = merge_score(dfe, dfe_orig, self.inv_zscore,
+                                                   abs(linear_interpol_inv_zscore(np.arange(0, temperature.size, 1))), mindelta)
 
                 except Exception as e:
                     logger.error('Spectral failed with ' + str(e))
-
-                # absolute zscore > 3 ---> anomaly
-                if self.inv_zscore is not None:
-                    col_list = [self.output_item, self.inv_zscore]
-                else:
-                    col_list = [self.output_item]
-                dfe_orig = pd.merge_asof(dfe_orig, dfe[col_list],
-                                         left_index=True, right_index=True, direction='nearest', tolerance=mindelta)
-
-                print(dfe_orig.head(3))
-
-                if self.output_item+'_y' in dfe_orig:
-                    zScoreII = dfe_orig[self.output_item+'_y'].to_numpy()
-                elif self.output_item in dfe_orig:
-                    zScoreII = dfe_orig[self.output_item].to_numpy()
-                else:
-                    zScoreII = dfe_orig[self.input_item].to_numpy()
-
-                if self.inv_zscore is not None:
-                    if self.inv_zscore+'_y' in dfe_orig:
-                        inv_zscoreII = dfe_orig[self.inv_zscore+'_y'].to_numpy()
-                    else:
-                        inv_zscoreII = dfe_orig[self.inv_zscore].to_numpy()
 
                 idx = pd.IndexSlice
                 df_copy.loc[idx[entity, :], self.output_item] = zScoreII
 
                 if self.inv_zscore is not None:
-                    df_copy.loc[idx[entity, :], self.inv_zscore] = inv_zscoreII
+                    df_copy.loc[idx[entity, :], self.inv_zscore] = inv_zScoreII
 
         if self.inv_zscore is not None:
             msg = 'SpectralAnomalyScoreExt'
@@ -495,7 +475,7 @@ class KMeansAnomalyScore(BaseTransformer):
 
         logger.debug(self.whoami + ': prepare Data')
 
-        # interpolate gaps - data imputation
+        # operate on simple timestamp index
         if len(dfEntity.index.names) > 1:
             index_names = dfEntity.index.names
             dfe = dfEntity.reset_index().set_index(index_names[0])
@@ -503,6 +483,7 @@ class KMeansAnomalyScore(BaseTransformer):
             index_names = None
             dfe = dfEntity
 
+        # interpolate gaps - data imputation
         try:
             dfe = dfe.interpolate(method="time")
         except Exception as e:
@@ -510,9 +491,6 @@ class KMeansAnomalyScore(BaseTransformer):
 
         # one dimensional time series - named temperature for catchyness
         temperature = dfe[[self.input_item]].fillna(0).to_numpy().reshape(-1,)
-
-        if index_names is not None:
-            dfe = dfe.reset_index().set_index(index_names)
 
         return dfe, temperature
 
@@ -538,7 +516,7 @@ class KMeansAnomalyScore(BaseTransformer):
             dfe_orig.sort_index(inplace=True)
 
             # minimal time delta for merging
-            mindelta = min_delta(dfe_orig)
+            mindelta, dfe_orig = min_delta(dfe_orig)
 
             logger.debug('Timedelta:' + str(mindelta))
 
@@ -584,9 +562,8 @@ class KMeansAnomalyScore(BaseTransformer):
                 linear_interpolateK = sp.interpolate.interp1d(
                     time_series_temperature, pred_score, kind='linear', fill_value='extrapolate')
 
-                kmeans_scoreI = linear_interpolateK(np.arange(0, temperature.size, 1))
-
-                zScoreII = merge_score(dfe, dfe_orig, self.output_item, kmeans_scoreI, mindelta)
+                zScoreII = merge_score(dfe, dfe_orig, self.output_item,
+                                       linear_interpolateK(np.arange(0, temperature.size, 1)), mindelta)
 
                 idx = pd.IndexSlice
                 df_copy.loc[idx[entity, :], self.output_item] = zScoreII
@@ -653,7 +630,7 @@ class GeneralizedAnomalyScore(BaseTransformer):
 
         logger.debug(self.whoami + ': prepare Data')
 
-        # interpolate gaps - data imputation
+        # operate on simple timestamp index
         if len(dfEntity.index.names) > 1:
             index_names = dfEntity.index.names
             dfe = dfEntity.reset_index().set_index(index_names[0])
@@ -661,6 +638,7 @@ class GeneralizedAnomalyScore(BaseTransformer):
             index_names = None
             dfe = dfEntity
 
+        # interpolate gaps - data imputation
         try:
             dfe = dfe.interpolate(method="time")
         except Exception as e:
@@ -668,9 +646,6 @@ class GeneralizedAnomalyScore(BaseTransformer):
 
         # one dimensional time series - named temperature for catchyness
         temperature = dfe[[self.input_item]].fillna(0).to_numpy().reshape(-1,)
-
-        if index_names is not None:
-            dfe = dfe.reset_index().set_index(index_names)
 
         return dfe, temperature
 
@@ -705,7 +680,7 @@ class GeneralizedAnomalyScore(BaseTransformer):
             dfe_orig.sort_index(inplace=True)
 
             # minimal time delta for merging
-            mindelta = min_delta(dfe_orig)
+            mindelta, dfe_orig = min_delta(dfe_orig)
 
             # interpolate gaps - data imputation by default
             #   for missing data detection we look at the timestamp gradient instead
@@ -780,26 +755,7 @@ class GeneralizedAnomalyScore(BaseTransformer):
 
                 dampen_anomaly_score(gam_scoreI, self.dampening)
 
-                dfe[self.output_item] = gam_scoreI
-
-                # absolute kmeans_score > 1000 ---> anomaly
-
-                dfe_orig = pd.merge_asof(
-                    dfe_orig,
-                    dfe[self.output_item],
-                    left_index=True,
-                    right_index=True,
-                    direction="nearest",
-                    tolerance=mindelta,
-                )
-
-                if self.output_item + "_y" in dfe_orig:
-                    zScoreII = dfe_orig[self.output_item + "_y"].to_numpy()
-                elif self.output_item in dfe_orig:
-                    zScoreII = dfe_orig[self.output_item].to_numpy()
-                else:
-                    print(dfe_orig.head(2))
-                    zScoreII = dfe_orig[self.input_item].to_numpy()
+                zScoreII = merge_score(dfe, dfe_orig, self.output_item, gam_scoreI, mindelta)
 
                 idx = pd.IndexSlice
                 df_copy.loc[idx[entity, :], self.output_item] = zScoreII
@@ -856,6 +812,14 @@ class NoDataAnomalyScore(GeneralizedAnomalyScore):
     def prepare_data(self, dfEntity):
 
         logger.debug(self.whoami + ': prepare Data')
+
+        # operate on simple timestamp index
+        if len(dfEntity.index.names) > 1:
+            index_names = dfEntity.index.names
+            dfe = dfEntity.reset_index().set_index(index_names[0])
+        else:
+            index_names = None
+            dfe = dfEntity
 
         # count the timedelta in seconds between two events
         timeSeq = (dfEntity.index.values - dfEntity.index[0].to_datetime64()) / np.timedelta64(1, 's')
