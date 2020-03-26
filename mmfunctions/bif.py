@@ -126,7 +126,7 @@ class AnomalyGenerator(BaseTransformer):
 
                 remainder = self.width - min(output_array.size - idx, self.width)
             else:
-                output_array[idx] = self.size  # todo randomness
+                output_array[idx] = max(abs(np.mean(input_array[idx:])), 1) * self.size  # todo randomness
 
         offset = input_array.size - idx
 
