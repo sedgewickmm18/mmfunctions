@@ -113,6 +113,7 @@ class AnomalyGenerator(BaseTransformer):
 
         # handle the rest of the array
         if idx < output_array.size:
+            logger.inject('InjectAnomaly at the end - at ' + str(idx))
             if not anomaly_extreme:
                 if filler is None:
                     filler = input_array[idx]
@@ -124,6 +125,8 @@ class AnomalyGenerator(BaseTransformer):
                     logger.error('InjectAnomaly filling up fails with ' + str(e1) + ' for ' + str(filler))
 
                 remainder = self.width - min(output_array.size - idx, self.width)
+            else:
+                output_array[idx] = self.size  # todo randomness
 
         offset = input_array.size - idx
 
