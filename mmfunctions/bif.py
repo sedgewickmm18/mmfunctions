@@ -113,7 +113,7 @@ class AnomalyGenerator(BaseTransformer):
 
         # handle the rest of the array
         if idx < output_array.size:
-            logger.inject('InjectAnomaly at the end - at ' + str(idx))
+            logger.info('InjectAnomaly at the end - at ' + str(idx))
             if not anomaly_extreme:
                 if filler is None:
                     filler = input_array[idx]
