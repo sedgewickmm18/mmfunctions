@@ -1377,9 +1377,9 @@ class SimpleRegressor(BaseEstimatorFunction):
         outputs = []
         return (inputs, outputs)
 
-    @classmethod
-    def get_input_items(cls):
-        return ['features', 'targets']
+    # @classmethod
+    # def get_input_items(cls):
+    #     return ['features', 'targets']
 
 
 class SimpleAnomaly(BaseRegressor):
