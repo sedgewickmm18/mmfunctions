@@ -244,11 +244,11 @@ class AnomalyGeneratorExtremeValue(AnomalyGenerator):
 
             # Prepare numpy array for marking anomalies
             actual = df_entity_grp[self.output_item].values
-            offset, remainder, output_array = self.injectAnomaly(actual, offset=offset, remainder=remainder, flatline=flatline,
+            offset, remainder, flatline, output_array = self.injectAnomaly(actual, offset=offset, remainder=remainder, flatline=flatline,
                                                                  entity_name=entity_grp_id, anomaly_extreme=True)
 
             # Update group counts for storage
-            self.counts_by_entity_id[entity_grp_id] = (offset, remainder)
+            self.counts_by_entity_id[entity_grp_id] = (offset, remainder, flatline)
             logger.debug('Final Grp Counts {}'.format(self.counts_by_entity_id))
 
             # Adding the missing elements to create final array
@@ -337,10 +337,10 @@ class AnomalyGeneratorNoData(AnomalyGenerator):
 
             # Prepare numpy array for marking anomalies
             actual = df_entity_grp[self.output_item].values
-            offset, remainder, output_array = self.injectAnomaly(actual, offset=offset, remainder=remainder, flatline=flatline,
+            offset, remainder, flatline, output_array = self.injectAnomaly(actual, offset=offset, remainder=remainder, flatline=flatline,
                                                                  entity_name=entity_grp_id, filler=np.nan, anomaly_extreme=False)
 
-            self.counts_by_entity_id[entity_grp_id] = (offset, remainder)
+            self.counts_by_entity_id[entity_grp_id] = (offset, remainder, flatline)
 
             # Adding the missing elements to create final array
             # final = np.append(actual[:strt_idx], a2)
@@ -429,11 +429,11 @@ class AnomalyGeneratorFlatline(AnomalyGenerator):
 
             # Prepare numpy array for marking anomalies
             actual = df_entity_grp[self.output_item].values
-            remainder, offset, output_array = self.injectAnomaly(actual, offset=offset, remainder=remainder, flatline=flatline,
+            remainder, offset, flatline, output_array = self.injectAnomaly(actual, offset=offset, remainder=remainder, flatline=flatline,
                                                                  entity_name=entity_grp_id, filler=None, anomaly_extreme=False)
 
             # Update group counts for storage
-            self.counts_by_entity_id[entity_grp_id] = (offset, remainder)
+            self.counts_by_entity_id[entity_grp_id] = (offset, remainder, flatline)
 
             # Adding the missing elements to create final array
             # final = np.append(actual[:strt_idx], a2)
