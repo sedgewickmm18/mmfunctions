@@ -1093,7 +1093,7 @@ class AlertExpressionWithFilter(BaseEvent):
         self.dimension_name = dimension_name
         self.dimension_value = dimension_value
         self.expression = expression
-        self.pulse_trigger = None
+        self.pulse_trigger = False
         self.alert_name = alert_name
         logger.info('AlertExpressionWithFilter  dim: ' + str(dimension_name) + '  exp: ' + str(expression) + '  alert: ' + str(alert_name))
         super().__init__()
@@ -1186,7 +1186,8 @@ class AlertExpressionWithFilterExt(AlertExpressionWithFilter):
 
     def __init__(self, expression, dimension_name, dimension_value, pulse_trigger, alert_name, **kwargs):
         super().__init__(expression, dimension_name, dimension_value, alert_name, **kwargs)
-        self.pulse_trigger = pulse_trigger
+        if pulse_trigger is None:
+            self.pulse_trigger = True
         logger.info('AlertExpressionWithFilterExt  dim: ' + str(dimension_name) + '  exp: ' + str(expression) + '  alert: ' +
                     str(alert_name) + '  pulsed: ' + str(pulse_trigger))
 
