@@ -21,6 +21,8 @@ import scipy as sp
 from scipy import signal, fftpack
 # from scipy.stats import energy_distance
 from sklearn import metrics
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
 from sklearn.covariance import MinCovDet
 from sklearn import ensemble
 from sklearn import linear_model
@@ -1213,9 +1215,9 @@ class AlertExpressionWithFilterExt(AlertExpressionWithFilter):
                                    description="Define alert expression using pandas systax. \
                                                 Example: df['inlet_temperature']>50. ${pressure} will be substituted \
                                                 with df['pressure'] before evaluation, ${} with df[<dimension_name>]"))
-        inputs.append(UISingleItem(name='pulse_trigger',
-                                   description="If true only generate alerts on crossing the threshold",
-                                   datatype=bool))
+        inputs.append(UISingle(name='pulse_trigger',
+                               description="If true only generate alerts on crossing the threshold",
+                               datatype=bool))
 
         # define arguments that behave as function outputs
         outputs = []
@@ -1237,9 +1239,14 @@ class GBMRegressor(BaseEstimatorFunction):
     estimators_per_execution = 1
     num_rounds_per_estimator = 1
 
+    def GBMPipeline(self):
+        steps = [('scaler', StandardScaler()), ('gbm', lightgbm.LGBMRegressor())]
+        return Pipeline(steps)
+
     def set_estimators(self):
         # gradient_boosted
-        self.estimators['light_gradient_boosted_regressor'] = (lightgbm.LGBMRegressor, self.params)
+        # self.estimators['light_gradient_boosted_regressor'] = (lightgbm.LGBMRegressor, self.params)
+        self.estimators['light_gradient_boosted_regressor'] = (self.GBMPipeline, self.params)
         logger.info('GBMRegressor start searching for best model')
 
     def __init__(self, features, targets, predictions=None,
@@ -1247,18 +1254,20 @@ class GBMRegressor(BaseEstimatorFunction):
         super().__init__(features=features, targets=targets, predictions=predictions)
         self.experiments_per_execution = 1
         self.auto_train = False
+
         # if n_estimators is not None or num_leaves is not None or learning_rate is not None or max_depth is not None:
         if n_estimators is not None or num_leaves is not None or learning_rate is not None:
-            self.params = {'n_estimators': [n_estimators],
-                           'num_leaves': [num_leaves],
-                           'learning_rate': [learning_rate],
-                           'max_depth': [max_depth],
-                           'verbosity': [2]}
+            self.params = {'gbm__n_estimators': [n_estimators],
+                           'gbm__num_leaves': [num_leaves],
+                           'gbm__learning_rate': [learning_rate],
+                           'gbm__max_depth': [max_depth],
+                           'gbm__verbosity': [2]}
         else:
-            self.params = {'n_estimators': [500],
-                           'num_leaves': [50],
-                           'learning_rate': [0.001],
-                           'verbosity': [2]}
+            self.params = {'gbm__n_estimators': [500],
+                           'gbm__num_leaves': [50],
+                           'gbm__learning_rate': [0.001],
+                           'gbm__verbosity': [2]}
+
         self.stop_auto_improve_at = -2
 
     def execute(self, df):
@@ -1323,14 +1332,29 @@ class SimpleRegressor(BaseEstimatorFunction):
     estimators_per_execution = 3
     num_rounds_per_estimator = 3
 
+    def GBRPipeline(self):
+        steps = [('scaler', StandardScaler()), ('gbr', ensemble.GradientBoostingRegressor)]
+        return Pipeline(steps)
+
+    def SGDPipeline(self):
+        steps = [('scaler', StandardScaler()), ('sgd', linear_model.SGDRegressor)]
+        return Pipeline(steps)
+
     def set_estimators(self):
         # gradient_boosted
-        params = {'n_estimators': [100, 250, 500, 1000], 'max_depth': [2, 4, 10], 'min_samples_split': [2, 5, 9],
-                  'learning_rate': [0.01, 0.02, 0.05], 'loss': ['ls']}
-        self.estimators['gradient_boosted_regressor'] = (ensemble.GradientBoostingRegressor, params)
+        params = {'gbr__n_estimators': [100, 250, 500, 1000],
+                  'gbr__max_depth': [2, 4, 10],
+                  'gbr__min_samples_split': [2, 5, 9],
+                  'gbr__learning_rate': [0.01, 0.02, 0.05],
+                  'gbr__loss': ['ls']}
+        # self.estimators['gradient_boosted_regressor'] = (ensemble.GradientBoostingRegressor, params)
+        self.estimators['gradient_boosted_regressor'] = (self.GBRPipeline, params)
+
         # sgd
-        params = {'max_iter': [250, 1000, 5000, 10000], 'tol': [0.001, 0.002, 0.005]}
-        self.estimators['sgd_regressor'] = (linear_model.SGDRegressor, params)
+        params = {'sgd__max_iter': [250, 1000, 5000, 10000],
+                  'sgd__tol': [0.001, 0.002, 0.005]}
+        # self.estimators['sgd_regressor'] = (linear_model.SGDRegressor, params)
+        self.estimators['sgd_regressor'] = (self.SGDPipeline, params)
         logger.info('SimpleRegressor start searching for best model')
 
     def __init__(self, features, targets, predictions=None,
