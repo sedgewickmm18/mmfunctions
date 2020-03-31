@@ -1,10 +1,8 @@
-from collections import OrderedDict
-import datetime as dt
 import numpy as np
 import pandas as pd
-from sqlalchemy import Column, Float, DateTime
-from iotfunctions.bif import AnomalyGeneratorExtremeValue, DateDifference
-from nose.tools import assert_true
+from sqlalchemy import Column, Float
+from mmfunctions.generator import AnomalyGeneratorExtremeValue
+# from nose.tools import assert_true
 
 # constants
 Temperature = 'Temperature'
@@ -57,10 +55,10 @@ def test_anomaly_generators():
 
     print('Compare Scores')
 
-    #print(results1)
-    #print(results2)
-    #print(origins1)
-    #print(origins2)
+    # print(results1)
+    # print(results2)
+    # print(origins1)
+    # print(origins2)
 
     # assert_true(comp[0])
     # assert_true(comp[1])
@@ -68,4 +66,5 @@ def test_anomaly_generators():
 
     pass
 
+# uncomment to run from CLI
 # test_anomaly_generators()

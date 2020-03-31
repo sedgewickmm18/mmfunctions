@@ -40,7 +40,7 @@ _IS_PREINSTALLED = False
 #                 offset|               where to start with the next anomaly
 #
 #                       | remainder       what's left of width to be filled
-#  TODO
+#  ToDo
 #  - save filler used in previous run for correct flatline generation (done)
 #  - save timestamp to support overlapping data/backtrack
 #

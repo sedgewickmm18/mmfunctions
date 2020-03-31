@@ -1,4 +1,3 @@
-
 # import numpy as np
 import pandas as pd
 from sklearn.metrics import r2_score
@@ -87,7 +86,6 @@ def test_anomaly_scores():
     df_agg = df_agg.reset_index().set_index(['timestamp']).asfreq(freq='T')
     df_agg['site'] = 'Munich'
     df_agg = df_agg.reset_index().set_index(['entity', 'timestamp', 'site']).dropna()
-
 
     print('Compute Spectral Anomaly Score')
     spsi = SpectralAnomalyScore(Temperature, 12, spectral)
