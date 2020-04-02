@@ -206,7 +206,8 @@ def merge_score(dfEntity, dfEntityOrig, column_name, score, mindelta):
     Fit interpolated score to original entity slice of the full dataframe
     '''
 
-    # equip score with time values
+    # equip score with time values, make sure it's positive
+    score[score < 0] = 0
     dfEntity[column_name] = score
 
     # merge
