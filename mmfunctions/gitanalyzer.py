@@ -64,71 +64,80 @@ def extract_timevalue(tval, replace=None):
     return tval
 
 
-def label_get_component(label):
-    component = ''
+def labelparm_initialize():
+    labelparm = {'component': '', 'theme': '', 'blocked': '',
+                 'issueType': 'Issue', 'businessValue': 4,
+                 'severity': 3, 'risk': 2}
+    return labelparm
+
+
+def label_get_component(label, labelparm):
     if label.startswith('Component') or label.startswith('Scrum') or label.startswith('Squad:'):
         label = label.strip()
-        component = label.split(':')[1]
-    return component
+        labelparm['component'] = label.split(':')[1]
+    elif labelparm['component'] is None:
+        labelparm['component'] = ''
 
 
-def label_get_theme(label):
-    theme = ''
+def label_get_theme(label, labelparm):
     if label.find('Theme') >= 0:
-        theme = label
-    return theme
+        labelparm['theme'] = label
+    elif labelparm['theme'] is None:
+        labelparm['theme'] = ''
 
 
-def label_get_blocked(label):
-    blocked = ''
+def label_get_blocked(label, labelparm):
     if label.startswith('blocked'):
-        blocked = 'YES'
-    return blocked
+        labelparm['blocked'] = 'YES'
+    elif labelparm['blocked'] is None:
+        labelparm['blocked'] = ''
 
 
-def label_get_issue_type(label):
-    issueType = 'Issue'
+def label_get_issue_type(label, labelparm):
     if label.startswith('Epic'):
-        issueType = 'Epic'
+        labelparm['issueType'] = 'Epic'
     elif label.startswith('bug'):
-        issueType = 'Bug'
+        labelparm['issueType'] = 'Bug'
     elif label.startswith('Enhancement'):
-        issueType = 'Enhancement'
+        labelparm['issueType'] = 'Enhancement'
+    elif labelparm['issueType'] is None:
+        labelparm['issueType'] = 'Issue'
 
-    return issueType
 
+def label_get_business_value(label, labelparm):
 
-def label_get_business_value(label):
-
-    # starts with Val or val with optional colon and optional space followed by 1,2,3,4
-    if re.fullmatch(label, '^(v|V)al(:|)( [1-4]|[1-4])') is not None:
-        return label[-1]
+    # starts with Val or val with optional colon or hyphen and optional space followed by 1,2,3,4
+    if re.fullmatch(label, '^(v|V)al(:|-|)( [1-4]|[1-4])') is not None:
+        labelparm['businessValue'] = label[-1]
     # default business value is 4
-    return 4
+    elif labelparm['businessValue'] is None:
+        labelparm['businessValue'] = 4
 
 
-def label_get_severity(label):
+def label_get_severity(label, labelparm):
 
-    # starts with [Ss]ev or [sS]everity with optional colon and optional space followed by 1,2,3,4
-    if re.fullmatch(label, '^(s|S)ev(erity|)(:|)( [1-4]|[1-4])') is not None:
-        return label[-1]
+    # starts with [Ss]ev or [sS]everity with optional colon or hyphen and optional space followed by 1,2,3,4
+    if re.fullmatch(label, '^(s|S)ev(erity|)(:|-|)( [1-4]|[1-4])') is not None:
+        labelparm['severity'] = label[-1]
     # default severity is 3
-    return 3
+    elif labelparm['severity'] is None:
+        labelparm['severity'] = 3
 
 
-def label_get_risk(label):
+def label_get_risk(label, labelparm):
 
-    # starts with [Ss]ev or [sS]everity with optional colon and optional space followed by 1,2,3
-    if re.fullmatch(label, '^(r|R)isk(:|)( [1-3]|[1-3])', re.I) is not None:
-        return label[-1]
-    elif re.fullmatch(label, '^risk(:|)( |)easy', re.I) is not None:
-        return 3
+    # starts with [Ss]ev or [sS]everity with optional colon or hyphen and optional space followed by 1,2,3
+    if re.fullmatch(label, '^(r|R)isk(:|-|)( [1-3]|[1-3])', re.I) is not None:
+        labelparm['risk'] = label[-1]
+    elif re.fullmatch(label, '^risk(:|-|)( |)easy', re.I) is not None:
+        labelparm['risk'] = 3
     elif re.fullmatch(label, '^risk(:|)( |)medium', re.I) is not None:
-        return 2
+        labelparm['risk'] = 2
     elif re.fullmatch(label, '^risk(:|)( |)difficult', re.I) is not None:
-        return 1
+        labelparm['risk'] = 1
     # default risk is 2
-    return 2
+    elif labelparm['risk'] is None:
+        labelparm['risk'] = 2
 
 
 def write_issues(params, repo, response, csvout):
@@ -163,22 +172,23 @@ def write_issues(params, repo, response, csvout):
         except Exception:
             pass
 
+        labelparm = labelparm_initialize()
         for label in label_list:
-            component = label_get_component(label)
-            theme = label_get_theme(label)
-            blocked = label_get_blocked(label)
-            issueType = label_get_issue_type(label)
-            businessValue = label_get_business_value(label)
-            severity = label_get_severity(label)
-            risk = label_get_risk(label)
+            label_get_component(label, labelparm)
+            label_get_theme(label, labelparm)
+            label_get_blocked(label, labelparm)
+            label_get_issue_type(label, labelparm)
+            label_get_business_value(label, labelparm)
+            label_get_severity(label, labelparm)
+            label_get_risk(label, labelparm)
 
         csvout.writerow([issue['number'], issue['title'],
                         repo,
                         created_at, updated_at, closed_at,
                         user, assignee, state, milestone,
-                        issueType, component,
-                        businessValue, severity, risk,
-                        theme, blocked, pipeline, str(label_list)])
+                        labelparm['issueType'], labelparm['component'],
+                        labelparm['businessValue'], labelparm['severity'], labelparm['risk'],
+                        labelparm['theme'], labelparm['blocked'], pipeline, str(label_list)])
 
 
 def get_travis_builds(params, url):
