@@ -10,10 +10,21 @@ Uses basic authentication (Github username + password) or token to retrieve Issu
 from a repository that username has access to. Supports Github API v3.
 """
 
-params_payload = {'is': 'issue', 'state': 'all'}  # alternative states: all, open, closed
+# params_payload = {'is': 'issue', 'state': 'all'}  # alternative states: all, open, closed
 
 logger = logging.getLogger(__name__)
 PACKAGE_URL = 'git+https://github.com/sedgewickmm18/mmfunctions.git@'
+
+# starts with Val or val with optional colon or hyphen and optional space followed by 1,2,3,4
+businessvalue_pattern = re.compile('^(v|V)al(:|-|)( [1-4]|[1-4])')
+# starts with [Ss]ev or [sS]everity with optional colon or hyphen and optional space followed by 1,2,3,4
+severity_pattern = re.compile('^(s|S)ev(erity|)(:|-|)( [1-4]|[1-4])')
+# starts with [rR]isk with optional colon or hyphen and optional space followed by 1,2,3
+#   or easy, medium or difficult
+risk_pattern = re.compile('^(r|R)isk(:|-|)( [1-3]|[1-3])', re.I)
+risk_pattern_alt_low = re.compile('^risk(:|-|)( |)low', re.I)
+risk_pattern_alt_med = re.compile('^risk(:|-|)( |)medium', re.I)
+risk_pattern_alt_high = re.compile('^risk(:|-|)( |)high', re.I)
 
 
 def get_zen_issues(params, repo_id, zenhub_dict):
@@ -26,14 +37,18 @@ def get_zen_issues(params, repo_id, zenhub_dict):
             'Content-Type': 'application/vnd.github.v3.raw+json',
             'User-Agent': 'Markus zenhub exporter - slightly modified'
         },
-        'params': params_payload
+        'params': params['GIT_PARAMS']
     }
     if params['ZENHUB_TOKEN'] != '':
         kwargs['headers']['X-Authentication-Token'] = '%s' % params['ZENHUB_TOKEN']
 
-    print("GET %s" % zen_url)
+    if params['progress']:
+        print("GET %s" % zen_url)
+
     resp = requests.get(zen_url, **kwargs)
-    print("  : => %s" % resp.status_code)
+
+    if params['progress']:
+        print("  : => %s" % resp.status_code)
 
     pipelines = resp.json()['pipelines']
 
@@ -105,9 +120,7 @@ def label_get_issue_type(label, labelparm):
 
 
 def label_get_business_value(label, labelparm):
-
-    # starts with Val or val with optional colon or hyphen and optional space followed by 1,2,3,4
-    if re.fullmatch(label, '^(v|V)al(:|-|)( [1-4]|[1-4])') is not None:
+    if re.fullmatch(businessvalue_pattern, label) is not None:
         labelparm['businessValue'] = label[-1]
     # default business value is 4
     elif labelparm['businessValue'] is None:
@@ -115,9 +128,7 @@ def label_get_business_value(label, labelparm):
 
 
 def label_get_severity(label, labelparm):
-
-    # starts with [Ss]ev or [sS]everity with optional colon or hyphen and optional space followed by 1,2,3,4
-    if re.fullmatch(label, '^(s|S)ev(erity|)(:|-|)( [1-4]|[1-4])') is not None:
+    if re.fullmatch(severity_pattern, label) is not None:
         labelparm['severity'] = label[-1]
     # default severity is 3
     elif labelparm['severity'] is None:
@@ -125,15 +136,13 @@ def label_get_severity(label, labelparm):
 
 
 def label_get_risk(label, labelparm):
-
-    # starts with [Ss]ev or [sS]everity with optional colon or hyphen and optional space followed by 1,2,3
-    if re.fullmatch(label, '^(r|R)isk(:|-|)( [1-3]|[1-3])', re.I) is not None:
+    if re.fullmatch(risk_pattern, label) is not None:
         labelparm['risk'] = label[-1]
-    elif re.fullmatch(label, '^risk(:|-|)( |)easy', re.I) is not None:
+    elif re.fullmatch(risk_pattern_alt_low, label) is not None:
         labelparm['risk'] = 3
-    elif re.fullmatch(label, '^risk(:|)( |)medium', re.I) is not None:
+    elif re.fullmatch(risk_pattern_alt_med, label) is not None:
         labelparm['risk'] = 2
-    elif re.fullmatch(label, '^risk(:|)( |)difficult', re.I) is not None:
+    elif re.fullmatch(risk_pattern_alt_high, label) is not None:
         labelparm['risk'] = 1
     # default risk is 2
     elif labelparm['risk'] is None:
@@ -142,7 +151,8 @@ def label_get_risk(label, labelparm):
 
 def write_issues(params, repo, response, csvout):
     "output a list of issues to csv"
-    print("  : Writing %s issues" % len(response.json()))
+    if params['progress']:
+        print("  : Writing %s issues" % len(response.json()))
 
     for issue in response.json():
 
@@ -197,7 +207,7 @@ def get_travis_builds(params, url):
             'Content-Type': 'application/vnd.github.v3.raw+json',
             'User-Agent': 'Padkrish issue exporter - slightly modified'
         },
-        'params': params_payload
+        'params': params['GIT_PARAMS']
     }
     if params['TRAVIS_TOKEN'] != '':
         kwargs['headers']['Authorization'] = 'token %s' % params['TRAVIS_TOKEN']
@@ -217,7 +227,7 @@ def get_issues(params, repo=None, url=None):
             'Content-Type': 'application/vnd.github.v3.raw+json',
             'User-Agent': 'Padkrish issue exporter - slightly modified'
         },
-        'params': params_payload
+        'params': params['GIT_PARAMS']
     }
     if params['GITHUB_TOKEN'] != '':
         kwargs['headers']['Authorization'] = 'token %s' % params['GITHUB_TOKEN']
@@ -225,9 +235,11 @@ def get_issues(params, repo=None, url=None):
     if url is None:
         url = params['BASE_URL'] + '/api/v3/repos/' + repo + '/issues'
 
-    print("GET %s" % url)
+    if params['progress']:
+        print("GET %s" % url)
     resp = requests.get(url, **kwargs)
-    print("  : => %s" % resp.status_code)
+    if params['progress']:
+        print("  : => %s" % resp.status_code)
 
     if resp.status_code != 200:
         raise Exception(resp.status_code)
@@ -255,8 +267,12 @@ def process(params, csvout, repo=None, url=None):
         process(params, csvout, repo, next_)
 
 
-def process_all(params):
-    # check whether global variables are defined
+def process_all(params, show_progress=None):
+
+    # default filename
+    csvfilename = 'monitoring-defects.csv'
+
+    # check whether global variables are defined and set params to default values
     x = ''
     try:
         x = params['REPO']
@@ -268,10 +284,16 @@ def process_all(params):
         x = params['ZENHUB_WORKSPACE']
         x = params['TRAVIS_TOKEN']
         x = params['BASE_URL']
+        if show_progress is None:
+            show_progress = False
+        params['progress'] = show_progress
+        if 'FILENAME' in params and params['FILENAME'] is not None:
+            csvfilename = params['FILENAME']
+        if 'GIT_PARAMS' not in params or params['GIT_PARAMS'] is None:
+            params['GIT_PARAMS'] = {'is': 'issue', 'state': 'all'}  # alternative states: all, open, closed
+
     except Exception as e_ndef:
         logger.error('Global variable not defined: ' + str(e_ndef) + ' ' + str(x))
-
-    csvfilename = 'monitoring-defects.csv'
 
     # retrieve zenhub information
     zenhub_dict = {}
