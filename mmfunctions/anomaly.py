@@ -1250,6 +1250,7 @@ class GBMRegressor(BaseEstimatorFunction):
                  n_estimators=None, num_leaves=None, learning_rate=None, max_depth=None):
         super().__init__(features=features, targets=targets, predictions=predictions)
         self.experiments_per_execution = 1
+        self.correlation_threshold = 0
         self.auto_train = False
 
         # if n_estimators is not None or num_leaves is not None or learning_rate is not None or max_depth is not None:
@@ -1360,6 +1361,7 @@ class SimpleRegressor(BaseEstimatorFunction):
 
         self.experiments_per_execution = 1
         self.auto_train = True
+        self.correlation_threshold = 0
 
         # self.stop_auto_improve_at = -2
 
