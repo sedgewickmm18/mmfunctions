@@ -1340,19 +1340,26 @@ class SimpleRegressor(BaseEstimatorFunction):
 
     def set_estimators(self):
         # gradient_boosted
-        params = {'gbr__n_estimators': [100, 250, 500, 1000],
-                  'gbr__max_depth': [2, 4, 10],
-                  'gbr__min_samples_split': [2, 5, 9],
-                  'gbr__learning_rate': [0.01, 0.02, 0.05],
-                  'gbr__loss': ['ls']}
-        # self.estimators['gradient_boosted_regressor'] = (ensemble.GradientBoostingRegressor, params)
-        self.estimators['gradient_boosted_regressor'] = (self.GBRPipeline, params)
+        # params = {'gbr__n_estimators': [100, 250, 500, 1000],
+        #           'gbr__max_depth': [2, 4, 10],
+        #           'gbr__min_samples_split': [2, 5, 9],
+        #           'gbr__learning_rate': [0.01, 0.02, 0.05],
+        #           'gbr__loss': ['ls']}
+        params = {'n_estimators': [100, 250, 500, 1000],
+                  'max_depth': [2, 4, 10],
+                  'min_samples_split': [2, 5, 9],
+                  'learning_rate': [0.01, 0.02, 0.05],
+                  'loss': ['ls']}
+        self.estimators['gradient_boosted_regressor'] = (ensemble.GradientBoostingRegressor, params)
+        # self.estimators['gradient_boosted_regressor'] = (self.GBRPipeline, params)
 
         # sgd
+        # params = {'sgd__max_iter': [250, 1000, 5000, 10000],
+        #           'sgd__tol': [0.001, 0.002, 0.005]}
         params = {'sgd__max_iter': [250, 1000, 5000, 10000],
                   'sgd__tol': [0.001, 0.002, 0.005]}
-        # self.estimators['sgd_regressor'] = (linear_model.SGDRegressor, params)
-        self.estimators['sgd_regressor'] = (self.SGDPipeline, params)
+        self.estimators['sgd_regressor'] = (linear_model.SGDRegressor, params)
+        # self.estimators['sgd_regressor'] = (self.SGDPipeline, params)
         logger.info('SimpleRegressor start searching for best model')
 
     def __init__(self, features, targets, predictions=None,
