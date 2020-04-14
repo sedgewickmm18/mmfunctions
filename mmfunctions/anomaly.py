@@ -1251,7 +1251,7 @@ class GBMRegressor(BaseEstimatorFunction):
         super().__init__(features=features, targets=targets, predictions=predictions)
         self.experiments_per_execution = 1
         self.correlation_threshold = 0
-        self.auto_train = False
+        self.auto_train = True
 
         # if n_estimators is not None or num_leaves is not None or learning_rate is not None or max_depth is not None:
         if n_estimators is not None or num_leaves is not None or learning_rate is not None:
