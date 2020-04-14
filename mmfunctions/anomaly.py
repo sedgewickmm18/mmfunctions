@@ -16,7 +16,6 @@ import re
 import datetime as dt
 import numpy as np
 import scipy as sp
-from sets import Set
 
 #  for Spectral Analysis
 from scipy import signal, fftpack
@@ -1316,7 +1315,7 @@ class GBMRegressor(BaseEstimatorFunction):
 
     @classmethod
     def get_input_items(cls):
-        return Set(['features', 'targets'])
+        return {'features', 'targets'}
 
 
 class SimpleRegressor(BaseEstimatorFunction):
