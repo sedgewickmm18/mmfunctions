@@ -41,7 +41,7 @@ import logging
 # import warnings
 # import json
 # from sqlalchemy import Column, Integer, String, Float, DateTime, Boolean, func
-from iotfunctions.base import (BaseTransformer, SimpleAggregator, BaseRegressor, BaseEvent, BaseEstimatorFunction)
+from iotfunctions.base import (BaseTransformer, BaseSimpleAggregator, BaseRegressor, BaseEvent, BaseEstimatorFunction)
 from iotfunctions.bif import (AlertHighValue)
 from iotfunctions.ui import (UISingle, UIMultiItem, UIFunctionOutSingle, UISingleItem, UIFunctionOutMulti,
                              UIExpression)
@@ -1495,7 +1495,7 @@ def _generate_metadata(cls, metadata):
     return common_metadata
 
 
-class SimpleAggregator(SimpleAggregator):
+class SimpleAggregator(BaseSimpleAggregator):
 
     @classmethod
     def metadata(cls):
