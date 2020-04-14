@@ -41,7 +41,7 @@ import logging
 # import warnings
 # import json
 # from sqlalchemy import Column, Integer, String, Float, DateTime, Boolean, func
-from iotfunctions.base import (BaseTransformer, BaseRegressor, BaseEvent, BaseEstimatorFunction)
+from iotfunctions.base import (BaseTransformer, SimpleAggregator, BaseRegressor, BaseEvent, BaseEstimatorFunction)
 from iotfunctions.bif import (AlertHighValue)
 from iotfunctions.ui import (UISingle, UIMultiItem, UIFunctionOutSingle, UISingleItem, UIFunctionOutMulti,
                              UIExpression)
@@ -1466,25 +1466,27 @@ class SimpleAnomaly(BaseRegressor):
         return (inputs, outputs)
 
 
-from iotfunctions.base import SimpleAggregator
-
 def _no_datatype_aggregator_output():
     return {'name': 'name',
             'description': 'Enter a name for the data item that is produced as a result of this calculation.'}.copy()
 
+
 def _general_aggregator_input():
     return {'name': 'source', 'description': 'Select the data item that you want to use as input for your calculation.',
             'type': 'DATA_ITEM', 'required': True, }.copy()
+
 
 def _general_aggregator_output():
     output_item = _no_datatype_aggregator_output()
     output_item['dataTypeFrom'] = 'source'
     return output_item
 
+
 def _number_aggregator_output():
     output_item = _no_datatype_aggregator_output()
     output_item['dataType'] = 'NUMBER'
     return output_item
+
 
 def _generate_metadata(cls, metadata):
     common_metadata = {'name': cls.__name__, 'moduleAndTargetName': '%s.%s' % (cls.__module__, cls.__name__),
@@ -1492,16 +1494,17 @@ def _generate_metadata(cls, metadata):
     common_metadata.update(metadata)
     return common_metadata
 
-class AggregateWithCalculation(SimpleAggregator):
+
+class SimpleAggregator(SimpleAggregator):
 
     @classmethod
     def metadata(cls):
         return _generate_metadata(cls, {'description': 'Create aggregation using expression on a data item.',
-            'input': [_general_aggregator_input(), {'name': 'expression',
-                'description': 'The expression. Use ${GROUP} to reference the current grain. \
-                 All Pandas Series methods can be used on the grain. For example, ${GROUP}.max() - ${GROUP}.min().',
-                'type': 'CONSTANT', 'required': True, 'dataType': 'LITERAL'}],
-            'output': [_no_datatype_aggregator_output()], 'tags': ['EVENT', 'JUPYTER']})
+                                        'input': [_general_aggregator_input(), {'name': 'expression',
+                                        'description': 'The expression. Use ${GROUP} to reference the current grain. \
+                                        All Pandas Series methods can be used on the grain. For example, ${GROUP}.max() - ${GROUP}.min().',
+                                        'type': 'CONSTANT', 'required': True, 'dataType': 'LITERAL'}],
+                                        'output': [_no_datatype_aggregator_output()], 'tags': ['EVENT', 'JUPYTER']})
 
     def __init__(self, expression=None):
         if expression is None or not isinstance(expression, str):
