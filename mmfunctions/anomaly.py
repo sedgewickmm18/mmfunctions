@@ -1506,10 +1506,11 @@ class SimpleAggregator(BaseSimpleAggregator):
                                         'type': 'CONSTANT', 'required': True, 'dataType': 'LITERAL'}],
                                         'output': [_no_datatype_aggregator_output()], 'tags': ['EVENT', 'JUPYTER']})
 
-    def __init__(self, expression=None):
+    def __init__(self, input_items=None, expression=None):
         if expression is None or not isinstance(expression, str):
             raise RuntimeError("argument expression must be provided and must be a string")
 
+        self.input_items = input_items
         self.expression = expression
 
     def execute(self, group):
