@@ -1315,7 +1315,7 @@ class GBMRegressor(BaseEstimatorFunction):
 
     @classmethod
     def get_input_items(cls):
-        return ['features', 'targets']
+        return Set(['features', 'targets'])
 
 
 class SimpleRegressor(BaseEstimatorFunction):
