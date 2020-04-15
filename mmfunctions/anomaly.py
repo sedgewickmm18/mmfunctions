@@ -1341,18 +1341,18 @@ class SimpleRegressor(BaseEstimatorFunction):
 
     def set_estimators(self):
         # gradient_boosted
-        params = {'gbr__n_estimators': [100, 250, 500, 1000],
-                  'gbr__max_depth': [2, 4, 10],
-                  'gbr__min_samples_split': [2, 5, 9],
-                  'gbr__learning_rate': [0.01, 0.02, 0.05],
-                  'gbr__loss': ['ls']}
-        # params = {'n_estimators': [100, 250, 500, 1000],
-        #           'max_depth': [2, 4, 10],
-        #           'min_samples_split': [2, 5, 9],
-        #           'learning_rate': [0.01, 0.02, 0.05],
-        #           'loss': ['ls']}
-        # self.estimators['gradient_boosted_regressor'] = (ensemble.GradientBoostingRegressor, params)
-        self.estimators['gradient_boosted_regressor'] = (self.GBRPipeline, params)
+        # params = {'gbr__n_estimators': [100, 250, 500, 1000],
+        #           'gbr__max_depth': [2, 4, 10],
+        #           'gbr__min_samples_split': [2, 5, 9],
+        #           'gbr__learning_rate': [0.01, 0.02, 0.05],
+        #           'gbr__loss': ['ls']}
+        params = {'n_estimators': [100, 250, 500, 1000],
+                  'max_depth': [2, 4, 10],
+                  'min_samples_split': [2, 5, 9],
+                  'learning_rate': [0.01, 0.02, 0.05],
+                  'loss': ['ls']}
+        self.estimators['gradient_boosted_regressor'] = (ensemble.GradientBoostingRegressor, params)
+        # self.estimators['gradient_boosted_regressor'] = (self.GBRPipeline, params)
 
         # sgd
         # params = {'sgd__max_iter': [250, 1000, 5000, 10000],
@@ -1523,6 +1523,6 @@ class SimpleAggregator(BaseSimpleAggregator):
         inputs.append(UIMultiItem(name='source', datatype=None, description=('Choose the data items'
                                                                                   ' that you would like to'
                                                                                   ' aggregate'),
-                                  output_item='output_items', is_output_datatype_derived=True))
+                                  output_item='name', is_output_datatype_derived=True))
         inputs.append(UIExpression(name='expression', description='Paste in or type an AS expression'))
         return (inputs, [])
