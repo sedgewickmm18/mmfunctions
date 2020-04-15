@@ -818,7 +818,11 @@ class TelemanomModel:
                 X_test_batch = channel.X_test[prior_idx:idx]
                 y_hat_batch = self.model.predict(X_test_batch)
 
-            logger.debug('predict: batch ' + str(i) + ' - ' + str(y_hat_batch.shape))
+            logger.debug(str(type(y_hat_batch)))
+            if type(y_hat_batch) == list:
+                logger.debug('predict: batch ' + str(i) + ' - ' + str(len(y_hat_batch)))
+            else:
+                logger.debug('predict: batch ' + str(i) + ' - ' + str(y_hat_batch.shape))
 
             self.aggregate_predictions(y_hat_batch)
 
@@ -849,6 +853,7 @@ class TelemanomEstimator(BaseEstimator):
             self.conf.l_s = 250
             self.conf.dropout = 0.2
             self.conf.lstm_batch_size = 80
+            self.conf.batch_size = 100
             self.chan = TelemanomChannel(self.conf, "MyDevice")
             self.model = None
             self.errors = None
@@ -914,15 +919,23 @@ class TelemanomEstimator(BaseEstimator):
 
             self.chan.shape_data(self.chan.test, train=False)
 
+            # clear old predictions
+            self.model.y_hat = np.array([])
+
             self.model.batch_predict(self.chan)
+
+            gap = len(self.chan.y_test) - len(self.model.y_hat)
+            if gap > 0:
+                padding = np.zeros(gap)
+                self.chan.y_hat = np.append(padding, self.model.y_hat)
 
             self.errors = TelemanomErrors(self.chan, self.conf, self.conf.use_id)
 
             print(self.errors.E_seq, ' \n', self.errors.anom_scores)
 
             padding = np.zeros(self.conf.l_s + self.conf.n_predictions)  # start at 250 + 10
-
             return np.append(padding, self.chan.y_hat)
+            # return self.chan.y_hat
 
         def score(self, X=None, y=None):
 
@@ -968,6 +981,7 @@ class LSTMRegressor(BaseEstimatorFunction):
         logger.info('Fit directly')
         estimator.best_params_ = {}
         estimator = estimator.fit(X=df_train[features], y=df_train[target])
+        self.estimator = estimator
         return estimator
 
     def execute(self, df):

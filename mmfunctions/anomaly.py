@@ -1516,3 +1516,13 @@ class SimpleAggregator(BaseSimpleAggregator):
 
     def execute(self, group):
         return eval(re.sub(r"\$\{GROUP\}", r"group", self.expression))
+
+    @classmethod
+    def build_ui(cls):
+        inputs = []
+        inputs.append(UIMultiItem(name='source', datatype=None, description=('Choose the data items'
+                                                                                  ' that you would like to'
+                                                                                  ' aggregate'),
+                                  output_item='output_items', is_output_datatype_derived=True))
+        inputs.append(UIExpression(name='expression', description='Paste in or type an AS expression'))
+        return (inputs, [])
