@@ -81,7 +81,7 @@ def extract_timevalue(tval, replace=None):
 
 def labelparm_initialize():
     labelparm = {'component': '', 'theme': '', 'blocked': '',
-                 'issueType': 'Issue', 'businessValue': 4,
+                 'issueType': 'Issue', 'businessValue': 0,
                  'severity': 3, 'risk': 2}
     return labelparm
 
@@ -122,9 +122,9 @@ def label_get_issue_type(label, labelparm):
 def label_get_business_value(label, labelparm):
     if re.fullmatch(businessvalue_pattern, label) is not None:
         labelparm['businessValue'] = label[-1]
-    # default business value is 4
+    # default business value is 0 (not yet sized)
     elif labelparm['businessValue'] is None:
-        labelparm['businessValue'] = 4
+        labelparm['businessValue'] = 0
 
 
 def label_get_severity(label, labelparm):
