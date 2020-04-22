@@ -18,10 +18,8 @@ import numpy as np
 import pandas as pd
 import logging
 
-from iotfunctions.base import (BaseTransformer, BaseEvent)
-from iotfunctions.bif import (AlertHighValue)
-from iotfunctions.ui import (UISingle, UIMultiItem, UIFunctionOutSingle, UISingleItem, UIFunctionOutMulti,
-                             UIExpression)
+from iotfunctions.base import (BaseEvent)
+from iotfunctions.ui import (UISingle, UIFunctionOutSingle, UISingleItem, UIExpression)
 
 logger = logging.getLogger(__name__)
 PACKAGE_URL = 'git+https://github.com/sedgewickmm18/mmfunctions.git@'
@@ -39,16 +37,12 @@ class AlertExpressionWithFilter(BaseEvent):
         self.expression = expression
         self.pulse_trigger = False
         self.alert_name = alert_name
+        self.alert_end = None
         logger.info('AlertExpressionWithFilter  dim: ' + str(dimension_name) + '  exp: ' + str(expression) + '  alert: ' + str(alert_name))
         super().__init__()
 
+    # evaluate alerts by entity
     def _calc(self, df):
-        '''
-        unused
-        '''
-        return df
-
-    def execute(self, df):
         # c = self._entity_type.get_attributes_dict()
         df = df.copy()
         logger.info('AlertExpressionWithFilter  exp: ' + self.expression + '  input: ' + str(df.columns))
@@ -80,14 +74,27 @@ class AlertExpressionWithFilter(BaseEvent):
                 n2 = np.where(df[self.dimension_name] == self.dimension_value, 1, 0)
                 np_res = np.multiply(n1, n2)
 
+            # get time index
+            ts_ind = df.index.get_level_values(self._entity_type._timestamp)
+
             if self.pulse_trigger:
                 # walk through all subsequences starting with the longest
                 # and replace all True with True, False, False, ...
-                for i in range(n1.size, 2, -1):
+                for i in range(np_res.size, 2, -1):
                     for j in range(0, i-1):
-                        if np.all(n1[j:i]):
-                            n1[j+1:i] = np.zeros(i-j-1, dtype=bool)
-                            n1[j] = i-j  # keep track of sequence length
+                        if np.all(np_res[j:i]):
+                            np_res[j+1:i] = np.zeros(i-j-1, dtype=int)
+                            np_res[j] = i-j  # keep track of sequence length
+
+                if self.alert_end is not None:
+                    alert_end = np.zeros(np_res.size)
+                    for i in range(np_res.size):
+                        if np_res[i] > 0:
+                            alert_end[i] = ts_ind[i]
+
+            else:
+                if self.alert_end is not None:
+                    df[self.alert_end] = df.index[0]
 
             logger.info('AlertExpressionWithFilter  shapes ' + str(n1.shape) + ' ' + str(n2.shape) + ' ' +
                         str(np_res.shape) + '  results\n - ' + str(n1) + '\n - ' + str(n2) + '\n - ' + str(np_res))
@@ -99,6 +106,12 @@ class AlertExpressionWithFilter(BaseEvent):
             pass
 
         return df
+
+    def execute(self, df):
+        '''
+        unused
+        '''
+        return super().execute(df)
 
     def get_input_items(self):
         items = set(self.dimension_name)
@@ -128,10 +141,13 @@ class AlertExpressionWithFilterExt(AlertExpressionWithFilter):
     Create alerts that are triggered when data values the expression is True
     '''
 
-    def __init__(self, expression, dimension_name, dimension_value, pulse_trigger, alert_name, **kwargs):
+    def __init__(self, expression, dimension_name, dimension_value, pulse_trigger, alert_name, alert_end, **kwargs):
         super().__init__(expression, dimension_name, dimension_value, alert_name, **kwargs)
         if pulse_trigger is None:
             self.pulse_trigger = True
+        if alert_end is not None:
+            self.alert_end = alert_end
+
         logger.info('AlertExpressionWithFilterExt  dim: ' + str(dimension_name) + '  exp: ' + str(expression) + '  alert: ' +
                     str(alert_name) + '  pulsed: ' + str(pulse_trigger))
 
