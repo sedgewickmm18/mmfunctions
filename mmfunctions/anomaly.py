@@ -223,7 +223,11 @@ def merge_score(dfEntity, dfEntityOrig, column_name, score, mindelta):
 
 class SpectralAnomalyScore(BaseTransformer):
     '''
-    Employs spectral analysis to extract features from the time series data and to compute zscore from it
+    An unsupervised anomaly detection function.
+     Applies a spectral analysis clustering techniqueto extract features from time series data and to create z scores.
+     Moves a sliding window across the data signal and applies the anomalymodelto each window.
+     The window size is typically set to 12 data points.
+     Try several anomaly detectors on your data and use the one that fits your data best.
     '''
     def __init__(self, input_item, windowsize, output_item):
         super().__init__()
@@ -383,13 +387,13 @@ class SpectralAnomalyScore(BaseTransformer):
         inputs.append(UISingleItem(
                 name='input_item',
                 datatype=float,
-                description='Column for feature extraction'
+                description='Data item to analyze'
                                               ))
 
         inputs.append(UISingle(
                 name='windowsize',
                 datatype=int,
-                description='Window size for spectral analysis - default 12'
+                description='Size of each sliding window in data points. Typically set to 12.'
                                               ))
 
         # define arguments that behave as function outputs
@@ -397,14 +401,18 @@ class SpectralAnomalyScore(BaseTransformer):
         outputs.append(UIFunctionOutSingle(
                 name='output_item',
                 datatype=float,
-                description='Spectral anomaly score (elliptic envelope)'
+                description='Spectral anomaly score (z-score)'
                 ))
         return (inputs, outputs)
 
 
 class SpectralAnomalyScoreExt(SpectralAnomalyScore):
     '''
-    Employs spectral analysis to extract features from the time series data and to compute zscore from it
+    An unsupervised anomaly detection function.
+     Applies a spectral analysis clustering techniqueto extract features from time series data and to create z scores.
+     Moves a sliding window across the data signal and applies the anomalymodelto each window.
+     The window size is typically set to 12 data points.
+     Try several anomaly detectors on your data and use the one that fits your data best.
     '''
     def __init__(self, input_item, windowsize, output_item, inv_zscore):
         super().__init__(input_item, windowsize, output_item)
@@ -424,13 +432,13 @@ class SpectralAnomalyScoreExt(SpectralAnomalyScore):
         inputs.append(UISingleItem(
                 name='input_item',
                 datatype=float,
-                description='Column for feature extraction'
+                description='Data item to analyze'
                                               ))
 
         inputs.append(UISingle(
                 name='windowsize',
                 datatype=int,
-                description='Window size for spectral analysis - default 12'
+                description='Size of each sliding window in data points. Typically set to 12.'
                                               ))
 
         # define arguments that behave as function outputs
@@ -438,20 +446,23 @@ class SpectralAnomalyScoreExt(SpectralAnomalyScore):
         outputs.append(UIFunctionOutSingle(
                 name='output_item',
                 datatype=float,
-                description='Spectral anomaly score (z-Score)'
+                description='Spectral anomaly score (z-score)'
                 ))
         outputs.append(UIFunctionOutSingle(
                 name='inv_zscore',
                 datatype=float,
-                description='zScore of inverted signal energy'
+                description='z-score of inverted signal energy - detects unusually low activity'
                 ))
         return (inputs, outputs)
 
 
 class KMeansAnomalyScore(BaseTransformer):
     '''
-    Employs kmeans on windowed time series data and to compute
-     an anomaly score from proximity to centroid's center points
+    An unsupervised anomaly detection function.
+     Applies a k-means analysis clustering technique to time series data.
+     Moves a sliding window across the data signal and applies the anomaly model to each window.
+     The window size is typically set to 12 data points.
+     Try several anomaly models on your data and use the one that fits your databest.
     '''
     def __init__(self, input_item, windowsize, output_item):
         super().__init__()
@@ -579,13 +590,13 @@ class KMeansAnomalyScore(BaseTransformer):
         inputs.append(UISingleItem(
                 name='input_item',
                 datatype=float,
-                description='Column for feature extraction'
+                description='Data item to analyze'
                                               ))
 
         inputs.append(UISingle(
                 name='windowsize',
                 datatype=int,
-                description='Window size for spectral analysis - default 12'
+                description='Size of each sliding window in data points. Typically set to 12.'
                                               ))
 
         # define arguments that behave as function outputs
@@ -600,9 +611,12 @@ class KMeansAnomalyScore(BaseTransformer):
 
 class GeneralizedAnomalyScore(BaseTransformer):
     """
-    Employs GAM on windowed time series data to compute an anomaly score from the covariance matrix
+    An unsupervised anomaly detection function.
+     Applies the Minimum Covariance Determinant (FastMCD) technique to detect outliers.
+     Moves a sliding window across the data signal and applies the anomaly model to each window.
+     The window size is typically set to 12 data points.
+     Try several anomaly detectors on your data and use the one that fits your data best.
     """
-
     def __init__(self, input_item, windowsize, output_item):
         super().__init__()
         logger.debug(input_item)
@@ -772,7 +786,7 @@ class GeneralizedAnomalyScore(BaseTransformer):
             UISingleItem(
                 name="input_item",
                 datatype=float,
-                description="Column for feature extraction",
+                description="Data item to analyze",
             )
         )
 
@@ -780,7 +794,7 @@ class GeneralizedAnomalyScore(BaseTransformer):
             UISingle(
                 name="windowsize",
                 datatype=int,
-                description="Window size for Generalized Anomaly analysis - default 12",
+                description="Size of each sliding window in data points. Typically set to 12."
             )
         )
 
@@ -798,8 +812,10 @@ class GeneralizedAnomalyScore(BaseTransformer):
 
 class NoDataAnomalyScore(GeneralizedAnomalyScore):
     '''
-    Employs generalized anomaly analysis to extract features from the
-      gaps in time series data and to compute the elliptic envelope from it
+    An unsupervised anomaly detection function.
+     Uses FastMCD to find gaps in data.
+     The function moves a sliding window across the data signal and applies the anomaly model to each window.
+     The window size is typically set to 12 data points.
     '''
     def __init__(self, input_item, windowsize, output_item):
         super().__init__(input_item, windowsize, output_item)
@@ -856,13 +872,13 @@ class NoDataAnomalyScore(GeneralizedAnomalyScore):
         inputs.append(UISingleItem(
                 name='input_item',
                 datatype=float,
-                description='Column for feature extraction'
+                description='Data item to analyze'
                                               ))
 
         inputs.append(UISingle(
                 name='windowsize',
                 datatype=int,
-                description='Window size for no data spectral analysis - default 12'
+                description='Size of each sliding window in data points. Typically set to 12.'
                                               ))
 
         # define arguments that behave as function outputs
@@ -877,7 +893,12 @@ class NoDataAnomalyScore(GeneralizedAnomalyScore):
 
 class FFTbasedGeneralizedAnomalyScore(GeneralizedAnomalyScore):
     """
-    Employs FFT and GAM on windowed time series data to compute an anomaly score from the covariance matrix
+    An unsupervised and robust anomaly detection function.
+     Extracts temporal features from time series data using Fast Fourier Transforms.
+     Applies the GeneralizedAnomalyScore to the features to detect outliers.
+     Moves a sliding window across the data signal and applies the anomaly models to each window.
+     The window size is typically set to 12 data points.
+     Try several anomaly detectors on your data and use the one that best fits your data.
     """
 
     def __init__(self, input_item, windowsize, output_item):
@@ -917,7 +938,7 @@ class FFTbasedGeneralizedAnomalyScore(GeneralizedAnomalyScore):
             UISingleItem(
                 name="input_item",
                 datatype=float,
-                description="Column for feature extraction",
+                description="Data item to analyze",
             )
         )
 
@@ -925,7 +946,7 @@ class FFTbasedGeneralizedAnomalyScore(GeneralizedAnomalyScore):
             UISingle(
                 name="windowsize",
                 datatype=int,
-                description="Window size for FFT feature based Generalized Anomaly analysis - default 12",
+                description="Size of each sliding window in data points. Typically set to 12."
             )
         )
 
@@ -943,7 +964,12 @@ class FFTbasedGeneralizedAnomalyScore(GeneralizedAnomalyScore):
 
 class FFTbasedGeneralizedAnomalyScore2(GeneralizedAnomalyScore):
     """
-    Employs FFT and GAM on windowed time series data to compute an anomaly score from the covariance matrix
+    An unsupervised and robust anomaly detection function.
+     Extracts temporal features from time series data using Fast Fourier Transforms.
+     Applies the GeneralizedAnomalyScore to the features to detect outliers.
+     Moves a sliding window across the data signal and applies the anomaly models to each window.
+     The window size is typically set to 12 data points.
+     Try several anomaly detectors on your data and use the one that best fits your data.
     """
 
     def __init__(self, input_item, windowsize, dampening, output_item):
@@ -984,7 +1010,7 @@ class FFTbasedGeneralizedAnomalyScore2(GeneralizedAnomalyScore):
             UISingleItem(
                 name="input_item",
                 datatype=float,
-                description="Column for feature extraction",
+                description="Data item to analyze",
             )
         )
 
@@ -992,7 +1018,7 @@ class FFTbasedGeneralizedAnomalyScore2(GeneralizedAnomalyScore):
             UISingle(
                 name="windowsize",
                 datatype=int,
-                description="Window size for FFT feature based Generalized Anomaly analysis - default 12",
+                description="Size of each sliding window in data points. Typically set to 12."
             )
         )
 
@@ -1000,7 +1026,7 @@ class FFTbasedGeneralizedAnomalyScore2(GeneralizedAnomalyScore):
             UISingle(
                 name="dampening",
                 datatype=float,
-                description="Moderate anomaly scores (value <= 1, default 1)",
+                description="Moderate the anomaly score. Use a value <=1. Typically set to 1."
             )
         )
 
@@ -1018,7 +1044,13 @@ class FFTbasedGeneralizedAnomalyScore2(GeneralizedAnomalyScore):
 
 class SaliencybasedGeneralizedAnomalyScore(GeneralizedAnomalyScore):
     """
-    Employs Saliency and GAM on windowed time series data to compute an anomaly score from the covariance matrix
+    An unsupervised anomaly detection function.
+     Based on salient region detection models,
+         it uses fast fourier transform to reconstruct a signal using the salient features of a the signal.
+     It applies GeneralizedAnomalyScore to the reconstructed signal.
+     The function moves a sliding window across the data signal and applies its analysis to each window.
+     The window size is typically set to 12 data points.
+     Try several anomaly detectors on your data and use the one that fits your data.
     """
 
     def __init__(self, input_item, windowsize, output_item):
@@ -1056,7 +1088,7 @@ class SaliencybasedGeneralizedAnomalyScore(GeneralizedAnomalyScore):
             UISingleItem(
                 name="input_item",
                 datatype=float,
-                description="Column for feature extraction",
+                description="Data item to analyze"
             )
         )
 
@@ -1064,7 +1096,7 @@ class SaliencybasedGeneralizedAnomalyScore(GeneralizedAnomalyScore):
             UISingle(
                 name="windowsize",
                 datatype=int,
-                description="Window size for Saliency feature based Generalized Anomaly analysis - default 12",
+                description="Size of each sliding window in data points. Typically set to 12.",
             )
         )
 
@@ -1074,7 +1106,7 @@ class SaliencybasedGeneralizedAnomalyScore(GeneralizedAnomalyScore):
             UIFunctionOutSingle(
                 name="output_item",
                 datatype=float,
-                description="Anomaly score (FFTbasedGeneralizedAnomalyScore)",
+                description="Anomaly score (SaliencybasedGeneralizedAnomalyScore)",
             )
         )
         return (inputs, outputs)
@@ -1171,9 +1203,9 @@ class GBMRegressor(BaseEstimatorFunction):
         outputs = []
         return (inputs, outputs)
 
-    @classmethod
-    def get_input_items(cls):
-        return {'features', 'targets'}
+    # @classmethod
+    # def get_input_items(cls):
+    #     return {'features', 'targets'}
 
 
 class SimpleRegressor(BaseEstimatorFunction):
@@ -1276,9 +1308,9 @@ class SimpleRegressor(BaseEstimatorFunction):
 
 class SimpleAnomaly(BaseRegressor):
     '''
-    Sample function uses a regression model to predict the value of one or more output
-    variables. It compares the actual value to the prediction and generates an alert
-    when the difference between the actual and predicted value is outside of a threshold.
+    A supervised anomaly detection function.
+     Uses a regression model to predict the value of target data items based on dependent data items or features.
+     Then, it compares the actual value to the predicted valueand generates an alert when the difference falls outside of a threshold.
     '''
 
     # class variables
