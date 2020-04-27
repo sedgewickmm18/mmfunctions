@@ -27,6 +27,9 @@ risk_pattern_alt_med = re.compile('^risk(:|-|)( |)medium', re.I)
 risk_pattern_alt_high = re.compile('^risk(:|-|)( |)high', re.I)
 
 
+#
+# build up a hashtable of issue_nr to (pipeline name, estimate)
+#
 def get_zen_issues(params, repo_id, zenhub_dict):
 
     zen_url = 'https://zenhub.ibm.com/p2/workspaces/' + params['ZENHUB_WORKSPACE'] + \
@@ -56,9 +59,14 @@ def get_zen_issues(params, repo_id, zenhub_dict):
         p_name = p['name']
         for issue in p['issues']:
             number = issue['issue_number']
+            estimate = ''
+            try:
+                estimate = issue['estimate']['value']
+            except Exception:
+                pass
             # epic = issue['is_epic']
             # zenhub_dict[number] = (epic, p_name)
-            zenhub_dict[number] = p_name
+            zenhub_dict[number] = (p_name, estimate)
 
     # import ipdb; ipdb.set_trace()
     if resp.status_code != 200:
@@ -176,9 +184,11 @@ def write_issues(params, repo, response, csvout):
             label_list.append(str(label['name']).strip().lstrip().rstrip())
 
         pipeline = ''
+        estimate = ''
         zenhub_dict = params['ZENHUB_DICT']
         try:
-            pipeline = zenhub_dict[issue['number']]
+            pipeline = zenhub_dict[issue['number']][0]
+            estimate = zenhub_dict[issue['number']][1]
         except Exception:
             pass
 
@@ -196,7 +206,7 @@ def write_issues(params, repo, response, csvout):
                         repo,
                         created_at, updated_at, closed_at,
                         user, assignee, state, milestone,
-                        labelparm['issueType'], labelparm['component'],
+                        labelparm['issueType'], labelparm['component'], estimate,
                         labelparm['businessValue'], labelparm['severity'], labelparm['risk'],
                         labelparm['theme'], labelparm['blocked'], pipeline, str(label_list)])
 
@@ -304,7 +314,7 @@ def process_all(params, show_progress=None):
     csvfile = open(csvfilename, 'w', newline='')
     csvout = csv.writer(csvfile, quoting=csv.QUOTE_MINIMAL)
     csvout.writerow(('Title', 'Repo', 'Created', 'Updated', 'Closed', 'Origin', 'Assignee', 'Status', 'Milestone', 'Type',
-                     'Component', 'BusinessValue', 'Severity', 'Risk', 'Theme', 'Blocked', 'Pipeline', 'Labels'))
+                     'Component', 'Estimate', 'BusinessValue', 'Severity', 'Risk', 'Theme', 'Blocked', 'Pipeline', 'Labels'))
     process(params, csvout, repo=params['REPO'])
     process(params, csvout, repo=params['REPO2'])
     csvfile.close()
