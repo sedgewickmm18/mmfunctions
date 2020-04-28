@@ -1361,6 +1361,7 @@ class SimpleAnomaly(BaseRegressor):
 
 def make_histogram(t, bins):
     rv = ''
+    logger.info('make_histogram ' + str(type(t)) + ' ' + str(t.shape))
     if np.isnan(t).any():
         logger.warning('make_histogram encountered NaN')
         return rv

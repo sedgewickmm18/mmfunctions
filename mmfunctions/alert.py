@@ -10,6 +10,7 @@
 
 '''
 The Built In Functions module contains preinstalled functions
+This alert module will be integrated into bif.py every now and then
 '''
 
 import re
