@@ -1372,7 +1372,7 @@ def make_histogram(t, bins):
         tv = minmax_scale(t.values)
         hist = np.histogram(tv, bins=bins, density=True)
         logger.info('make_histogram returns ' + str(hist))
-        rv = str(hist)
+        rv = str(hist[0])
     except Exception as e:
         logger.warning('make_histogram np.hist failed with ' + str(e))
     return rv
