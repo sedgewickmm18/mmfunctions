@@ -1391,12 +1391,11 @@ class HistogramAggregator(BaseSimpleAggregator):
             self.bins = int(bins)
 
     def execute(self, group):
-        # return eval(re.sub(r"\$\{GROUP\}", r"group", self.expression))
-        # group is a groups dictionary from running something like
+        #
+        # group is a series
+        #   when calling agg(<aggregator functions>) for each element of the group dictionary
         #   df_input.groupby([pd.Grouper(freq='1H', level='timestamp'), pd.Grouper(level='deviceid')])
-        # return group.agg({self.input_item: make_histogram(self.input_item, self.bins)})
-        # return group.apply(lambda t: make_histogram(t[self.input_item], self.bins))
-        # return group.apply(make_histogram(group[self.input_item], self.bins)
+        #
         return make_histogram(group, self.bins)
 
     @classmethod
