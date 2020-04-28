@@ -22,7 +22,7 @@ from scipy import signal, fftpack
 from sklearn.utils import check_X_y
 from sklearn import metrics
 from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import StandardScaler, minmax_scale
 from sklearn.covariance import MinCovDet
 from sklearn import ensemble
 from sklearn import linear_model
@@ -1369,7 +1369,8 @@ def make_histogram(t, bins):
         logger.warning('make_histogram encountered NaN')
         return rv
     try:
-        hist = np.histogram(t, bins=bins, density=True)
+        tv = minmax_scale(t.values)
+        hist = np.histogram(tv, bins=bins, density=True)
         logger.info('make_histogram returns ' + str(hist))
         rv = str(hist)
     except Exception as e:
