@@ -1370,6 +1370,7 @@ def make_histogram(t, bins):
         return rv
     try:
         hist = np.histogram(t, bins=bins, density=True)
+        logger.info('make_histogram returns ' + str(hist))
         rv = str(hist)
     except Exception as e:
         logger.warning('make_histogram np.hist failed with ' + str(e))
@@ -1393,7 +1394,6 @@ class HistogramAggregator(BaseSimpleAggregator):
         # group is a groups dictionary from running something like
         #   df_input.groupby([pd.Grouper(freq='1H', level='timestamp'), pd.Grouper(level='deviceid')])
         # return group.agg({self.input_item: make_histogram(self.input_item, self.bins)})
-        logger.info("group is " + str(type(group)))
         # return group.apply(lambda t: make_histogram(t[self.input_item], self.bins))
         # return group.apply(make_histogram(group[self.input_item], self.bins)
         return make_histogram(group, self.bins)
