@@ -41,7 +41,7 @@ import logging
 # import warnings
 # import json
 # from sqlalchemy import Column, Integer, String, Float, DateTime, Boolean, func
-from iotfunctions.base import (BaseTransformer, BaseRegressor, BaseEstimatorFunction)
+from iotfunctions.base import (BaseTransformer, BaseRegressor, BaseEstimatorFunction, BaseSimpleAggregator)
 from iotfunctions.bif import (AlertHighValue)
 from iotfunctions.ui import (UISingle, UIMultiItem, UIFunctionOutSingle, UISingleItem, UIFunctionOutMulti)
 
@@ -1357,3 +1357,36 @@ class SimpleAnomaly(BaseRegressor):
             UIFunctionOutMulti(name='alerts', datatype=bool, cardinality_from='targets', is_datatype_derived=False, ))
 
         return (inputs, outputs)
+
+class HistogramAggregator(BaseSimpleAggregator):
+    '''
+    The docstring of the function will show as the function description in the UI.
+    '''
+
+    def __init__(self, source=None, bins=None):
+
+        self.input_item = source
+        if bins is None:
+            self.bins = 15
+        else:
+            self.bins = bins
+
+    def execute(self, group):
+        # return eval(re.sub(r"\$\{GROUP\}", r"group", self.expression))
+        # group is a groups dictionary from running something like
+        #   df_input.groupby([pd.Grouper(freq='1H', level='timestamp'), pd.Grouper(level='deviceid')])
+        return group.agg({self.input_item: lambda t: str(np.histogram(t, bins=self.bins, density=True))})
+
+    @classmethod
+    def build_ui(cls):
+        inputs = []
+        inputs.append(UISingleItem(name='source', datatype=None, description=('Choose the data items'
+                                                                            ' that you would like to'
+                                                                                  ' aggregate'),
+                                  output_item='name', is_output_datatype_derived=True))
+
+        inputs.append(UISingleItem(
+                name='bins',
+                datatype=int,
+                description='Histogram bins - 15 by default'))
+        return (inputs, [])
