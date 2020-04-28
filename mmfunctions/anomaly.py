@@ -1386,7 +1386,7 @@ class HistogramAggregator(BaseSimpleAggregator):
         if bins is None:
             self.bins = 15
         else:
-            self.bins = bins
+            self.bins = int(bins)
 
     def execute(self, group):
         # return eval(re.sub(r"\$\{GROUP\}", r"group", self.expression))
@@ -1407,7 +1407,7 @@ class HistogramAggregator(BaseSimpleAggregator):
         # output_item='name', is_output_datatype_derived=True))
         inputs.append(UISingle(
                 name='bins',
-                datatype=None,
+                datatype=int,
                 description='Histogram bins - 15 by default'))
 
         outputs = []
