@@ -1358,11 +1358,24 @@ class SimpleAnomaly(BaseRegressor):
 
         return (inputs, outputs)
 
+
+def make_histogram(t, bins):
+    rv = ''
+    if np.isnan(t).any():
+        logger.warning('make_histogram encountered NaN')
+        return rv
+    try:
+        hist = np.histogram(t, bins=bins, density=True)
+        rv = str(hist)
+    except Exception as e:
+        logger.warning('make_histogram np.hist failed with ' + str(e))
+    return rv
+
+
 class HistogramAggregator(BaseSimpleAggregator):
     '''
     The docstring of the function will show as the function description in the UI.
     '''
-
     def __init__(self, source=None, bins=None):
 
         self.input_item = source
@@ -1375,17 +1388,17 @@ class HistogramAggregator(BaseSimpleAggregator):
         # return eval(re.sub(r"\$\{GROUP\}", r"group", self.expression))
         # group is a groups dictionary from running something like
         #   df_input.groupby([pd.Grouper(freq='1H', level='timestamp'), pd.Grouper(level='deviceid')])
-        return group.agg({self.input_item: lambda t: str(np.histogram(t, bins=self.bins, density=True))})
+        # return group.agg({self.input_item: lambda t: str(np.histogram(t, bins=self.bins, density=True))})
+        return group.agg({self.input_item: make_histogram(self.input_item, self.bins)})
 
     @classmethod
     def build_ui(cls):
         inputs = []
-        inputs.append(UIMultiItem(name='source', datatype=None, description=('Choose the data items'
-                                                                            ' that you would like to'
-                                                                                  ' aggregate'),
+        inputs.append(UIMultiItem(name='source', datatype=None,
+                                  description=('Choose the data items that you would like to aggregate'),
                                   output_item='name', is_output_datatype_derived=True))
 
-        inputs.append(UISingleItem(
+        inputs.append(UISingle(
                 name='bins',
                 datatype=int,
                 description='Histogram bins - 15 by default'))
