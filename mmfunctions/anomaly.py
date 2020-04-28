@@ -1394,8 +1394,9 @@ class HistogramAggregator(BaseSimpleAggregator):
         #   df_input.groupby([pd.Grouper(freq='1H', level='timestamp'), pd.Grouper(level='deviceid')])
         # return group.agg({self.input_item: make_histogram(self.input_item, self.bins)})
         logger.info("group is " + str(type(group)))
-        return group.apply(lambda t: make_histogram(t[self.input_item], self.bins))
+        # return group.apply(lambda t: make_histogram(t[self.input_item], self.bins))
         # return group.apply(make_histogram(group[self.input_item], self.bins)
+        return make_histogram(group, self.bins)
 
     @classmethod
     def build_ui(cls):
