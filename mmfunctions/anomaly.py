@@ -1380,7 +1380,7 @@ class HistogramAggregator(BaseSimpleAggregator):
     @classmethod
     def build_ui(cls):
         inputs = []
-        inputs.append(UISingleItem(name='source', datatype=None, description=('Choose the data items'
+        inputs.append(UIMultiItem(name='source', datatype=None, description=('Choose the data items'
                                                                             ' that you would like to'
                                                                                   ' aggregate'),
                                   output_item='name', is_output_datatype_derived=True))
