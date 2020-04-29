@@ -103,7 +103,9 @@ def set_window_size_and_overlap(windowsize, trim_value=2*DefaultWindowSize):
     if trimmed_ws == 1:
         ws_overlap = 0
     else:
-        ws_overlap = trimmed_ws - np.maximum(trimmed_ws // DefaultWindowSize, 1)
+        # ws_overlap = trimmed_ws - np.maximum(trimmed_ws // DefaultWindowSize, 1)
+        # larger overlap - half the window
+        ws_overlap = trimmed_ws // 2
 
     return trimmed_ws, ws_overlap
 
