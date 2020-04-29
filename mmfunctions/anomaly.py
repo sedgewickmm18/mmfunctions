@@ -733,8 +733,10 @@ class GeneralizedAnomalyScore(BaseTransformer):
                         + str(self.step) + ", InputSize: " + str(slices.shape)
                         + " failed in the fitting step with \"" + str(ve) + "\" - scoring zero")
 
-                    pred_score = np.zeros(slices.shape[0])
-                    pass
+                    dfe[self.output_item] = 0
+                    #  this fails in the interpolation step
+                    # pred_score = np.zeros(slices.shape[0])
+                    continue
 
                 except Exception as e:
 
