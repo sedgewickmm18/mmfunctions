@@ -470,10 +470,10 @@ class KMeansAnomalyScore(BaseTransformer):
         self.input_item = input_item
 
         # use 12 by default
-        self.windowsize, _ = set_window_size_and_overlap(windowsize)
+        self.windowsize, windowoverlap = set_window_size_and_overlap(windowsize)
 
         # step
-        self.step = 1
+        self.step = self.windowsize - windowoverlap
 
         # assume 1 per sec for now
         self.frame_rate = 1
@@ -626,10 +626,10 @@ class GeneralizedAnomalyScore(BaseTransformer):
         self.input_item = input_item
 
         # use 12 by default
-        self.windowsize, self.windowoverlap = set_window_size_and_overlap(windowsize)
+        self.windowsize, windowoverlap = set_window_size_and_overlap(windowsize)
 
         # step
-        self.step = 1
+        self.step = self.windowsize - windowoverlap
 
         # assume 1 per sec for now
         self.frame_rate = 1
