@@ -760,7 +760,7 @@ class GeneralizedAnomalyScore(BaseTransformer):
                 timesTS = np.linspace(diff // 2 + diff % 2, temperature.size - diff//2 + 1, diff)
 
                 print(self.whoami + '   Entity: ' + str(entity) + ', result shape: ' + str(timesTS.shape) +
-                      ' score shape: ' + str(pred_score.shape))
+                      ' score shape: ' + str(pred_score.shape) + ' input shape: ' + str(temperature.shape))
                 logger.debug(self.whoami + '   Entity: ' + str(entity) + ', result shape: ' + str(timesTS.shape) +
                              ' score shape: ' + str(pred_score.shape))
 
