@@ -570,7 +570,7 @@ class KMeansAnomalyScore(BaseTransformer):
                 #     self.windowsize//2, temperature.size - self.windowsize//2 + 1,
                 #     temperature.size - self.windowsize + 1)
                 diff = temperature.size - pred_score.size
-                time_series_temperature = np.linspace(diff // 2 + diff % 2, temperature.size - diff//2 + 1,
+                time_series_temperature = np.linspace(diff // 2, temperature.size - diff//2 + diff % 2,
                                                       temperature.size - diff + 1)
 
                 linear_interpolateK = sp.interpolate.interp1d(
@@ -758,7 +758,7 @@ class GeneralizedAnomalyScore(BaseTransformer):
                 # timesTS = np.linspace(self.windowsize // 2, temperature.size - self.windowsize // 2 + 1,
                 #    temperature.size - self.windowsize + 1)
                 diff = temperature.size - pred_score.size
-                time_series_temperature = np.linspace(diff // 2 + diff % 2, temperature.size - diff//2 + 1,
+                time_series_temperature = np.linspace(diff // 2, temperature.size - diff//2 + diff % 2,
                                                       temperature.size - diff + 1)
 
                 print(self.whoami + '   Entity: ' + str(entity) + ', result shape: ' + str(time_series_temperature.shape) +
