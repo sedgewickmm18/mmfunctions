@@ -566,9 +566,11 @@ class KMeansAnomalyScore(BaseTransformer):
 
                 # length of time_series_temperature, signal_energy and ets_zscore is smaller than half the original
                 #   extend it to cover the full original length
-                time_series_temperature = np.linspace(
-                     self.windowsize//2, temperature.size - self.windowsize//2 + 1,
-                     temperature.size - self.windowsize + 1)
+                # time_series_temperature = np.linspace(
+                #     self.windowsize//2, temperature.size - self.windowsize//2 + 1,
+                #     temperature.size - self.windowsize + 1)
+                diff = temperature.size - pred_score.size
+                time_series_temperature = np.linspace(diff // 2 + diff % 2, temperature.size - diff//2 + 1, diff)
 
                 linear_interpolateK = sp.interpolate.interp1d(
                     time_series_temperature, pred_score, kind='linear', fill_value='extrapolate')
@@ -752,11 +754,10 @@ class GeneralizedAnomalyScore(BaseTransformer):
                 # will break if pred_score is None
                 # length of timesTS, ETS and ets_zscore is smaller than half the original
                 #   extend it to cover the full original length
-                timesTS = np.linspace(
-                    self.windowsize // 2,
-                    temperature.size - self.windowsize // 2 + 1,
-                    temperature.size - self.windowsize + 1,
-                )
+                # timesTS = np.linspace(self.windowsize // 2, temperature.size - self.windowsize // 2 + 1,
+                #    temperature.size - self.windowsize + 1)
+                diff = temperature.size - pred_score.size
+                timesTS = np.linspace(diff // 2 + diff % 2, temperature.size - diff//2 + 1, diff)
 
                 logger.debug(self.whoami + '   Entity: ' + str(entity) + ', result shape: ' + str(timesTS.shape) +
                              ' score shape: ' + str(pred_score.shape))
