@@ -26,6 +26,8 @@ from sklearn.preprocessing import StandardScaler, minmax_scale
 from sklearn.covariance import MinCovDet
 from sklearn import ensemble
 from sklearn import linear_model
+from sklearn.experimental import enable_iterative_imputer
+from sklearn.impute import IterativeImputer
 
 #   for KMeans
 #  import skimage as ski
@@ -1136,7 +1138,7 @@ class GBMRegressor(BaseEstimatorFunction):
     num_rounds_per_estimator = 1
 
     def GBMPipeline(self):
-        steps = [('scaler', StandardScaler()), ('gbm', lightgbm.LGBMRegressor())]
+        steps = [('imputer', IterativeImputer()), ('scaler', StandardScaler()), ('gbm', lightgbm.LGBMRegressor())]
         return Pipeline(steps)
 
     def set_estimators(self):
