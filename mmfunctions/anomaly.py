@@ -19,7 +19,7 @@ import scipy as sp
 #  for Spectral Analysis
 from scipy import signal, fftpack
 # from scipy.stats import energy_distance
-from sklearn.utils import check_X_y
+from sklearn.utils import check_array
 from sklearn import metrics
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler, minmax_scale
@@ -1187,7 +1187,7 @@ class GBMRegressor(BaseEstimatorFunction):
             # dfe = df_copy.loc[[entity]].dropna(how='all')
             # dfe = df_copy.loc[[entity]].copy()
             # try:
-                check_X_y(df_copy.loc[[entity]][self.features].values)
+                check_array(df_copy.loc[[entity]][self.features].values)
                 dfe = super()._execute(df_copy.loc[[entity]], entity)
                 print(df_copy.columns)
                 # for c in self.predictions:
@@ -1290,7 +1290,7 @@ class SimpleRegressor(BaseEstimatorFunction):
 
         for entity in entities:
             try:
-                check_X_y(df_copy.loc[[entity]][self.features].values)
+                check_array(df_copy.loc[[entity]][self.features].values)
                 dfe = super()._execute(df_copy.loc[[entity]], entity)
                 print(df_copy.columns)
                 # for c in self.predictions:
