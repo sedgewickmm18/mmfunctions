@@ -1184,7 +1184,6 @@ class GBMRegressor(BaseEstimatorFunction):
             try:
                 check_array(df_copy.loc[[entity]][self.features].values, allow_nd=True)
             except Exception as e:
-                print(df_copy.loc[[entity]][self.features].values)
                 logger.error('Found Nan or infinite value in feature columns for entity ' + str(entity) + ' error: ' + str(e))
                 continue
 
