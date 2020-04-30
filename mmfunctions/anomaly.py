@@ -1140,7 +1140,7 @@ class GBMRegressor(BaseEstimatorFunction):
     num_rounds_per_estimator = 1
 
     def GBMPipeline(self):
-        transform = ColumnTransformer([('numeric-imputer', SimpleImputer(strategy='median'))])
+        transform = ColumnTransformer(transformers=[('numeric-imputer', SimpleImputer(strategy='median'))])
         steps = [('transformer', transform),
                  ('scaler', StandardScaler()), ('gbm', lightgbm.LGBMRegressor())]
         return Pipeline(steps)
