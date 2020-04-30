@@ -1140,7 +1140,7 @@ class GBMRegressor(BaseEstimatorFunction):
     num_rounds_per_estimator = 1
 
     def GBMPipeline(self):
-        steps = [('imputer-nan', SimpleImputer(strategy='median')),
+        steps = [ #('imputer-nan', SimpleImputer(strategy='median')),
                  ('scaler', StandardScaler()), ('gbm', lightgbm.LGBMRegressor())]
         return Pipeline(steps=steps)
 
@@ -1187,7 +1187,8 @@ class GBMRegressor(BaseEstimatorFunction):
             # dfe = df_copy.loc[[entity]].dropna(how='all')
             # dfe = df_copy.loc[[entity]].copy()
             # try:
-                check_array(df_copy.loc[[entity]][self.features].values)
+                check_array(df_copy.loc[[entity]][self.features].values, allow_nd=True, force_all_finite='allow-nan')
+                check_array(df_copy.loc[[entity]][self.features].values, allow_nd=True)
                 dfe = super()._execute(df_copy.loc[[entity]], entity)
                 print(df_copy.columns)
                 # for c in self.predictions:
