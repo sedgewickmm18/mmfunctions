@@ -26,10 +26,6 @@ from sklearn.preprocessing import StandardScaler, minmax_scale
 from sklearn.covariance import MinCovDet
 from sklearn import ensemble
 from sklearn import linear_model
-# from sklearn.experimental import enable_iterative_imputer
-# from sklearn.impute import IterativeImputer
-# from sklearn.compose import ColumnTransformer
-from sklearn.impute import SimpleImputer
 
 #   for KMeans
 #  import skimage as ski
@@ -1140,8 +1136,7 @@ class GBMRegressor(BaseEstimatorFunction):
     num_rounds_per_estimator = 1
 
     def GBMPipeline(self):
-        steps = [ #('imputer-nan', SimpleImputer(strategy='median')),
-                 ('scaler', StandardScaler()), ('gbm', lightgbm.LGBMRegressor())]
+        steps = [('scaler', StandardScaler()), ('gbm', lightgbm.LGBMRegressor())]
         return Pipeline(steps=steps)
 
     def set_estimators(self):
@@ -1186,18 +1181,18 @@ class GBMRegressor(BaseEstimatorFunction):
             # per entity - copy for later inplace operations
             # dfe = df_copy.loc[[entity]].dropna(how='all')
             # dfe = df_copy.loc[[entity]].copy()
-            # try:
-                check_array(df_copy.loc[[entity]][self.features].values, allow_nd=True, force_all_finite='allow-nan')
+            try:
                 check_array(df_copy.loc[[entity]][self.features].values, allow_nd=True)
-                dfe = super()._execute(df_copy.loc[[entity]], entity)
-                print(df_copy.columns)
-                # for c in self.predictions:
-                df_copy.loc[entity, self.predictions] = dfe[self.predictions]
-                # df_copy = df_copy.loc[[entity]] = dfe
-                print(df_copy.columns)
-            # except Exception as e:
-                # logger.info('GBMRegressor for entity ' + str(entity) + ' failed with: ' + str(e))
-                # continue
+            except Exception as e:
+                logger.error('Found Nan or infinite value in feature columns for entity ' + str(entity) + ' error: ' + str(e))
+                continue
+
+            dfe = super()._execute(df_copy.loc[[entity]], entity)
+            print(df_copy.columns)
+            # for c in self.predictions:
+            df_copy.loc[entity, self.predictions] = dfe[self.predictions]
+            # df_copy = df_copy.loc[[entity]] = dfe
+            print(df_copy.columns)
         return df_copy
 
     @classmethod
