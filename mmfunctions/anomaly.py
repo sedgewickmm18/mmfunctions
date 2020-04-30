@@ -1333,6 +1333,7 @@ class SimpleAnomaly(BaseRegressor):
             alerts = ['%s_alert' % x for x in self.targets]
         self.alerts = alerts
         self.threshold = threshold
+        self.correlation_threshold = 0
 
     def execute(self, df):
 
