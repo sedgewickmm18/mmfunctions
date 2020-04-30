@@ -28,6 +28,7 @@ from sklearn import ensemble
 from sklearn import linear_model
 # from sklearn.experimental import enable_iterative_imputer
 # from sklearn.impute import IterativeImputer
+from sklearn.compose import ColumnTransformer
 from sklearn.impute import SimpleImputer
 
 #   for KMeans
@@ -1139,7 +1140,9 @@ class GBMRegressor(BaseEstimatorFunction):
     num_rounds_per_estimator = 1
 
     def GBMPipeline(self):
-        steps = [('imputer', SimpleImputer()), ('scaler', StandardScaler()), ('gbm', lightgbm.LGBMRegressor())]
+        transform = ColumnTransformer([('numeric-imputer', SimpleImputer(strategy='median'))])
+        steps = [('transformer', transform),
+                 ('scaler', StandardScaler()), ('gbm', lightgbm.LGBMRegressor())]
         return Pipeline(steps)
 
     def set_estimators(self):
