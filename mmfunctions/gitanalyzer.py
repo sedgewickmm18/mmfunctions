@@ -26,14 +26,127 @@ risk_pattern_alt_low = re.compile('^risk(:|-|)( |)low', re.I)
 risk_pattern_alt_med = re.compile('^risk(:|-|)( |)medium', re.I)
 risk_pattern_alt_high = re.compile('^risk(:|-|)( |)high', re.I)
 
+FarFuture = '2030-01-01'
+IssueSeparator = 10000
+
+
+#
+# get repo_id, repo name from repo nr
+#
+def get_repo(repo_nr, param):
+    if repo_nr == 1:
+        return param['REPO_ID'], param['REPO']
+    elif repo_nr == 2:
+        return param['REPO2_ID'], param['REPO2']
+    return 0, ''
+
+
+def get_repo_nr(repo_id, param):
+    if param['REPO_ID'] == repo_id:
+        return 1
+    elif param['REPO2_ID'] == repo_id:
+        return 2
+    return 0
+
+
+def get_full_issue_nr(issue_nr, repo_nr):
+    return repo_nr * IssueSeparator + issue_nr
+
+
+def separate_issue_nr(complex_issue_nr):
+    return complex_issue_nr // IssueSeparator, complex_issue_nr % IssueSeparator
+
+
+#
+# retrieve all zenhub releases
+#
+def get_zen_releases(params, repo_nr, release_dict):
+
+    repo_id, repo = get_repo(repo_nr, params)
+    zen_url = params['ZEN_BASE_URL'] + '/p1/repositories/' + str(repo_id) + '/reports/releases'
+
+    kwargs = {
+        'headers': {
+            'Content-Type': 'application/vnd.github.v3.raw+json',
+            'User-Agent': 'Markus zenhub exporter - slightly modified'
+        },
+        'params': params['GIT_PARAMS']
+    }
+
+    if params['ZENHUB_TOKEN'] != '':
+        kwargs['headers']['X-Authentication-Token'] = '%s' % params['ZENHUB_TOKEN']
+
+    if params['progress']:
+        print("GET %s" % zen_url)
+
+    resp = requests.get(zen_url, **kwargs)
+
+    if params['progress']:
+        print("  : => %s" % resp.status_code)
+
+    # print(resp.json())
+    for rel in resp.json():
+        # print(rel)
+        start = dt.datetime.strptime(rel['start_date'][:10], "%Y-%m-%d")
+        desired_end = dt.datetime.\
+            strptime(rel['desired_end_date'][:10], "%Y-%m-%d")
+        closed = FarFuture
+        if rel['state'] == 'closed':
+            closed = dt.datetime.\
+                strptime(rel['closed_at'][:10], "%Y-%m-%d")
+        release_dict[rel['release_id']] = (rel['title'], start, desired_end, closed, rel['state'])
+
+    return
+
+
+#
+# build up a hashtable of issue_nr to (release name)
+#
+def get_zen_release_map(params, release_id, rel_parms, zenhub_rel_dict):
+
+    zen_url = params['ZEN_BASE_URL'] + '/p1/reports/release/' + str(release_id) + '/issues'
+
+    kwargs = {
+        'headers': {
+            'Content-Type': 'application/vnd.github.v3.raw+json',
+            'User-Agent': 'Markus zenhub exporter - slightly modified'
+        },
+        'params': params['GIT_PARAMS']
+    }
+
+    if params['ZENHUB_TOKEN'] != '':
+        kwargs['headers']['X-Authentication-Token'] = '%s' % params['ZENHUB_TOKEN']
+
+    if params['progress']:
+        print("GET %s" % zen_url)
+
+    resp = requests.get(zen_url, **kwargs)
+
+    if params['progress']:
+        print("  : => %s" % resp.status_code)
+
+    # print(resp.json())
+    for iss in resp.json():
+        #  print(rel)
+        # cheat multi index to single index
+        if get_repo_nr(iss['repo_id'], params) == 0:
+            continue
+        number = get_full_issue_nr(iss['issue_number'], get_repo_nr(iss['repo_id'], params))
+        # print (iss['issue_number'], iss['repo_id'], number)
+        zenhub_rel_dict[number] = rel_parms
+
+    return
+
 
 #
 # build up a hashtable of issue_nr to (pipeline name, estimate)
 #
-def get_zen_issues(params, repo_id, zenhub_dict):
+def get_zen_issues(params, repo_nr, zenhub_dict):
 
-    zen_url = 'https://zenhub.ibm.com/p2/workspaces/' + params['ZENHUB_WORKSPACE'] + \
-              '/repositories/' + str(repo_id) + '/board'
+    repo_id, repo = get_repo(repo_nr, params)
+
+    zen_url = params['ZEN_BASE_URL'] + '/p2/workspaces/' + params['ZENHUB_WORKSPACE'] + \
+        '/repositories/' + str(repo_id) + '/board'
 
     kwargs = {
         'headers': {
@@ -58,7 +171,7 @@ def get_zen_issues(params, repo_id, zenhub_dict):
     for p in pipelines:
         p_name = p['name']
         for issue in p['issues']:
-            number = issue['issue_number']
+            number = get_full_issue_nr(issue['issue_number'], repo_nr)
             estimate = ''
             try:
                 estimate = issue['estimate']['value']
@@ -157,14 +270,20 @@ def label_get_risk(label, labelparm):
         labelparm['risk'] = 2
 
 
-def write_issues(params, repo, response, csvout):
+def write_issues(params, repo_nr, response, csvout):
     "output a list of issues to csv"
+
+    repo_id, repo = get_repo(repo_nr, params)
+
     if params['progress']:
         print("  : Writing %s issues" % len(response.json()))
 
     for issue in response.json():
 
         user = extract_issuefield(issue['user'], 'login')
+
+        number = get_full_issue_nr(issue['number'], repo_nr)
+
         assignee = extract_issuefield(issue['assignee'], 'login')
         state = issue['state']
 
@@ -185,10 +304,17 @@ def write_issues(params, repo, response, csvout):
 
         pipeline = ''
         estimate = ''
+        release = ''
+        zenhub_rel_dict = params['ZENHUB_REL_DICT']
+        try:
+            release = zenhub_rel_dict[number][0]
+        except Exception:
+            pass
+
         zenhub_dict = params['ZENHUB_DICT']
         try:
-            pipeline = zenhub_dict[issue['number']][0]
-            estimate = zenhub_dict[issue['number']][1]
+            pipeline = zenhub_dict[number][0]
+            estimate = zenhub_dict[number][1]
         except Exception:
             pass
 
@@ -205,7 +331,7 @@ def write_issues(params, repo, response, csvout):
         csvout.writerow([issue['number'], issue['title'],
                         repo,
                         created_at, updated_at, closed_at,
-                        user, assignee, state, milestone,
+                        user, assignee, state, release, milestone,
                         labelparm['issueType'], labelparm['component'], estimate,
                         labelparm['businessValue'], labelparm['severity'], labelparm['risk'],
                         labelparm['theme'], labelparm['blocked'], pipeline, str(label_list)])
@@ -231,7 +357,10 @@ def get_travis_builds(params, url):
     print(resp)
 
 
-def get_issues(params, repo=None, url=None):
+def get_issues(params, repo_nr=0, url=None):
+
+    repo_id, repo = get_repo(repo_nr, params)
+
     kwargs = {
         'headers': {
             'Content-Type': 'application/vnd.github.v3.raw+json',
@@ -269,18 +398,19 @@ def next_page(response):
     return None
 
 
-def process(params, csvout, repo=None, url=None):
-    resp = get_issues(params, repo, url)
-    write_issues(params, repo, resp, csvout)
+def process(params, csvout, repo_nr=1, url=None):
+    resp = get_issues(params, repo_nr, url)
+    write_issues(params, repo_nr, resp, csvout)
     next_ = next_page(resp)
     if next_ is not None:
-        process(params, csvout, repo, next_)
+        process(params, csvout, repo_nr, next_)
 
 
 def process_all(params, show_progress=None):
 
     # default filename
     csvfilename = 'monitoring-defects.csv'
+    releasefilename = 'monitoring-releases.csv'
 
     # check whether global variables are defined and set params to default values
     x = ''
@@ -294,6 +424,8 @@ def process_all(params, show_progress=None):
         x = params['ZENHUB_WORKSPACE']
         x = params['TRAVIS_TOKEN']
         x = params['BASE_URL']
+        x = params['ZEN_BASE_URL']
+        x = params['IGNORE_RELEASES']
         if show_progress is None:
             show_progress = False
         params['progress'] = show_progress
@@ -306,15 +438,41 @@ def process_all(params, show_progress=None):
         logger.error('Global variable not defined: ' + str(e_ndef) + ' ' + str(x))
 
     # retrieve zenhub information
+    print('loading zenhub releases')
+    zenhub_releases = {}
+    get_zen_releases(params, 1, zenhub_releases)
+    get_zen_releases(params, 2, zenhub_releases)
+    params['ZENHUB_RELEASES'] = zenhub_releases
+
+    print('loading zenhub issues per releases')
+    zenhub_rel_dict = {}
+    csvfile = open(releasefilename, 'w', newline='')
+    csvout = csv.writer(csvfile, quoting=csv.QUOTE_MINIMAL)
+    csvout.writerow(('Id', 'Title', 'Start', 'DesiredEnd', 'Closed'))
+    for rel in params['ZENHUB_RELEASES']:
+        # ignore releases by name or state
+        if zenhub_releases[rel][0] in params['IGNORE_RELEASES'] or zenhub_releases[rel][4] in params['IGNORE_RELEASES']:
+            continue
+        csvout.writerow([rel, zenhub_releases[rel][0], zenhub_releases[rel][1], zenhub_releases[rel][2], zenhub_releases[rel][3]])
+        get_zen_release_map(params, rel, params['ZENHUB_RELEASES'][rel], zenhub_rel_dict)
+    csvfile.close()
+    params['ZENHUB_REL_DICT'] = zenhub_rel_dict
+
+    # print(zenhub_rel_dict)
+    # return
+
+    print('loading zenhub issues by board')
     zenhub_dict = {}
-    get_zen_issues(params, params['REPO_ID'], zenhub_dict)
-    get_zen_issues(params, params['REPO2_ID'], zenhub_dict)
+    get_zen_issues(params, 1, zenhub_dict)
+    get_zen_issues(params, 2, zenhub_dict)
     params['ZENHUB_DICT'] = zenhub_dict
 
     csvfile = open(csvfilename, 'w', newline='')
     csvout = csv.writer(csvfile, quoting=csv.QUOTE_MINIMAL)
-    csvout.writerow(('Title', 'Repo', 'Created', 'Updated', 'Closed', 'Origin', 'Assignee', 'Status', 'Milestone', 'Type',
+    csvout.writerow(('Title', 'Repo', 'Created', 'Updated', 'Closed', 'Origin', 'Assignee', 'Status', 'Release', 'Milestone', 'Type',
                      'Component', 'Estimate', 'BusinessValue', 'Severity', 'Risk', 'Theme', 'Blocked', 'Pipeline', 'Labels'))
-    process(params, csvout, repo=params['REPO'])
-    process(params, csvout, repo=params['REPO2'])
+    print('Process github repo 1')
+    process(params, csvout, repo_nr=1)
+    print('Process github repo 2')
+    process(params, csvout, repo_nr=2)
     csvfile.close()
