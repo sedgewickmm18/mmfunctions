@@ -12,8 +12,8 @@
 The Built In Functions module contains customer specific helper functions
 '''
 
+import json
 import datetime as dt
-import numpy as np
 import pytz
 
 # import re
@@ -25,7 +25,7 @@ import wiotp.sdk
 # import json
 # from sqlalchemy import Column, Integer, String, Float, DateTime, Boolean, func
 from iotfunctions.base import (BaseTransformer)
-from iotfunctions.ui import (UISingleItem, UIMultiItem)
+from iotfunctions.ui import (UIMultiItem)
 
 logger = logging.getLogger(__name__)
 PACKAGE_URL = 'git+https://github.com/sedgewickmm18/mmfunctions.git'
@@ -70,6 +70,7 @@ class UnrollData(BaseTransformer):
         client.connect()
 
         Now = dt.datetime.now(pytz.timezone("UTC"))
+        print(Now)
 
         # assume single entity
         for ix, row in df.iterrows():
@@ -81,13 +82,15 @@ class UnrollData(BaseTransformer):
             # columns with 5 elements
             speed = row[self.speed].to_numpy()
             power = row[self.power].to_numpy()
+            print(ix)
 
             for i in range(15):
-                js = {'vibx': vibx[i], 'viby': viby[i], 'vibz': vibz[i],
-                      'speed': speed[i // 3], 'power': power[i // 3]}
+                jsin = {'evt_time': ix[1], 'vibx': vibx[i], 'viby': viby[i], 'vibz': vibz[i],
+                        'speed': speed[i // 3], 'power': power[i // 3]}
+                jsdump = json.dumps(jsin)
+                js = json.loads(jsdump)
 
-                client.publishEvent(eventId="MMEventNew", msgFormat="json", data=str(js),
-                                    qos=0, onPublish=None, Date=Now + dt.datetime.timedelta(0, 20 * i))
+                client.publishEvent(eventId="MMEventNew", msgFormat="json", data=str(js))
 
         msg = 'UnrollData'
         self.trace_append(msg)
