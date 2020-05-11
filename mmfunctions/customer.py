@@ -46,14 +46,13 @@ class UnrollData(BaseTransformer):
     '''
     Compute L2Norm of string encoded array
     '''
-    def __init__(self, vibrationx, vibrationy, vibrationz, speed, power):
+    def __init__(self, group1_in, group2_in, group1_out, group2_out):
         super().__init__()
 
-        self.vibrationx = vibrationx
-        self.vibrationy = vibrationy
-        self.vibrationz = vibrationz
-        self.speed = speed
-        self.power = power
+        self.group1_in = group1_in
+        self.group2_in = group2_in
+        self.group1_out = group1_out
+        self.group2_out = group2_out
 
         # HARDCODED SINGLE ENTITY + Output device type
         self.config = {"identity": {"orgId": "vrvzh6", "typeId": "MMOutputDevice", "deviceId": "MMDeviceID"},
@@ -63,6 +62,7 @@ class UnrollData(BaseTransformer):
 
         # ONE ENTITY FOR NOW
         # connect
+        print('Unroll Data execute')
         client = wiotp.sdk.device.DeviceClient(config=self.config, logHandlers=None)
 
         client.on_connect = on_connect  # On Connect Callback.
@@ -75,13 +75,13 @@ class UnrollData(BaseTransformer):
         # assume single entity
         for ix, row in df.iterrows():
             # columns with 15 elements
-            vibx = row[self.vibrationx].to_numpy()
-            viby = row[self.vibrationy].to_numpy()
-            vibz = row[self.vibrationz].to_numpy()
+            vibx = row[self.group1_in[0]].to_numpy()
+            viby = row[self.group1_in[1]].to_numpy()
+            vibz = row[self.group1_in[2]].to_numpy()
 
             # columns with 5 elements
-            speed = row[self.speed].to_numpy()
-            power = row[self.power].to_numpy()
+            speed = row[self.group2_in[0]].to_numpy()
+            power = row[self.group2_in[1]].to_numpy()
             print(ix)
 
             for i in range(15):
