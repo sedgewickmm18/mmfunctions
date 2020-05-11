@@ -75,6 +75,8 @@ class UnrollData(BaseTransformer):
         # assume single entity
         for ix, row in df.iterrows():
             # columns with 15 elements
+            print (ix, row)
+
             vibx = row[self.group1_in[0]].to_numpy()
             viby = row[self.group1_in[1]].to_numpy()
             vibz = row[self.group1_in[2]].to_numpy()
