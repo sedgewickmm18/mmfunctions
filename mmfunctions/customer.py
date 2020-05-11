@@ -55,7 +55,7 @@ class UnrollData(BaseTransformer):
         self.group2_out = group2_out
 
         # HARDCODED SINGLE ENTITY + Output device type
-        self.config = {"identity": {"orgId": "vrvzh6", "typeId": "MMOutputDevice", "deviceId": "MMDeviceID"},
+        self.config = {"identity": {"orgId": "vrvzh6", "typeId": "MMDevice", "deviceId": "MMDeviceID"},
                        "auth": {"token": "mmdevice"}}
 
     def execute(self, df):
@@ -90,7 +90,7 @@ class UnrollData(BaseTransformer):
                 jsdump = json.dumps(jsin)
                 js = json.loads(jsdump)
 
-                client.publishEvent(eventId="MMEventNew", msgFormat="json", data=str(js))
+                client.publishEvent(eventId="MMOutputEventType", msgFormat="json", data=str(js))
 
         msg = 'UnrollData'
         self.trace_append(msg)
