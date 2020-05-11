@@ -12,79 +12,84 @@
 The Built In Functions module contains customer specific helper functions
 '''
 
+import datetime as dt
 import numpy as np
-# import scipy as sp
-
-# from scipy.stats import energy_distance
-from scipy import linalg
+import pytz
 
 # import re
 # import pandas as pd
 import logging
+import wiotp.sdk
+
 # import warnings
 # import json
 # from sqlalchemy import Column, Integer, String, Float, DateTime, Boolean, func
 from iotfunctions.base import (BaseTransformer)
-from iotfunctions.ui import (UIFunctionOutSingle, UISingleItem)
+from iotfunctions.ui import (UISingleItem, UIMultiItem)
 
 logger = logging.getLogger(__name__)
-PACKAGE_URL = 'git+https://github.com/sedgewickmm18/mmfunctions.git@'
+PACKAGE_URL = 'git+https://github.com/sedgewickmm18/mmfunctions.git'
 _IS_PREINSTALLED = False
 
-FrequencySplit = 0.3
-DefaultWindowSize = 12
-SmallEnergy = 0.0000001
+
+# On connect MQTT Callback.
+def on_connect(client, userdata, flags, rc):
+    print("Connected with result code : " + str(rc))
 
 
-def l2normArray(df, target_col, source_col1, source_col2=None, source_col3=None):
-    l2vib = []
-    for index, row in df.iterrows():
-        l2vib_element = linalg.norm(np.fromstring(row[source_col1].replace('[', ' ').replace(']', ''), sep=','))**2
-        if source_col2 is not None:
-            l2vib_element = \
-             l2vib_element + linalg.norm(np.fromstring(row[source_col2].replace('[', ' ').replace(']', ''), sep=','))**2
-        if source_col3 is not None:
-            l2vib_element = \
-             l2vib_element + linalg.norm(np.fromstring(row[source_col3].replace('[', ' ').replace(']', ''), sep=','))**2
-        l2vib.append(l2vib_element**(1/2))
-    df[target_col] = np.asarray(l2vib)
-    return df
+# on publish MQTT Callback.
+def on_publish(client, userdata, mid):
+    print("Message Published.")
 
 
-def unroll5minArray(df, source_col):
-    l0, l1, l2, l3, l4 = [], [], [], [], []
-    for source_col_entry in df[source_col].values:
-        l0.append(eval(eval(source_col_entry)[0]))
-        l1.append(eval(eval(source_col_entry)[1]))
-        l2.append(eval(eval(source_col_entry)[2]))
-        l3.append(eval(eval(source_col_entry)[3]))
-        l4.append(eval(eval(source_col_entry)[4]))
-    df[source_col + '_0'] = np.asarray(l0)
-    df[source_col + '_1'] = np.asarray(l1)
-    df[source_col + '_2'] = np.asarray(l2)
-    df[source_col + '_3'] = np.asarray(l3)
-    df[source_col + '_4'] = np.asarray(l4)
-    return df
-
-
-class L2Norm(BaseTransformer):
+class UnrollData(BaseTransformer):
     '''
     Compute L2Norm of string encoded array
     '''
-    def __init__(self, input_item1, input_item2, input_item3, output_item):
+    def __init__(self, vibrationx, vibrationy, vibrationz, speed, power):
         super().__init__()
 
-        self.input_item1 = input_item1
-        self.input_item2 = input_item2
-        self.input_item3 = input_item3
+        self.vibrationx = vibrationx
+        self.vibrationy = vibrationy
+        self.vibrationz = vibrationz
+        self.speed = speed
+        self.power = power
 
-        self.output_item = output_item
+        # HARDCODED SINGLE ENTITY + Output device type
+        self.config = {"identity": {"orgId": "vrvzh6", "typeId": "MMOutputDevice", "deviceId": "MMDeviceID"},
+                       "auth": {"token": "mmdevice"}}
 
     def execute(self, df):
 
-        df = l2normArray(df, self.input_item1, self.input_item2, self.input_item3, self.output_item)
+        # ONE ENTITY FOR NOW
+        # connect
+        client = wiotp.sdk.device.DeviceClient(config=self.config, logHandlers=None)
 
-        msg = 'L2Norm'
+        client.on_connect = on_connect  # On Connect Callback.
+        client.on_publish = on_publish  # On Publish Callback.
+        client.connect()
+
+        Now = dt.datetime.now(pytz.timezone("UTC"))
+
+        # assume single entity
+        for ix, row in df.iterrows():
+            # columns with 15 elements
+            vibx = row[self.vibrationx].to_numpy()
+            viby = row[self.vibrationy].to_numpy()
+            vibz = row[self.vibrationz].to_numpy()
+
+            # columns with 5 elements
+            speed = row[self.speed].to_numpy()
+            power = row[self.power].to_numpy()
+
+            for i in range(15):
+                js = {'vibx': vibx[i], 'viby': viby[i], 'vibz': vibz[i],
+                      'speed': speed[i // 3], 'power': power[i // 3]}
+
+                client.publishEvent(eventId="MMEventNew", msgFormat="json", data=str(js),
+                                    qos=0, onPublish=None, Date=Now + dt.datetime.timedelta(0, 20 * i))
+
+        msg = 'UnrollData'
         self.trace_append(msg)
 
         return (df)
@@ -94,62 +99,21 @@ class L2Norm(BaseTransformer):
 
         # define arguments that behave as function inputs
         inputs = []
-        inputs.append(UISingleItem(
-                name='input_item1',
-                datatype=str,
-                description='String encoded array of sensor readings'
+        inputs.append(UIMultiItem(
+                name='group1_in',
+                datatype=None,
+                description='String encoded array of sensor readings, 15 readings per 5 mins',
+                output_item='group1_out',
+                is_output_datatype_derived=True, output_datatype=None
+                ))
+        inputs.append(UIMultiItem(
+                name='group2_in',
+                datatype=None,
+                description='String encoded array of sensor readings, 5 readings per 5 mins',
+                output_item='group2_out',
+                is_output_datatype_derived=True, output_datatype=None
                 ))
 
-        inputs.append(UISingleItem(
-                name='input_item2',
-                datatype=str,
-                description='String encoded array of sensor readings'
-                ))
-
-        inputs.append(UISingleItem(
-                name='input_item3',
-                datatype=str,
-                description='String encoded array of sensor readings'
-                ))
-
-        # define arguments that behave as function outputs
-        outputs = []
-        outputs.append(UIFunctionOutSingle(
-                name='output_item',
-                datatype=float,
-                description='L2 norm of the string encoded sensor readings'
-                ))
-        return (inputs, outputs)
-
-
-class Unroll5MinArray(BaseTransformer):
-    '''
-    Unroll string encoded array of 5 sensor readings
-    '''
-    def __init__(self, input_item):
-        super().__init__()
-
-        self.input_item = input_item
-
-    def execute(self, df):
-
-        df = Unroll5MinArray(df, self.input_item)
-
-        msg = 'Unroll'
-        self.trace_append(msg)
-
-        return (df)
-
-    @classmethod
-    def build_ui(cls):
-
-        # define arguments that behave as function inputs
-        inputs = []
-        inputs.append(UISingleItem(
-                name='input_item',
-                datatype=str,
-                description='String encoded array of sensor readings'
-                ))
         # define arguments that behave as function outputs
         outputs = []
         return (inputs, outputs)
