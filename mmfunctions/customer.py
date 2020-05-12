@@ -91,7 +91,7 @@ class UnrollData(BaseTransformer):
                 jsdump = json.dumps(jsin)
                 js = json.loads(jsdump)
                 print('sending ', js)
-                client.publishEvent(eventId="MMOutputEventType", msgFormat="json", data=str(js))
+                client.publishEvent(eventId="MMOutputEventType", msgFormat="json", data=js)
 
         msg = 'UnrollData'
         self.trace_append(msg)
