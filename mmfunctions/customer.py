@@ -90,7 +90,7 @@ class UnrollData(BaseTransformer):
                         'speed': speed[i // 3], 'power': power[i // 3]}
                 jsdump = json.dumps(jsin)
                 js = json.loads(jsdump)
-
+                print('sending ', js)
                 client.publishEvent(eventId="MMOutputEventType", msgFormat="json", data=str(js))
 
         msg = 'UnrollData'
