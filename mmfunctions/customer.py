@@ -86,7 +86,7 @@ class UnrollData(BaseTransformer):
             power = eval(row['Power'])
 
             for i in range(15):
-                jsin = {'evt_time': ix[1], 'vibx': vibx[i], 'viby': viby[i], 'vibz': vibz[i],
+                jsin = {'evt_time': ix[1].astype(str), 'vibx': vibx[i], 'viby': viby[i], 'vibz': vibz[i],
                         'speed': speed[i // 3], 'power': power[i // 3]}
                 jsdump = json.dumps(jsin)
                 js = json.loads(jsdump)
