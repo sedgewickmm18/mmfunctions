@@ -75,16 +75,15 @@ class UnrollData(BaseTransformer):
         # assume single entity
         for ix, row in df.iterrows():
             # columns with 15 elements
-            print (ix, row)
+            print(ix, row)
 
-            vibx = row['VibrationX'].to_numpy()
-            viby = row['VibrationY'].to_numpy()
-            vibz = row['VibrationZ'].to_numpy()
+            vibx = eval(row['VibrationX']).to_numpy()
+            viby = eval(row['VibrationY']).to_numpy()
+            vibz = eval(row['VibrationZ']).to_numpy()
 
             # columns with 5 elements
-            speed = row['Speed'].to_numpy()
-            power = row['Power'].to_numpy()
-            print(ix)
+            speed = eval(row['Speed']).to_numpy()
+            power = eval(row['Power']).to_numpy()
 
             for i in range(15):
                 jsin = {'evt_time': ix[1], 'vibx': vibx[i], 'viby': viby[i], 'vibz': vibz[i],
