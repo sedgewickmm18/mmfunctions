@@ -77,13 +77,13 @@ class UnrollData(BaseTransformer):
             # columns with 15 elements
             print (ix, row)
 
-            vibx = row[self.group1_in[0]].to_numpy()
-            viby = row[self.group1_in[1]].to_numpy()
-            vibz = row[self.group1_in[2]].to_numpy()
+            vibx = row['VibrationX'].to_numpy()
+            viby = row['VibrationY'].to_numpy()
+            vibz = row['VibrationZ'].to_numpy()
 
             # columns with 5 elements
-            speed = row[self.group2_in[0]].to_numpy()
-            power = row[self.group2_in[1]].to_numpy()
+            speed = row['Speed'].to_numpy()
+            power = row['Power'].to_numpy()
             print(ix)
 
             for i in range(15):
