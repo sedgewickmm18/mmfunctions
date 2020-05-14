@@ -17,7 +17,7 @@ import datetime as dt
 import pytz
 
 # import re
-# import pandas as pd
+import pandas as pd
 import logging
 import wiotp.sdk
 
@@ -75,7 +75,7 @@ class UnrollData(BaseTransformer):
         # assume single entity
         for ix, row in df.iterrows():
             # columns with 15 elements
-            print(ix, row)
+            # print(ix, row)
 
             vibx = eval(row['VibrationX'])
             viby = eval(row['VibrationY'])
@@ -86,7 +86,8 @@ class UnrollData(BaseTransformer):
             power = eval(row['Power'])
 
             for i in range(15):
-                jsin = {'tim': str(ix[1]), 'vibx': vibx[i], 'viby': viby[i], 'vibz': vibz[i],
+                jsin = {'tim': str(ix[1] + pd.TimeDelta(seconds=20)),
+                        'vibx': vibx[i], 'viby': viby[i], 'vibz': vibz[i],
                         'spd': speed[i // 3], 'pwr': power[i // 3]}
                 jsdump = json.dumps(jsin)
                 js = json.loads(jsdump)
