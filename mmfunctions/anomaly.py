@@ -49,6 +49,9 @@ logger = logging.getLogger(__name__)
 PACKAGE_URL = 'git+https://github.com/sedgewickmm18/mmfunctions.git@'
 _IS_PREINSTALLED = False
 
+Error_SmallWindowsize = 0.0001
+Error_Generic = 0.0002
+
 FrequencySplit = 0.3
 DefaultWindowSize = 12
 SmallEnergy = 1e-20
@@ -280,6 +283,10 @@ class SpectralAnomalyScore(BaseTransformer):
         df_copy[self.output_item] = 0
         # df_copy.sort_index()   # NoOp
 
+        # check data type
+        if df_copy[self.input_item].dtype != np.float64:
+            return (df_copy)
+
         for entity in entities:
             # per entity - copy for later inplace operations
             dfe = df_copy.loc[[entity]].dropna(how='all')
@@ -310,13 +317,13 @@ class SpectralAnomalyScore(BaseTransformer):
 
             if temperature.size <= self.windowsize:
                 logger.debug(str(temperature.size) + ' <= ' + str(self.windowsize))
-                dfe[self.output_item] = 0.0001
+                dfe[self.output_item] = Error_SmallWindowsize
             else:
                 logger.debug(str(temperature.size) + str(self.windowsize))
 
-                dfe[self.output_item] = 0.00001
+                dfe[self.output_item] = Error_Generic
                 if self.inv_zscore is not None:
-                    dfe[self.inv_zscore] = 0.00001
+                    dfe[self.inv_zscore] = Error_Generic
 
                 zScoreII = None
                 inv_zScoreII = None
@@ -340,7 +347,7 @@ class SpectralAnomalyScore(BaseTransformer):
                     signal_energy[signal_energy < SmallEnergy] = SmallEnergy
                     inv_signal_energy = np.divide(np.ones(signal_energy.size), signal_energy)
 
-                    dfe[self.output_item] = 0.0002
+                    dfe[self.output_item] = 0.0005
 
                     ets_zscore = abs(sp.stats.zscore(signal_energy)) * Spectral_normalizer
                     inv_zscore = abs(sp.stats.zscore(inv_signal_energy))
@@ -350,7 +357,7 @@ class SpectralAnomalyScore(BaseTransformer):
 
                     # length of time_series_temperature, signal_energy and ets_zscore is smaller than half the original
                     #   extend it to cover the full original length
-                    dfe[self.output_item] = 0.0005
+                    dfe[self.output_item] = 0.0006
                     linear_interpolate = sp.interpolate.interp1d(
                         time_series_temperature, ets_zscore, kind='linear', fill_value='extrapolate')
 
@@ -514,7 +521,10 @@ class KMeansAnomalyScore(BaseTransformer):
         logger.debug(str(entities))
 
         df_copy[self.output_item] = 0
-        # df_copy.sort_index() - NoOP
+
+        # check data type
+        if df_copy[self.input_item].dtype != np.float64:
+            return (df_copy)
 
         for entity in entities:
             # per entity - copy for later inplace operations
@@ -684,7 +694,10 @@ class GeneralizedAnomalyScore(BaseTransformer):
         logger.debug(str(entities))
 
         df_copy[self.output_item] = 0
-        # df_copy.sort_index()
+
+        # check data type
+        if df_copy[self.input_item].dtype != np.float64:
+            return (df_copy)
 
         for entity in entities:
             # per entity - copy for later inplace operations
