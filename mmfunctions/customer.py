@@ -86,7 +86,8 @@ class UnrollData(BaseTransformer):
             power = eval(row['Power'])
 
             for i in range(15):
-                jsin = {'tim': str(ix[1] + pd.Timedelta(seconds=20*i)),
+                jsin = {'tim': (ix[1] + pd.Timedelta(seconds=20*i)).strftime("%Y-%m-%dT%H:%M:%S.%f"),
+                        # 2020-05-26T10:24:56.098000.
                         'vibx': vibx[i], 'viby': viby[i], 'vibz': vibz[i],
                         'spd': speed[i // 3], 'pwr': power[i // 3]}
                 jsdump = json.dumps(jsin)
