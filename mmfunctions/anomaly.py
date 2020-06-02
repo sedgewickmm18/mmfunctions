@@ -1145,8 +1145,6 @@ class GBMRegressor(BaseEstimatorFunction):
 
     # class variables
     train_if_no_model = True
-    estimators_per_execution = 1
-    num_rounds_per_estimator = 1
 
     def GBMPipeline(self):
         steps = [('scaler', StandardScaler()), ('gbm', lightgbm.LGBMRegressor())]
@@ -1160,10 +1158,17 @@ class GBMRegressor(BaseEstimatorFunction):
 
     def __init__(self, features, targets, predictions=None,
                  n_estimators=None, num_leaves=None, learning_rate=None, max_depth=None):
-        super().__init__(features=features, targets=targets, predictions=predictions)
+        super().__init__(features=features, targets=targets, predictions=predictions,
+                         keep_current_models=True)
         self.experiments_per_execution = 1
         self.correlation_threshold = 0
         self.auto_train = True
+
+        self.estimators_per_execution = 1
+        self.num_rounds_per_estimator = 1
+        self.parameter_tuning_iterations = 1
+        self.experiments_per_execution = 1
+        self.cv = 2
 
         # if n_estimators is not None or num_leaves is not None or learning_rate is not None or max_depth is not None:
         if n_estimators is not None or num_leaves is not None or learning_rate is not None:
