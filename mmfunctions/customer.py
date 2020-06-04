@@ -55,7 +55,7 @@ class UnrollData(BaseTransformer):
         self.group2_out = group2_out
 
         # HARDCODED SINGLE ENTITY + Output device type
-        self.config = {"identity": {"orgId": "vrvzh6", "typeId": "MMDeviceType", "deviceId": "MMShadow1"},
+        self.config = {"identity": {"orgId": "vrvzh6", "typeId": "MMDeviceTypeShadow", "deviceId": "MMShadow1"},
                        "auth": {"token": "mmshadow1"}}
 
     def execute(self, df):
