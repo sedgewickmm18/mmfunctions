@@ -127,6 +127,7 @@ def get_zen_release_map(params, release_id, rel_parms, zenhub_rel_dict):
 
     # print(resp.json())
     for iss in resp.json():
+        #print (type(iss), ' ' , iss)
         #  print(rel)
         # cheat multi index to single index
         if get_repo_nr(iss['repo_id'], params) == 0:
@@ -469,7 +470,7 @@ def process_all(params, show_progress=None):
 
     csvfile = open(csvfilename, 'w', newline='')
     csvout = csv.writer(csvfile, quoting=csv.QUOTE_MINIMAL)
-    csvout.writerow(('Title', 'Repo', 'Created', 'Updated', 'Closed', 'Origin', 'Assignee', 'Status', 'Release', 'Milestone', 'Type',
+    csvout.writerow(('IssueNr', 'Title', 'Repo', 'Created', 'Updated', 'Closed', 'Origin', 'Assignee', 'Status', 'Release', 'Milestone', 'Type',
                      'Component', 'Estimate', 'BusinessValue', 'Severity', 'Risk', 'Theme', 'Blocked', 'Pipeline', 'Labels'))
     print('Process github repo 1')
     process(params, csvout, repo_nr=1)

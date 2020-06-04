@@ -55,8 +55,8 @@ class UnrollData(BaseTransformer):
         self.group2_out = group2_out
 
         # HARDCODED SINGLE ENTITY + Output device type
-        self.config = {"identity": {"orgId": "vrvzh6", "typeId": "MMDeviceType", "deviceId": "MMDevice1"},
-                       "auth": {"token": "mmdevice1"}}
+        self.config = {"identity": {"orgId": "vrvzh6", "typeId": "MMDeviceType", "deviceId": "MMShadow1"},
+                       "auth": {"token": "mmshadow1"}}
 
     def execute(self, df):
 
@@ -86,10 +86,10 @@ class UnrollData(BaseTransformer):
             power = eval(row['Power'])
 
             for i in range(15):
-                jsin = {'tim': (ix[1] + pd.Timedelta(seconds=20*i)).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
+                jsin = {'time': (ix[1] + pd.Timedelta(seconds=20*i - 300)).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
                         # 2020-05-26T10:24:56.098000.
                         'vibx': vibx[i], 'viby': viby[i], 'vibz': vibz[i],
-                        'spd': speed[i // 3], 'pwr': power[i // 3]}
+                        'speed': speed[i // 3], 'power': power[i // 3]}
                 jsdump = json.dumps(jsin)
                 js = json.loads(jsdump)
                 print('sending ', js)
