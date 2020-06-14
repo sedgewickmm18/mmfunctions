@@ -575,21 +575,27 @@ class KMeansAnomalyScore(BaseTransformer):
                     continue
 
                 pred_score = cblofwin.decision_scores_.copy() * KMeans_normalizer
+                # np.savetxt('kmeans.csv', pred_score)
 
                 # length of time_series_temperature, signal_energy and ets_zscore is smaller than half the original
                 #   extend it to cover the full original length
-                # time_series_temperature = np.linspace(
-                #     self.windowsize//2, temperature.size - self.windowsize//2 + 1,
-                #     temperature.size - self.windowsize + 1)
                 diff = temperature.size - pred_score.size
-                time_series_temperature = np.linspace(diff // 2 + diff % 2, temperature.size - diff//2,
-                                                      temperature.size - diff)
+
+                time_series_temperature = np.linspace(
+                    self.windowsize//2, temperature.size - self.windowsize//2 + 1,
+                    temperature.size - diff)
+                #     temperature.size - self.windowsize + 1)
+
+                #time_series_temperature = np.linspace(diff // 2 + diff % 2, temperature.size - diff//2,
+                #                                      temperature.size - diff)
 
                 linear_interpolateK = sp.interpolate.interp1d(
                     time_series_temperature, pred_score, kind='linear', fill_value='extrapolate')
 
                 zScoreII = merge_score(dfe, dfe_orig, self.output_item,
                                        linear_interpolateK(np.arange(0, temperature.size, 1)), mindelta)
+
+                # np.savetxt('kmeans2.csv', zScoreII)
 
                 idx = pd.IndexSlice
                 df_copy.loc[idx[entity, :], self.output_item] = zScoreII
@@ -767,14 +773,20 @@ class GeneralizedAnomalyScore(BaseTransformer):
                         + " failed in the fitting step with " + str(e))
                     continue
 
+                # np.savetxt(self.whoami + '.csv', pred_score)
+
                 # will break if pred_score is None
                 # length of timesTS, ETS and ets_zscore is smaller than half the original
                 #   extend it to cover the full original length
-                # timesTS = np.linspace(self.windowsize // 2, temperature.size - self.windowsize // 2 + 1,
-                #    temperature.size - self.windowsize + 1)
                 diff = temperature.size - pred_score.size
-                time_series_temperature = np.linspace(diff // 2 + diff % 2, temperature.size - diff//2,
-                                                      temperature.size - diff)
+
+                time_series_temperature = np.linspace(
+                    self.windowsize//2, temperature.size - self.windowsize//2 + 1,
+                    temperature.size - diff)
+                #     temperature.size - self.windowsize + 1)
+
+                #time_series_temperature = np.linspace(diff // 2 + diff % 2, temperature.size - diff//2,
+                #                                      temperature.size - diff)
 
                 print(self.whoami + '   Entity: ' + str(entity) + ', result shape: ' + str(time_series_temperature.shape) +
                       ' score shape: ' + str(pred_score.shape) + ' input shape: ' + str(temperature.shape))
@@ -792,6 +804,8 @@ class GeneralizedAnomalyScore(BaseTransformer):
                 dampen_anomaly_score(gam_scoreI, self.dampening)
 
                 zScoreII = merge_score(dfe, dfe_orig, self.output_item, gam_scoreI, mindelta)
+
+                # np.savetxt(self.whoami + '2.csv', zScoreII)
 
                 idx = pd.IndexSlice
                 df_copy.loc[idx[entity, :], self.output_item] = zScoreII
