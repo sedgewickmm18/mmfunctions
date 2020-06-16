@@ -26,6 +26,10 @@ risk_pattern_alt_low = re.compile('^risk(:|-|)( |)low', re.I)
 risk_pattern_alt_med = re.compile('^risk(:|-|)( |)medium', re.I)
 risk_pattern_alt_high = re.compile('^risk(:|-|)( |)high', re.I)
 
+squad_pattern= re.compile('^(s|S)quad(:|-|)( |)', re.I)
+customer_pattern= re.compile('^(c|C)ustomer(:|-|)( |)', re.I)
+
+
 FarFuture = '2030-01-01'
 IssueSeparator = 10000
 
@@ -212,63 +216,82 @@ def label_get_component(label, labelparm):
     if label.startswith('Component') or label.startswith('Scrum') or label.startswith('Squad:'):
         label = label.strip()
         labelparm['component'] = label.split(':')[1]
+        return True
     elif labelparm['component'] is None:
         labelparm['component'] = ''
+        return False
 
 
 def label_get_theme(label, labelparm):
-    if label.find('Theme') >= 0:
+    if label.find('Theme') >= 0 or label == 'AppConnect':
         labelparm['theme'] = label
+        return True
     elif labelparm['theme'] is None:
         labelparm['theme'] = ''
+        return False
 
 
 def label_get_blocked(label, labelparm):
     if label.startswith('blocked'):
         labelparm['blocked'] = 'YES'
+        return True
     elif labelparm['blocked'] is None:
         labelparm['blocked'] = ''
+        return False
 
 
 def label_get_issue_type(label, labelparm):
     if label.startswith('Epic'):
         labelparm['issueType'] = 'Epic'
+        return True
     elif label.startswith('bug'):
         labelparm['issueType'] = 'Bug'
+        return True
     elif label.startswith('Enhancement'):
         labelparm['issueType'] = 'Enhancement'
+        return True
     elif labelparm['issueType'] is None:
         labelparm['issueType'] = 'Issue'
+        return False
 
 
 def label_get_business_value(label, labelparm):
     if re.fullmatch(businessvalue_pattern, label) is not None:
         labelparm['businessValue'] = label[-1]
+        return True
     # default business value is 0 (not yet sized)
     elif labelparm['businessValue'] is None:
         labelparm['businessValue'] = 0
+        return False
 
 
 def label_get_severity(label, labelparm):
     if re.fullmatch(severity_pattern, label) is not None:
         labelparm['severity'] = label[-1]
+        return True
     # default severity is 3
     elif labelparm['severity'] is None:
         labelparm['severity'] = 3
+        return False
 
 
 def label_get_risk(label, labelparm):
     if re.fullmatch(risk_pattern, label) is not None:
         labelparm['risk'] = label[-1]
+        return True
     elif re.fullmatch(risk_pattern_alt_low, label) is not None:
         labelparm['risk'] = 3
+        return True
     elif re.fullmatch(risk_pattern_alt_med, label) is not None:
         labelparm['risk'] = 2
+        return True
     elif re.fullmatch(risk_pattern_alt_high, label) is not None:
         labelparm['risk'] = 1
+        return True
     # default risk is 2
     elif labelparm['risk'] is None:
         labelparm['risk'] = 2
+        return False
 
 
 def write_issues(params, repo_nr, response, csvout):
@@ -300,6 +323,7 @@ def write_issues(params, repo_nr, response, csvout):
         closed_at = extract_timevalue(issue['closed_at'])
 
         label_list = []
+        label_list_copy = []
         for label in labels:
             label_list.append(str(label['name']).strip().lstrip().rstrip())
 
@@ -321,13 +345,39 @@ def write_issues(params, repo_nr, response, csvout):
 
         labelparm = labelparm_initialize()
         for label in label_list:
-            label_get_component(label, labelparm)
-            label_get_theme(label, labelparm)
-            label_get_blocked(label, labelparm)
-            label_get_issue_type(label, labelparm)
-            label_get_business_value(label, labelparm)
-            label_get_severity(label, labelparm)
-            label_get_risk(label, labelparm)
+            t = label_get_component(label, labelparm) or \
+                label_get_theme(label, labelparm) or \
+                label_get_blocked(label, labelparm) or \
+                label_get_issue_type(label, labelparm) or \
+                label_get_business_value(label, labelparm) or \
+                label_get_severity(label, labelparm) or \
+                label_get_risk(label, labelparm)
+
+            # only copy unknown labels to the label list
+            if not t:
+                label_list_copy.append(label)
+
+        label1, label2, label3, label4, label5 = '','','','',''
+        try:
+            label1 = label_list_copy.pop(0)
+            try:
+                label2 = label_list_copy.pop(0)
+                try:
+                    label3 = label_list_copy.pop(0)
+                    try:
+                        label4 = label_list_copy.pop(0)
+                        try:
+                            label5 = label_list_copy.pop(0)
+                        except Exception:
+                            pass
+                    except Exception:
+                        pass
+                except Exception:
+                    pass
+            except Exception:
+                pass
+        except Exception:
+            pass
 
         csvout.writerow([issue['number'], issue['title'],
                         repo,
@@ -335,7 +385,8 @@ def write_issues(params, repo_nr, response, csvout):
                         user, assignee, state, release, milestone,
                         labelparm['issueType'], labelparm['component'], estimate,
                         labelparm['businessValue'], labelparm['severity'], labelparm['risk'],
-                        labelparm['theme'], labelparm['blocked'], pipeline, str(label_list)])
+                        labelparm['theme'], labelparm['blocked'], pipeline,
+                        label1, label2, label3, label4, label5, str(label_list_copy)])
 
 
 def get_travis_builds(params, url):
@@ -470,8 +521,9 @@ def process_all(params, show_progress=None):
 
     csvfile = open(csvfilename, 'w', newline='')
     csvout = csv.writer(csvfile, quoting=csv.QUOTE_MINIMAL)
-    csvout.writerow(('IssueNr', 'Title', 'Repo', 'Created', 'Updated', 'Closed', 'Origin', 'Assignee', 'Status', 'Release', 'Milestone', 'Type',
-                     'Component', 'Estimate', 'BusinessValue', 'Severity', 'Risk', 'Theme', 'Blocked', 'Pipeline', 'Labels'))
+    csvout.writerow(('IssueNr', 'Title', 'Repo', 'Created', 'Updated', 'Closed', 'Origin', 'Assignee', 'Status', 'Release', 'Milestone',
+                     'Type', 'Component', 'Estimate', 'BusinessValue', 'Severity', 'Risk', 'Theme', 'Blocked', 'Pipeline', 'Label1',
+                     'Label2', 'Label3', 'Label4', 'Label5', 'Labels'))
     print('Process github repo 1')
     process(params, csvout, repo_nr=1)
     print('Process github repo 2')
