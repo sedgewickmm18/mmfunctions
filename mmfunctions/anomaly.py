@@ -538,7 +538,8 @@ class KMeansAnomalyScore(BaseTransformer):
             entities2 = df_copy[mask].index.unique(level=0)
             logger.info('Expression eval for ' + expr + ' gave ' + str(entities2))
         except Exception as e:
-            logger.info('Expression eval for ' + expr + ' failed with ' + str(e))
+            if expr is not None:
+                logger.info('Expression eval for ' + expr + ' failed with ' + str(e))
 
         df_copy[self.output_item] = 0
 
