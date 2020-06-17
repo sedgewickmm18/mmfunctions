@@ -491,12 +491,13 @@ class KMeansAnomalyScore(BaseTransformer):
 
         self.whoami = 'KMeans'
 
-        if '${' in expr:
-            expr = re.sub(r"\$\{(\w+)\}", r"df['\1']", expression)
-            logger.info('Expression - after regexp: ' + expr)
-            msg = 'Expression converted to %s. ' % expr
-        else:
-            msg = 'Expression (%s). ' % expr
+        if expr is not None:
+            if '${' in expr:
+                expr = re.sub(r"\$\{(\w+)\}", r"df['\1']", expression)
+                logger.info('Expression - after regexp: ' + expr)
+                msg = 'Expression converted to %s. ' % expr
+            else:
+                msg = 'Expression (%s). ' % expr
 
         self.expression = expr
 
