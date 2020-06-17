@@ -498,6 +498,8 @@ class KMeansAnomalyScore(BaseTransformer):
                 msg = 'Expression converted to %s. ' % expr
             else:
                 msg = 'Expression (%s). ' % expr
+        else:
+            msg = 'Empty expression'
 
         self.expression = expr
 
