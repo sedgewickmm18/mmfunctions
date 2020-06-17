@@ -35,7 +35,7 @@ from pyod.models.cblof import CBLOF
 # for gradient boosting
 import lightgbm
 
-# import re
+import re
 import pandas as pd
 import logging
 # import warnings
@@ -473,7 +473,7 @@ class KMeansAnomalyScore(BaseTransformer):
      The window size is typically set to 12 data points.
      Try several anomaly models on your data and use the one that fits your databest.
     '''
-    def __init__(self, input_item, windowsize, output_item):
+    def __init__(self, input_item, windowsize, output_item, expr=None):
         super().__init__()
         logger.debug(input_item)
         self.input_item = input_item
@@ -490,6 +490,18 @@ class KMeansAnomalyScore(BaseTransformer):
         self.output_item = output_item
 
         self.whoami = 'KMeans'
+
+        if '${' in expr:
+            expr = re.sub(r"\$\{(\w+)\}", r"df['\1']", expression)
+            logger.info('Expression - after regexp: ' + expr)
+            msg = 'Expression converted to %s. ' % expr
+        else:
+            msg = 'Expression (%s). ' % expr
+
+        self.expression = expr
+
+        self.trace_append(msg)
+
 
     def prepare_data(self, dfEntity):
 
@@ -519,6 +531,16 @@ class KMeansAnomalyScore(BaseTransformer):
         df_copy = df.copy()
         entities = np.unique(df_copy.index.levels[0])
         logger.debug(str(entities))
+
+        try:
+            if self.expression is not None:
+                mask = eval(str(self.expression))
+            else:
+                mask = np.full(len(df_copy) , True)
+            entities2 = df_copy[mask].index.unique(level=0)
+            logger.info('Expression eval for ' + expr + ' gave ' + str(entities2))
+        except Exception as e:
+            logger.info('Expression eval for ' + expr + ' failed with ' + str(e))
 
         df_copy[self.output_item] = 0
 
