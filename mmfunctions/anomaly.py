@@ -21,8 +21,9 @@ from scipy import signal, fftpack
 # from scipy.stats import energy_distance
 from sklearn.utils import check_array
 from sklearn import metrics
+from sklearn.base import BaseEstimator
 from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import StandardScaler, minmax_scale
+from sklearn.preprocessing import StandardScaler, RobustScaler, MinMaxScaler, minmax_scale
 from sklearn.covariance import MinCovDet
 from sklearn import ensemble
 from sklearn import linear_model
@@ -1170,6 +1171,196 @@ class SaliencybasedGeneralizedAnomalyScore(GeneralizedAnomalyScore):
 
 #######################################################################################
 
+class Standard_Scaler(BaseEstimatorFunction):
+
+    '''
+    Regressor based on gradient boosting method as provided by lightGBM
+    '''
+    eval_metric = staticmethod(metrics.r2_score)
+
+    # class variables
+    train_if_no_model = True
+
+    def set_estimators(self):
+        self.estimators['standard_scaler'] = (StandardScaler, self.params)
+        logger.info('Standard Scaler initialized')
+
+    def __init__(self, features=None, targets=None, predictions=None):
+        super().__init__(features=features, targets=targets, predictions=predictions,
+                         keep_current_models=True)
+
+        # do not run score and call transform instead of predict
+        self.is_scaler = True
+        self.experiments_per_execution = 1
+
+        self.params = {}
+
+    def execute(self, df):
+
+        df_copy = df.copy()
+        entities = np.unique(df_copy.index.levels[0])
+        logger.debug(str(entities))
+
+        missing_cols = [x for x in self.predictions if x not in df_copy.columns]
+        for m in missing_cols:
+            df_copy[m] = None
+
+        for entity in entities:
+            # per entity - copy for later inplace operations
+            # dfe = df_copy.loc[[entity]].dropna(how='all')
+            # dfe = df_copy.loc[[entity]].copy()
+            try:
+                check_array(df_copy.loc[[entity]][self.features].values, allow_nd=True)
+            except Exception as e:
+                logger.error('Found Nan or infinite value in feature columns for entity ' + str(entity) + ' error: ' + str(e))
+                continue
+
+            dfe = super()._execute(df_copy.loc[[entity]], entity)
+            print(df_copy.columns)
+            # for c in self.predictions:
+            df_copy.loc[entity, self.predictions] = dfe[self.predictions]
+            # df_copy = df_copy.loc[[entity]] = dfe
+            print(df_copy.columns)
+        return df_copy
+
+    @classmethod
+    def build_ui(cls):
+        # define arguments that behave as function inputs
+        inputs = []
+        inputs.append(UIMultiItem(name='features', datatype=float, required=True))
+        inputs.append(UIMultiItem(name='targets', datatype=float, required=True, output_item='predictions',
+                                  is_output_datatype_derived=True))
+        # define arguments that behave as function outputs
+        outputs = []
+        return (inputs, outputs)
+
+
+class Robust_Scaler(BaseEstimatorFunction):
+
+    '''
+    Regressor based on gradient boosting method as provided by lightGBM
+    '''
+    eval_metric = staticmethod(metrics.r2_score)
+
+    # class variables
+    train_if_no_model = True
+
+    def set_estimators(self):
+        self.estimators['robust_scaler'] = (RobustScaler, self.params)
+        logger.info('Robust Scaler initialized')
+
+    def __init__(self, features=None, targets=None, predictions=None):
+        super().__init__(features=features, targets=targets, predictions=predictions,
+                         keep_current_models=True)
+
+        # do not run score and call transform instead of predict
+        self.is_scaler = True
+        self.experiments_per_execution = 1
+
+        self.params = {}
+
+    def execute(self, df):
+
+        df_copy = df.copy()
+        entities = np.unique(df_copy.index.levels[0])
+        logger.debug(str(entities))
+
+        missing_cols = [x for x in self.predictions if x not in df_copy.columns]
+        for m in missing_cols:
+            df_copy[m] = None
+
+        for entity in entities:
+            # per entity - copy for later inplace operations
+            # dfe = df_copy.loc[[entity]].dropna(how='all')
+            # dfe = df_copy.loc[[entity]].copy()
+            try:
+                check_array(df_copy.loc[[entity]][self.features].values, allow_nd=True)
+            except Exception as e:
+                logger.error('Found Nan or infinite value in feature columns for entity ' + str(entity) + ' error: ' + str(e))
+                continue
+
+            dfe = super()._execute(df_copy.loc[[entity]], entity)
+            print(df_copy.columns)
+            # for c in self.predictions:
+            df_copy.loc[entity, self.predictions] = dfe[self.predictions]
+            # df_copy = df_copy.loc[[entity]] = dfe
+            print(df_copy.columns)
+        return df_copy
+
+    @classmethod
+    def build_ui(cls):
+        # define arguments that behave as function inputs
+        inputs = []
+        inputs.append(UIMultiItem(name='features', datatype=float, required=True))
+        inputs.append(UIMultiItem(name='targets', datatype=float, required=True, output_item='predictions',
+                                  is_output_datatype_derived=True))
+        # define arguments that behave as function outputs
+        outputs = []
+        return (inputs, outputs)
+
+
+class MinMax_Scaler(BaseEstimatorFunction):
+    '''
+    Regressor based on gradient boosting method as provided by lightGBM
+    '''
+    eval_metric = staticmethod(metrics.r2_score)
+
+    # class variables
+    train_if_no_model = True
+
+    def set_estimators(self):
+        self.estimators['minmax_scaler'] = (MinMaxScaler, self.params)
+        logger.info('MinMax Scaler initialized')
+
+    def __init__(self, features=None, targets=None, predictions=None):
+        super().__init__(features=features, targets=targets, predictions=predictions,
+                         keep_current_models=True)
+
+        # do not run score and call transform instead of predict
+        self.is_scaler = True
+        self.experiments_per_execution = 1
+
+        self.params = {}
+
+    def execute(self, df):
+
+        df_copy = df.copy()
+        entities = np.unique(df_copy.index.levels[0])
+        logger.debug(str(entities))
+
+        missing_cols = [x for x in self.predictions if x not in df_copy.columns]
+        for m in missing_cols:
+            df_copy[m] = None
+
+        for entity in entities:
+            # per entity - copy for later inplace operations
+            # dfe = df_copy.loc[[entity]].dropna(how='all')
+            # dfe = df_copy.loc[[entity]].copy()
+            try:
+                check_array(df_copy.loc[[entity]][self.features].values, allow_nd=True)
+            except Exception as e:
+                logger.error('Found Nan or infinite value in feature columns for entity ' + str(entity) + ' error: ' + str(e))
+                continue
+
+            dfe = super()._execute(df_copy.loc[[entity]], entity)
+            print(df_copy.columns)
+            # for c in self.predictions:
+            df_copy.loc[entity, self.predictions] = dfe[self.predictions]
+            # df_copy = df_copy.loc[[entity]] = dfe
+            print(df_copy.columns)
+        return df_copy
+
+    @classmethod
+    def build_ui(cls):
+        # define arguments that behave as function inputs
+        inputs = []
+        inputs.append(UIMultiItem(name='features', datatype=float, required=True))
+        inputs.append(UIMultiItem(name='targets', datatype=float, required=True, output_item='predictions',
+                                  is_output_datatype_derived=True))
+        # define arguments that behave as function outputs
+        outputs = []
+        return (inputs, outputs)
+
 
 class GBMRegressor(BaseEstimatorFunction):
 
@@ -1199,11 +1390,9 @@ class GBMRegressor(BaseEstimatorFunction):
         self.correlation_threshold = 0
         self.auto_train = True
 
-        self.estimators_per_execution = 1
         self.num_rounds_per_estimator = 1
         self.parameter_tuning_iterations = 1
-        self.experiments_per_execution = 1
-        self.cv = 2
+        self.cv = 1
 
         # if n_estimators is not None or num_leaves is not None or learning_rate is not None or max_depth is not None:
         if n_estimators is not None or num_leaves is not None or learning_rate is not None:
@@ -1281,7 +1470,6 @@ class SimpleRegressor(BaseEstimatorFunction):
 
     # class variables
     train_if_no_model = True
-    estimators_per_execution = 3
     num_rounds_per_estimator = 3
 
     def GBRPipeline(self):
@@ -1379,7 +1567,6 @@ class SimpleAnomaly(BaseRegressor):
 
     # class variables
     train_if_no_model = True
-    estimators_per_execution = 3
     num_rounds_per_estimator = 3
 
     def __init__(self, features, targets, threshold, predictions=None, alerts=None):
