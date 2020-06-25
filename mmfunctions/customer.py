@@ -85,7 +85,7 @@ class UnrollData(BaseTransformer):
         if i_am_device:
             client = wiotp.sdk.device.DeviceClient(config=auth_token, logHandlers=None)
         else:
-            client = wiotp.sdk.device.ApplicationClient(config=auth_token, logHandlers=None)
+            client = wiotp.sdk.application.ApplicationClient(config=auth_token, logHandlers=None)
 
         client.on_connect = on_connect  # On Connect Callback.
         client.on_publish = on_publish  # On Publish Callback.
