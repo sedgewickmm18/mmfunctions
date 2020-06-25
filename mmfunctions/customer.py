@@ -68,9 +68,13 @@ class UnrollData(BaseTransformer):
             print('Auth Token missing ' , str(ae))
 
         i_am_device = False
-        if 'identity' in auth_token:
-            if 'orgId' in auth_token.identity:
-                i_am_device = True
+        try:
+            if 'auth' in auth_token:
+                if 'identity' in auth_token.auth:
+                    if 'orgId' in auth_token.auth.identity:
+                        i_am_device = True
+        except Exception:
+            pass
 
 
         # ONE ENTITY FOR NOW
