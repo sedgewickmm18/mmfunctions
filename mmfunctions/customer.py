@@ -97,7 +97,8 @@ class UnrollData(BaseTransformer):
         # assume single entity
         for ix, row in df.iterrows():
             # columns with 15 elements
-            print(ix, row)
+            #print(ix, row)
+            device_id = ix[0].replace('Device','Shadow')
 
             vibx = eval(row['VibrationX'])
             viby = eval(row['VibrationY'])
@@ -115,11 +116,11 @@ class UnrollData(BaseTransformer):
                         'speed': speed[i // 3], 'power': power[i // 3]}
                 jsdump = json.dumps(jsin)
                 js = json.loads(jsdump)
-                print('sending ', js)
+                print('sending ', js, ' to ', device_id)
                 if i_am_device:
                     client.publishEvent(eventId="MMEventOutputType", msgFormat="json", data=js)
                 else:
-                    client.publishEvent(typeId="MMDeviceTypeShadow", deviceId="MMShadow1", eventId="MMEventOutputType",
+                    client.publishEvent(typeId="MMDeviceTypeShadow", deviceId=device_id, eventId="MMEventOutputType",
                                         msgFormat="json", data=js, qos=0)  # , onPublish=eventPublishCallback)
 
         msg = 'UnrollData'
