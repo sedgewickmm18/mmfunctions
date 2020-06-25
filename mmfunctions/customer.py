@@ -54,18 +54,24 @@ class UnrollData(BaseTransformer):
         self.group2_out = group2_out
 
         # HARDCODED SINGLE ENTITY + Output device type
-        self.config = {"identity": {"orgId": "vrvzh6", "typeId": "MMDeviceTypeShadow", "deviceId": "MMShadow1"},
-                       "auth": {"token": "mmshadow1"}}
+        #self.config = {"identity": {"orgId": "vrvzh6", "typeId": "MMDeviceTypeShadow", "deviceId": "MMShadow1"},
+        #               "auth": {"token": "mmshadow1"}}
 
     def execute(self, df):
 
+        #
         c = self._entity_type.get_attributes_dict()
-        print(c)
+        try:
+            auth_token = c['auth_token']
+        except Exception as ae:
+            print('Auth Token missing ' , str(ae))
+
 
         # ONE ENTITY FOR NOW
         # connect
         print('Unroll Data execute')
-        client = wiotp.sdk.device.DeviceClient(config=self.config, logHandlers=None)
+        #client = wiotp.sdk.device.DeviceClient(config=self.config, logHandlers=None)
+        client = wiotp.sdk.device.DeviceClient(config=auth_token, logHandlers=None)
 
         client.on_connect = on_connect  # On Connect Callback.
         client.on_publish = on_publish  # On Publish Callback.
