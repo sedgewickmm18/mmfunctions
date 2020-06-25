@@ -63,15 +63,25 @@ class UnrollData(BaseTransformer):
         c = self._entity_type.get_attributes_dict()
         try:
             auth_token = c['auth_token']
+            print('Auth Token ' , str(auth_token))
         except Exception as ae:
             print('Auth Token missing ' , str(ae))
+
+        i_am_device = False
+        if identity in auth_token:
+            if orgId in auth_token.identity:
+                i_am_device = True
 
 
         # ONE ENTITY FOR NOW
         # connect
         print('Unroll Data execute')
         #client = wiotp.sdk.device.DeviceClient(config=self.config, logHandlers=None)
-        client = wiotp.sdk.device.DeviceClient(config=auth_token, logHandlers=None)
+        client = None
+        if i_am_device:
+            client = wiotp.sdk.device.DeviceClient(config=auth_token, logHandlers=None)
+        else:
+            client = wiotp.sdk.device.ApplicationClient(config=auth_token, logHandlers=None)
 
         client.on_connect = on_connect  # On Connect Callback.
         client.on_publish = on_publish  # On Publish Callback.
