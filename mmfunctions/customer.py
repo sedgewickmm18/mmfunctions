@@ -41,8 +41,6 @@ def on_connect(client, userdata, flags, rc):
 def on_publish(client, userdata, mid):
     print("Message Published.")
 
-auth_token = UISingle(name='auth_token', description='Authtoken for device', values=['mmshadow1'], datatype=str)
-
 class UnrollData(BaseTransformer):
     '''
     Compute L2Norm of string encoded array
@@ -61,89 +59,8 @@ class UnrollData(BaseTransformer):
 
     def execute(self, df):
 
-        # ONE ENTITY FOR NOW
-        # connect
-        print('Unroll Data execute')
-        client = wiotp.sdk.device.DeviceClient(config=self.config, logHandlers=None)
-
-        client.on_connect = on_connect  # On Connect Callback.
-        client.on_publish = on_publish  # On Publish Callback.
-        client.connect()
-
-        Now = dt.datetime.now(pytz.timezone("UTC"))
-        print(Now)
-
-        # assume single entity
-        for ix, row in df.iterrows():
-            # columns with 15 elements
-            # print(ix, row)
-
-            vibx = eval(row['VibrationX'])
-            viby = eval(row['VibrationY'])
-            vibz = eval(row['VibrationZ'])
-
-            # columns with 5 elements
-            speed = eval(row['Speed'])
-            power = eval(row['Power'])
-
-            for i in range(15):
-                jsin = {'evt_timestamp': (ix[1] + pd.Timedelta(seconds=20*i - 300)).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + 'Z',
-                        #'evt_timestamp': (ix[1] + pd.Timedelta(seconds=20*i - 300)).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
-                        # 2020-05-26T10:24:56.098000.
-                        'vibx': vibx[i], 'viby': viby[i], 'vibz': vibz[i],
-                        'speed': speed[i // 3], 'power': power[i // 3]}
-                jsdump = json.dumps(jsin)
-                js = json.loads(jsdump)
-                print('sending ', js)
-                client.publishEvent(eventId="MMEventOutputType", msgFormat="json", data=js)
-
-        msg = 'UnrollData'
-        self.trace_append(msg)
-
-        return (df)
-
-    @classmethod
-    def build_ui(cls):
-
-        # define arguments that behave as function inputs
-        inputs = []
-        inputs.append(UIMultiItem(
-                name='group1_in',
-                datatype=None,
-                description='String encoded array of sensor readings, 15 readings per 5 mins',
-                output_item='group1_out',
-                is_output_datatype_derived=True, output_datatype=None
-                ))
-        inputs.append(UIMultiItem(
-                name='group2_in',
-                datatype=None,
-                description='String encoded array of sensor readings, 5 readings per 5 mins',
-                output_item='group2_out',
-                is_output_datatype_derived=True, output_datatype=None
-                ))
-
-        # define arguments that behave as function outputs
-        outputs = []
-        return (inputs, outputs)
-
-
-class UnrollData2(BaseTransformer):
-    '''
-    Compute L2Norm of string encoded array
-    '''
-    def __init__(self, group1_in, group2_in, group1_out, group2_out):
-        super().__init__()
-
-        self.group1_in = group1_in
-        self.group2_in = group2_in
-        self.group1_out = group1_out
-        self.group2_out = group2_out
-
-        # HARDCODED SINGLE ENTITY + Output device type
-        self.config = {"identity": {"orgId": "vrvzh6", "typeId": "MMDeviceTypeShadow", "deviceId": "MMShadow1"},
-                       "auth": {"token": "mmshadow1"}}
-
-    def execute(self, df):
+        c = self._entity_type.get_attributes_dict()
+        print(c)
 
         # ONE ENTITY FOR NOW
         # connect
@@ -205,7 +122,6 @@ class UnrollData2(BaseTransformer):
                 output_item='group2_out',
                 is_output_datatype_derived=True, output_datatype=None
                 ))
-        inputs.append(auth_token)
 
         # define arguments that behave as function outputs
         outputs = []
