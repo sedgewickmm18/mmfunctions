@@ -47,7 +47,7 @@ from iotfunctions.bif import (AlertHighValue)
 from iotfunctions.ui import (UISingle, UIMultiItem, UIFunctionOutSingle, UISingleItem, UIFunctionOutMulti)
 
 logger = logging.getLogger(__name__)
-PACKAGE_URL = 'git+https://github.com/sedgewickmm18/mmfunctions.git@'
+PACKAGE_URL = 'git+https://github.com/sedgewickmm18/mmfunctions.git'
 _IS_PREINSTALLED = False
 
 Error_SmallWindowsize = 0.0001

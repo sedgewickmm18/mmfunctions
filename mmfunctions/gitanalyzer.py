@@ -461,16 +461,22 @@ def process(params, csvout, repo_nr=1, url=None):
 def process_all(params, show_progress=None):
 
     # default filename
-    csvfilename = 'monitoring-defects.csv'
-    releasefilename = 'monitoring-releases.csv'
+    projectname = ''
+    try:
+        projectname = params['PROJECT']
+    except Exception:
+        projectname = 'monitoring'
+        pass
+
+    csvfilename = projectname + '-defects.csv'
+    releasefilename = projectname + '-releases.csv'
+    hasMoreRepos = True
 
     # check whether global variables are defined and set params to default values
     x = ''
     try:
         x = params['REPO']
-        x = params['REPO2']
         x = params['REPO_ID']
-        x = params['REPO2_ID']
         x = params['GITHUB_TOKEN']
         x = params['ZENHUB_TOKEN']
         x = params['ZENHUB_WORKSPACE']
@@ -489,11 +495,21 @@ def process_all(params, show_progress=None):
     except Exception as e_ndef:
         logger.error('Global variable not defined: ' + str(e_ndef) + ' ' + str(x))
 
+    try:
+        x = params['REPO2']
+        x = params['REPO2_ID']
+    except Exception:
+        hasMoreRepos = False
+        pass
+
     # retrieve zenhub information
     print('loading zenhub releases')
     zenhub_releases = {}
     get_zen_releases(params, 1, zenhub_releases)
-    get_zen_releases(params, 2, zenhub_releases)
+
+    if hasMoreRepos:
+        get_zen_releases(params, 2, zenhub_releases)
+
     params['ZENHUB_RELEASES'] = zenhub_releases
 
     print('loading zenhub issues per releases')
@@ -516,16 +532,22 @@ def process_all(params, show_progress=None):
     print('loading zenhub issues by board')
     zenhub_dict = {}
     get_zen_issues(params, 1, zenhub_dict)
-    get_zen_issues(params, 2, zenhub_dict)
+
+    if hasMoreRepos:
+        get_zen_issues(params, 2, zenhub_dict)
+
     params['ZENHUB_DICT'] = zenhub_dict
 
     csvfile = open(csvfilename, 'w', newline='')
-    csvout = csv.writer(csvfile, quoting=csv.QUOTE_MINIMAL)
+    csvout = csv.writer(csvfile, delimiter='|', quoting=csv.QUOTE_MINIMAL)
     csvout.writerow(('IssueNr', 'Title', 'Repo', 'Created', 'Updated', 'Closed', 'Origin', 'Assignee', 'Status', 'Release', 'Milestone',
                      'Type', 'Component', 'Estimate', 'BusinessValue', 'Severity', 'Risk', 'Theme', 'Blocked', 'Pipeline', 'Label1',
                      'Label2', 'Label3', 'Label4', 'Label5', 'Labels'))
     print('Process github repo 1')
     process(params, csvout, repo_nr=1)
-    print('Process github repo 2')
-    process(params, csvout, repo_nr=2)
+
+    if hasMoreRepos:
+        print('Process github repo 2')
+        process(params, csvout, repo_nr=2)
+
     csvfile.close()
