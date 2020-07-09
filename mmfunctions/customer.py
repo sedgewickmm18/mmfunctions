@@ -97,22 +97,21 @@ class UnrollData(BaseTransformer):
         # assume single entity
         for ix, row in df.iterrows():
             # columns with 15 elements
-            #print(ix, row)
-            device_id = ix[0].replace('Device','Shadow')
+            #device_id = ix[0].replace('Device','Shadow') - device id is identical !
 
-            vibx = eval(row['VibrationX'])
-            viby = eval(row['VibrationY'])
-            vibz = eval(row['VibrationZ'])
+            vibx = eval(row['rms_x'])
+            viby = eval(row['rms_y'])
+            vibz = eval(row['rms_z'])
 
             # columns with 5 elements
-            speed = eval(row['Speed'])
-            power = eval(row['Power'])
+            speed = eval(row['accel_speed'])
+            power = eval(row['accel_power'])
 
             for i in range(15):
                 jsin = {'evt_timestamp': (ix[1] + pd.Timedelta(seconds=20*i - 300)).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + 'Z',
                         #'evt_timestamp': (ix[1] + pd.Timedelta(seconds=20*i - 300)).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
                         # 2020-05-26T10:24:56.098000.
-                        'vibx': vibx[i], 'viby': viby[i], 'vibz': vibz[i],
+                        'rms_x': vibx[i], 'rms_y': viby[i], 'rms_z': vibz[i],
                         'speed': speed[i // 3], 'power': power[i // 3]}
                 jsdump = json.dumps(jsin)
                 js = json.loads(jsdump)
@@ -120,8 +119,10 @@ class UnrollData(BaseTransformer):
                 if i_am_device:
                     client.publishEvent(eventId="MMEventOutputType", msgFormat="json", data=js)
                 else:
-                    client.publishEvent(typeId="MMDeviceTypeShadow", deviceId=device_id, eventId="MMEventOutputType",
-                                        msgFormat="json", data=js, qos=0)  # , onPublish=eventPublishCallback)
+                    client.publishEvent(typeId="Shadow_pump_de_gen5", deviceId=device_id, eventId="ShadowPumpDeGen5",
+                                        msgFormat="json", data=js, qos=0)
+                    #client.publishEvent(typeId="MMDeviceTypeShadow", deviceId=device_id, eventId="MMEventOutputType",
+                    #                    msgFormat="json", data=js, qos=0)  # , onPublish=eventPublishCallback)
 
         msg = 'UnrollData'
         self.trace_append(msg)
