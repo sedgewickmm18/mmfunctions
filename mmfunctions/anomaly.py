@@ -227,6 +227,157 @@ def merge_score(dfEntity, dfEntityOrig, column_name, score, mindelta):
     return merged_score
 
 
+class Interpolator(BaseTransformer):
+    '''
+     An unsupervised anomaly detection function.
+     Applies a spectral analysis clustering techniqueto extract features from time series data and to create z scores.
+     Moves a sliding window across the data signal and applies the anomalymodelto each window.
+     The window size is typically set to 12 data points.
+     Try several anomaly detectors on your data and use the one that fits your data best.
+    '''
+    def __init__(self, input_item, windowsize, missing, output_item):
+        super().__init__()
+        logger.debug(input_item)
+        self.input_item = input_item
+
+        # use 12 by default
+        self.windowsize, self.windowoverlap = set_window_size_and_overlap(windowsize)
+
+        # assume 1 per sec for now
+        self.frame_rate = 1
+
+        self.missing = missing
+
+        self.output_item = output_item
+
+        self.inv_zscore = None
+
+        self.whoami = 'Spectral'
+
+    def prepare_data(self, dfEntity):
+
+        logger.debug(self.whoami + ': prepare Data')
+
+        # operate on simple timestamp index
+        if len(dfEntity.index.names) > 1:
+            index_names = dfEntity.index.names
+            dfe = dfEntity.reset_index().set_index(index_names[0])
+        else:
+            index_names = None
+            dfe = dfEntity
+
+        # interpolate gaps - data imputation
+        try:
+            dfe = dfe.interpolate(method="time")
+        except Exception as e:
+            logger.error('Prepare data error: ' + str(e))
+
+        # one dimensional time series - named temperature for catchyness
+        # replace NaN with self.missing
+        temperature = dfe[[self.input_item]].fillna(self.missing).to_numpy().reshape(-1,)
+
+        # drop all missing values
+        temperature[temperature != self.missing]
+
+        return dfe, temperature
+
+    def execute(self, df):
+
+        df_copy = df.copy()
+        entities = np.unique(df.index.levels[0])
+        logger.debug(str(entities))
+
+        df_copy[self.output_item] = 0
+        # df_copy.sort_index()   # NoOp
+
+        # check data type
+        if df_copy[self.input_item].dtype != np.float64:
+            return (df_copy)
+
+        for entity in entities:
+            # per entity - copy for later inplace operations
+            dfe = df_copy.loc[[entity]].dropna(how='all')
+            dfe_orig = df_copy.loc[[entity]].copy()
+
+            # get rid of entityid part of the index
+            # do it inplace as we copied the data before
+            dfe.reset_index(level=[0], inplace=True)
+            dfe.sort_index(inplace=True)
+            dfe_orig.reset_index(level=[0], inplace=True)
+            dfe_orig.sort_index(inplace=True)
+
+            # minimal time delta for merging
+            mindelta, dfe_orig = min_delta(dfe_orig)
+
+            logger.debug('Timedelta:' + str(mindelta) + ' Index: ' + str(dfe_orig.index))
+
+            # interpolate gaps - data imputation by default
+            #   for missing data detection we look at the timestamp gradient instead
+            dfe, temperature = self.prepare_data(dfe)
+
+            logger.debug('Module Interpolator, Entity: ' + str(entity) + ', Input: ' + str(self.input_item) +
+                         ', Windowsize: ' + str(self.windowsize) + ', Output: ' + str(self.output_item) +
+                         ', Overlap: ' + str(self.windowoverlap) + ', Inputsize: ' + str(temperature.size))
+
+            if temperature.size <= self.windowsize:
+                logger.debug(str(temperature.size) + ' <= ' + str(self.windowsize))
+                dfe[self.output_item] = Error_SmallWindowsize
+            else:
+                logger.debug(str(temperature.size) + str(self.windowsize))
+
+                try:
+                    # length of time_series_temperature, signal_energy and ets_zscore is smaller than half the original
+                    #   extend it to cover the full original length
+
+                    linear_interpolate = sp.interpolate.interp1d(
+                        time_series_temperature, temperature, kind='linear', fill_value='extrapolate')
+
+                    temperatureII = merge_score(dfe, dfe_orig, self.output_item,
+                                           abs(linear_interpolate(np.arange(0, temperature.size, 1))), mindelta)
+
+                except Exception as e:
+                    logger.error('Spectral failed with ' + str(e))
+
+                idx = pd.IndexSlice
+                df_copy.loc[idx[entity, :], self.output_item] = temperatureII
+
+        msg = 'Interpolator'
+        self.trace_append(msg)
+
+        return (df_copy)
+
+    @classmethod
+    def build_ui(cls):
+
+        # define arguments that behave as function inputs
+        inputs = []
+        inputs.append(UISingleItem(
+                name='input_item',
+                datatype=float,
+                description='Data item to interpolate'
+                                              ))
+
+        inputs.append(UISingle(
+                name='windowsize',
+                datatype=int,
+                description='Minimal size of the window for interpolating data.'
+                                              ))
+        inputs.append(UISingle(
+                name='missing',
+                datatype=int,
+                description='Data to be interpreted as not-a-number.'
+                                              ))
+
+        # define arguments that behave as function outputs
+        outputs = []
+        outputs.append(UIFunctionOutSingle(
+                name='output_item',
+                datatype=float,
+                description='Interpolated data'
+                ))
+        return (inputs, outputs)
+
+
 class SpectralAnomalyScore(BaseTransformer):
     '''
     An unsupervised anomaly detection function.
