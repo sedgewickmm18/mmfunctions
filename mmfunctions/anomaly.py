@@ -266,6 +266,12 @@ class Interpolator(BaseTransformer):
             index_names = None
             dfe = dfEntity
 
+        # remove Nan
+        dfe = dfe[dfe[self.input_item].notna()]
+
+        # remove self.missing
+        dfe = dfe[dfe[self.input_item] != self.missing]
+
         # interpolate gaps - data imputation
         try:
             dfe = dfe.interpolate(method="time")
@@ -274,10 +280,7 @@ class Interpolator(BaseTransformer):
 
         # one dimensional time series - named temperature for catchyness
         # replace NaN with self.missing
-        temperature = dfe[[self.input_item]].fillna(self.missing).to_numpy().reshape(-1,)
-
-        # drop all missing values
-        temperature[temperature != self.missing]
+        temperature = dfe[[self.input_item]].fillna(0).to_numpy().reshape(-1,)
 
         return dfe, temperature
 
@@ -317,23 +320,25 @@ class Interpolator(BaseTransformer):
 
             logger.debug('Module Interpolator, Entity: ' + str(entity) + ', Input: ' + str(self.input_item) +
                          ', Windowsize: ' + str(self.windowsize) + ', Output: ' + str(self.output_item) +
-                         ', Overlap: ' + str(self.windowoverlap) + ', Inputsize: ' + str(temperature.size))
+                         ', Inputsize: ' + str(temperature.size) + ', Fullsize: ' + str(dfe_orig[self.input_item].values.shape))
 
             if temperature.size <= self.windowsize:
                 logger.debug(str(temperature.size) + ' <= ' + str(self.windowsize))
                 dfe[self.output_item] = Error_SmallWindowsize
             else:
                 logger.debug(str(temperature.size) + str(self.windowsize))
+                temperatureII = None
 
                 try:
                     # length of time_series_temperature, signal_energy and ets_zscore is smaller than half the original
                     #   extend it to cover the full original length
 
-                    linear_interpolate = sp.interpolate.interp1d(
-                        time_series_temperature, temperature, kind='linear', fill_value='extrapolate')
+                    #linear_interpolate = sp.interpolate.interp1d(
+                    #    time_series_temperature, temperature, kind='linear', fill_value='extrapolate')
 
-                    temperatureII = merge_score(dfe, dfe_orig, self.output_item,
-                                           abs(linear_interpolate(np.arange(0, temperature.size, 1))), mindelta)
+                    #temperatureII = merge_score(dfe, dfe_orig, self.output_item,
+                    #                       abs(linear_interpolate(np.arange(0, temperature.size, 1))), mindelta)
+                    temperatureII = merge_score(dfe, dfe_orig, self.output_item, temperature, mindelta)
 
                 except Exception as e:
                     logger.error('Spectral failed with ' + str(e))
