@@ -61,7 +61,9 @@ def test_anomaly_scores():
 
     print("Executed Anomaly functions")
 
-    # df_comp.to_csv('AzureAnomalysampleOutput.csv')
+    # generate comparison data
+    #df_comp.to_csv('AzureAnomalysampleOutput.csv')
+
     df_o = pd.read_csv('AzureAnomalysampleOutput.csv')
 
     # print('Compare Scores - Linf')
