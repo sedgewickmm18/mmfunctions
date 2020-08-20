@@ -921,7 +921,7 @@ class KMeansAnomalyScore(BaseEstimatorFunction):
             except Exception as e:
                 logger.info('KMeans failed with ' + str(e))
                 self.trace_append('KMeans failed with' + str(e))
-                continue
+                return df_copy
 
             pred_score = cblofwin.decision_scores_.copy() * KMeans_normalizer
             # np.savetxt('kmeans.csv', pred_score)
