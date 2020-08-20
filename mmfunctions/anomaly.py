@@ -826,7 +826,7 @@ class KMeansAnomalyScore(BaseEstimatorFunction):
         logger.info('Standard Scaler initialized')
 
     def __init__(self, input_item, windowsize, output_item, expr=None):
-        super().__init__(features=input_item, targets=[output_item], keep_current_models=True)
+        super().__init__(features=[input_item], targets=[output_item], keep_current_models=True)
 
         logger.debug(input_item)
         # do not run score and call transform instead of predict
