@@ -1,0 +1,24 @@
+
+
+Idea: 
+- Collect sensor data
+- Drop it into a data lake
+- Process the persisted data in a data pipeline with configurable step
+- Show it on a configurable dashboard (some similarity to grafana, no programming, only json config)
+
+
+Why do we do it:
+- So far we have customers that compute Overall Equipment Effiency 
+- others pass sensor data to anomaly detectors (as configurable step of the data pipeline)
+
+
+What's the clue:
+ 
+- Everything is integrated, data flows through the various stages automatically
+- Configurable steps: Customers can render OEE with aggregator functions or apply anomaly detectors to sensor data
+
+
+What's the AI part
+
+- We support simple anomaly detector methods that don't need training data, proximity based (KMeans) or linear (FastMCD)
+- We also support anomaly detection via gradient boosting based prediction:

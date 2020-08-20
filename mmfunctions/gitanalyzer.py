@@ -130,6 +130,13 @@ def get_zen_release_map(params, release_id, rel_parms, zenhub_rel_dict):
         print("  : => %s" % resp.status_code)
 
     # print(resp.json())
+    issueList = None
+    try:
+        issueList = resp.json()
+    except Exception:
+        print ('Issue with ', resp)
+        return
+
     for iss in resp.json():
         #print (type(iss), ' ' , iss)
         #  print(rel)
@@ -197,11 +204,14 @@ def extract_issuefield(person, field):
     return ''
 
 
-def extract_timevalue(tval, replace=None):
+def extract_timevalue(params, tval, replace=None):
+    timeformat = '%Y-%m-%dT%H:%M:%SZ'
     if tval is not None:
-        tval = dt.datetime.strptime(tval, "%Y-%m-%dT%H:%M:%SZ")
+        tval = dt.datetime.strptime(tval, timeformat)
     elif replace is not None:
-        tval = dt.datetime.strptime(replace, "%Y-%m-%dT%H:%M:%SZ")
+        tval = dt.datetime.strptime(replace, timeformat)
+    if 'JIRA' in params and tval is not None:
+        return dt.datetime.strftime(tval, '%d/%b/%y %I:%M %p')
     return tval
 
 
@@ -294,6 +304,14 @@ def label_get_risk(label, labelparm):
         return False
 
 
+def map_user(params, userid):
+    if userid in params:
+        return params[userid]
+    else:
+        if 'UNKNOWN_USER' in params:
+            return params['UNKNOWN_USER']
+    return userid
+
 def write_issues(params, repo_nr, response, csvout):
     "output a list of issues to csv"
 
@@ -308,6 +326,9 @@ def write_issues(params, repo_nr, response, csvout):
 
         number = get_full_issue_nr(issue['number'], repo_nr)
 
+        #url = issue['url']
+        url = 'https://github.ibm.com/' + repo + '/issues/' + str(issue['number'])
+
         assignee = extract_issuefield(issue['assignee'], 'login')
         state = issue['state']
 
@@ -318,9 +339,9 @@ def write_issues(params, repo_nr, response, csvout):
         milestone = extract_issuefield(issue['milestone'], 'title')
         labels = issue['labels']
 
-        created_at = extract_timevalue(issue['created_at'], '2010-01-01T00:00:00Z')
-        updated_at = extract_timevalue(issue['updated_at'])
-        closed_at = extract_timevalue(issue['closed_at'])
+        created_at = extract_timevalue(params, issue['created_at'], '2010-01-01T00:00:00Z')
+        updated_at = extract_timevalue(params, issue['updated_at'])
+        closed_at = extract_timevalue(params, issue['closed_at'])
 
         label_list = []
         label_list_copy = []
@@ -379,15 +400,17 @@ def write_issues(params, repo_nr, response, csvout):
         except Exception:
             pass
 
+        user = map_user(params, user)
+        assignee = map_user(params, assignee)
+
         csvout.writerow([issue['number'], issue['title'],
-                        repo,
+                        repo, url,
                         created_at, updated_at, closed_at,
                         user, assignee, state, release, milestone,
                         labelparm['issueType'], labelparm['component'], estimate,
                         labelparm['businessValue'], labelparm['severity'], labelparm['risk'],
                         labelparm['theme'], labelparm['blocked'], pipeline,
                         label1, label2, label3, label4, label5, str(label_list_copy)])
-
 
 def get_travis_builds(params, url):
     kwargs = {
@@ -540,9 +563,9 @@ def process_all(params, show_progress=None):
 
     csvfile = open(csvfilename, 'w', newline='')
     csvout = csv.writer(csvfile, delimiter='|', quoting=csv.QUOTE_MINIMAL)
-    csvout.writerow(('IssueNr', 'Title', 'Repo', 'Created', 'Updated', 'Closed', 'Origin', 'Assignee', 'Status', 'Release', 'Milestone',
-                     'Type', 'Component', 'Estimate', 'BusinessValue', 'Severity', 'Risk', 'Theme', 'Blocked', 'Pipeline', 'Label1',
-                     'Label2', 'Label3', 'Label4', 'Label5', 'Labels'))
+    csvout.writerow(('IssueNr', 'Title', 'Repo', 'Url', 'Created', 'Updated', 'Closed', 'Origin', 'Assignee', 'Status', 'Release',
+                     'Milestone', 'Type', 'Component', 'Estimate', 'BusinessValue', 'Severity', 'Risk', 'Theme', 'Blocked', 'Pipeline',
+                     'Label1', 'Label2', 'Label3', 'Label4', 'Label5', 'Labels'))
     print('Process github repo 1')
     process(params, csvout, repo_nr=1)
 
