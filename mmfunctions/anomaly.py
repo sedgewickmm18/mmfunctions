@@ -622,7 +622,7 @@ class SpectralAnomalyScoreExt(SpectralAnomalyScore):
         return (inputs, outputs)
 
 
-class KMeansAnomalyScore_old(BaseTransformer):
+class KMeansAnomalyScore(BaseTransformer):
     '''
     An unsupervised anomaly detection function.
      Applies a k-means analysis clustering technique to time series data.
@@ -808,7 +808,7 @@ class KMeansAnomalyScore_old(BaseTransformer):
         return (inputs, outputs)
 
 
-class KMeansAnomalyScore(BaseEstimatorFunction):
+class KMeansAnomalyScorev2(BaseEstimatorFunction):
     '''
     An unsupervised anomaly detection function.
      Applies a k-means analysis clustering technique to time series data.
@@ -825,7 +825,7 @@ class KMeansAnomalyScore(BaseEstimatorFunction):
         self.estimators['standard_scaler'] = (StandardScaler, self.params)
         logger.info('Standard Scaler initialized')
 
-    def __init__(self, input_item, windowsize, output_item, expr=None):
+    def __init__(self, input_item, windowsize, normalize, output_item, expr=None):
         super().__init__(features=[input_item], targets=[output_item], predictions=None, keep_current_models=True)
 
         logger.debug(input_item)
@@ -842,6 +842,8 @@ class KMeansAnomalyScore(BaseEstimatorFunction):
 
         # step
         self.step = self.windowsize - windowoverlap
+
+        self.normalize = normalize
 
         # assume 1 per sec for now
         self.frame_rate = 1
@@ -968,7 +970,6 @@ class KMeansAnomalyScore(BaseEstimatorFunction):
 
         df_copy[self.output_item] = 0
 
-
         for entity in entities:
             # per entity - copy for later inplace operations
             # dfe = df_copy.loc[[entity]].dropna(how='all')
@@ -979,17 +980,18 @@ class KMeansAnomalyScore(BaseEstimatorFunction):
                 logger.error('Found Nan or infinite value in feature columns for entity ' + str(entity) + ' error: ' + str(e))
                 continue
 
-            dfe = super()._execute(df_copy.loc[[entity]], entity)
-            print(df_copy.columns)
+            if self.normalize:
+                dfe = super()._execute(df_copy.loc[[entity]], entity)
+                print(df_copy.columns)
 
-            # for c in self.predictions:
-            df_copy.loc[entity, self.predictions] = dfe[self.predictions]
+                # for c in self.predictions:
+                df_copy.loc[entity, self.predictions] = dfe[self.predictions]
 
             # df_copy = df_copy.loc[[entity]] = dfe
             #print(df_copy.columns)
             df_copy = self.kexecute(entity, df_copy)
 
-        msg = 'KMeansAnomalyScore'
+        msg = 'KMeansAnomalyScorev2'
         self.trace_append(msg)
         return (df_copy)
 
@@ -998,12 +1000,33 @@ class KMeansAnomalyScore(BaseEstimatorFunction):
     def build_ui(cls):
         # define arguments that behave as function inputs
         inputs = []
-        inputs.append(UIMultiItem(name='features', datatype=float, required=True))
-        inputs.append(UIMultiItem(name='targets', datatype=float, required=True, output_item='predictions',
-                                  is_output_datatype_derived=True))
+        inputs.append(UISingleItem(
+                name='input_item',
+                datatype=float,
+                description='Data item to analyze'
+                                              ))
+
+        inputs.append(UISingle(
+                name='windowsize',
+                datatype=int,
+                description='Size of each sliding window in data points. Typically set to 12.'
+                                              ))
+
+        inputs.append(UISingle(
+                name='normalize',
+                datatype=bool,
+                description='Flag for normalizing data.'
+                                              ))
+
         # define arguments that behave as function outputs
         outputs = []
+        outputs.append(UIFunctionOutSingle(
+                name='output_item',
+                datatype=float,
+                description='Anomaly score (kmeans)'
+                ))
         return (inputs, outputs)
+
 
 
 class GeneralizedAnomalyScore(BaseTransformer):
