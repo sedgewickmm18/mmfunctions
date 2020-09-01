@@ -1990,6 +1990,87 @@ class SaliencybasedGeneralizedAnomalyScore(GeneralizedAnomalyScore):
         )
         return (inputs, outputs)
 
+
+class SaliencybasedGeneralizedAnomalyScorev2(GeneralizedAnomalyScorev2):
+    """
+    An unsupervised anomaly detection function.
+     Based on salient region detection models,
+         it uses fast fourier transform to reconstruct a signal using the salient features of a the signal.
+     It applies GeneralizedAnomalyScore to the reconstructed signal.
+     The function moves a sliding window across the data signal and applies its analysis to each window.
+     The window size is typically set to 12 data points.
+     Try several anomaly detectors on your data and use the one that fits your data.
+    """
+
+    def __init__(self, input_item, windowsize, output_item):
+        super().__init__(input_item, windowsize, output_item)
+
+        self.whoami = 'Saliency'
+        self.saliency = Saliency(windowsize, 0, 0)
+        self.normalizer = Saliency_normalizer
+
+        logger.debug('Saliency')
+
+    def feature_extract(self, temperature):
+
+        logger.debug(self.whoami + ': feature extract')
+
+        temperature_saliency = self.saliency.transform_spectral_residual(temperature)
+
+        slices = skiutil.view_as_windows(
+            temperature_saliency, window_shape=(self.windowsize,), step=self.step
+        )
+        return slices
+
+    def execute(self, df):
+        df_copy = super().execute(df)
+
+        msg = "SaliencybasedGeneralizedAnomalyScore"
+        self.trace_append(msg)
+        return df_copy
+
+    @classmethod
+    def build_ui(cls):
+        # define arguments that behave as function inputs
+        inputs = []
+        inputs.append(
+            UISingleItem(
+                name="input_item",
+                datatype=float,
+                description="Data item to analyze"
+            )
+        )
+
+        inputs.append(
+            UISingle(
+                name="windowsize",
+                datatype=int,
+                description="Size of each sliding window in data points. Typically set to 12.",
+            )
+        )
+
+        inputs.append(UISingle(
+                name='normalize',
+                datatype=bool,
+                description='Flag for normalizing data.'
+                                              ))
+
+        # define arguments that behave as function outputs
+        outputs = []
+        outputs.append(
+            UIFunctionOutSingle(
+                name="output_item",
+                datatype=float,
+                description="Anomaly score (SaliencybasedGeneralizedAnomalyScore)",
+            )
+        )
+        return (inputs, outputs)
+
+
+#######################################################################################
+# Regressors
+#######################################################################################
+
 class GBMRegressor(BaseEstimatorFunction):
 
     '''
