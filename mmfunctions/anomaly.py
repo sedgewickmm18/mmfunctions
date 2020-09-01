@@ -1781,8 +1781,8 @@ class FFTbasedGeneralizedAnomalyScorev2(GeneralizedAnomalyScorev2):
      Try several anomaly detectors on your data and use the one that best fits your data.
     """
 
-    def __init__(self, input_item, windowsize, output_item):
-        super().__init__(input_item, windowsize, output_item)
+    def __init__(self, input_item, windowsize, normalize, output_item):
+        super().__init__(input_item, windowsize, normalize, output_item)
 
         self.whoami = 'FFT'
         self.normalizer = FFT_normalizer
@@ -2002,8 +2002,8 @@ class SaliencybasedGeneralizedAnomalyScorev2(GeneralizedAnomalyScorev2):
      Try several anomaly detectors on your data and use the one that fits your data.
     """
 
-    def __init__(self, input_item, windowsize, output_item):
-        super().__init__(input_item, windowsize, output_item)
+    def __init__(self, input_item, windowsize, normalize, output_item):
+        super().__init__(input_item, windowsize, normalize, output_item)
 
         self.whoami = 'Saliency'
         self.saliency = Saliency(windowsize, 0, 0)
