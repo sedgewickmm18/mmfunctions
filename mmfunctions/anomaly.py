@@ -1393,6 +1393,232 @@ class GeneralizedAnomalyScore(BaseTransformer):
         return (inputs, outputs)
 
 
+
+class GeneralizedAnomalyScorev2(Standard_Scaler):
+    """
+    An unsupervised anomaly detection function.
+     Applies the Minimum Covariance Determinant (FastMCD) technique to detect outliers.
+     Moves a sliding window across the data signal and applies the anomaly model to each window.
+     The window size is typically set to 12 data points.
+     Try several anomaly detectors on your data and use the one that fits your data best.
+    """
+    # class variables
+    eval_metric = staticmethod(metrics.r2_score)
+
+    train_if_no_model = True
+
+    def __init__(self, input_item, windowsize, normalize, output_item, expr=None):
+        super().__init__(features=[input_item], targets=[output_item], predictions=None)
+
+
+        logger.debug(input_item)
+        # do not run score and call transform instead of predict
+
+        self.input_item = input_item
+
+        # use 12 by default
+        self.windowsize, windowoverlap = set_window_size_and_overlap(windowsize)
+
+        # step
+        self.step = self.windowsize - windowoverlap
+
+        self.normalize = normalize
+
+        # assume 1 per sec for now
+        self.frame_rate = 1
+
+        self.dampening = 1  # dampening - dampen anomaly score
+
+        self.output_item = output_item
+
+        self.normalizer = Generalized_normalizer
+
+        self.whoami = 'GAMv2'
+
+
+    def prepare_data(self, dfEntity):
+
+        logger.debug(self.whoami + ': prepare Data')
+
+        # operate on simple timestamp index
+        if len(dfEntity.index.names) > 1:
+            index_names = dfEntity.index.names
+            dfe = dfEntity.reset_index().set_index(index_names[0])
+        else:
+            index_names = None
+            dfe = dfEntity
+
+        # interpolate gaps - data imputation
+        try:
+            dfe = dfe.interpolate(method="time")
+        except Exception as e:
+            logger.error('Prepare data error: ' + str(e))
+
+        # one dimensional time series - named temperature for catchyness
+        temperature = dfe[[self.input_item]].fillna(0).to_numpy().reshape(-1,)
+
+        return dfe, temperature
+
+    def feature_extract(self, temperature):
+
+        logger.debug(self.whoami + ': feature extract')
+
+        slices = skiutil.view_as_windows(
+            temperature, window_shape=(self.windowsize,), step=self.step
+        )
+        return slices
+
+
+    def kexecute(self, entity, df_copy):
+
+        # per entity - copy for later inplace operations
+        dfe = df_copy.loc[[entity]].dropna(how='all')
+        dfe_orig = df_copy.loc[[entity]].copy()
+
+        # get rid of entityid part of the index
+        # do it inplace as we copied the data before
+        dfe.reset_index(level=[0], inplace=True)
+        dfe.sort_index(inplace=True)
+        dfe_orig.reset_index(level=[0], inplace=True)
+        dfe_orig.sort_index(inplace=True)
+
+        # minimal time delta for merging
+        mindelta, dfe_orig = min_delta(dfe_orig)
+
+        logger.debug('Timedelta:' + str(mindelta))
+
+        # interpolate gaps - data imputation by default
+        #   for missing data detection we look at the timestamp gradient instead
+        dfe, temperature = self.prepare_data(dfe)
+
+        logger.debug('Module ' + self.whoami + ', Entity: ' + str(entity) + ', Input: ' + str(self.input_item) +
+                     ', Windowsize: ' + str(self.windowsize) + ', Output: ' + str(self.output_item) +
+                     ', Overlap: ' + str(self.step) + ', Inputsize: ' + str(temperature.size))
+
+        if temperature.size > self.windowsize:
+            logger.debug(str(temperature.size) + "," + str(self.windowsize))
+
+            # NN = GeneralizedAnomalyModel( base_learner=MinCovDet(), fit_function="fit",
+            #        predict_function="mahalanobis", score_sign=1,)
+            temperature -= np.mean(temperature, axis=0)
+            mcd = MinCovDet()
+
+            # Chop into overlapping windows (default) or run through FFT first
+            slices = self.feature_extract(temperature)
+
+            pred_score = None
+
+            try:
+                # NN.fit(slices)
+                mcd.fit(slices)
+
+                # pred_score = NN.decision_function(slices).copy()
+                pred_score = mcd.mahalanobis(slices).copy() * self.normalizer
+
+            except ValueError as ve:
+
+                logger.info(
+                    self.whoami + " GeneralizedAnomalyScore: Entity: "
+                    + str(entity) + ", Input: " + str(self.input_item) + ", WindowSize: "
+                    + str(self.windowsize) + ", Output: " + str(self.output_item) + ", Step: "
+                    + str(self.step) + ", InputSize: " + str(slices.shape)
+                    + " failed in the fitting step with \"" + str(ve) + "\" - scoring zero")
+
+                dfe[self.output_item] = 0
+                #  this fails in the interpolation step
+                # pred_score = np.zeros(slices.shape[0])
+                return df_copy
+
+            except Exception as e:
+
+                dfe[self.output_item] = 0
+                logger.error(
+                    self.whoami + " GeneralizedAnomalyScore: Entity: "
+                    + str(entity) + ", Input: " + str(self.input_item) + ", WindowSize: "
+                    + str(self.windowsize) + ", Output: " + str(self.output_item) + ", Step: "
+                    + str(self.step) + ", InputSize: " + str(slices.shape)
+                    + " failed in the fitting step with " + str(e))
+                return df_copy
+
+            # np.savetxt(self.whoami + '.csv', pred_score)
+
+            # will break if pred_score is None
+            # length of timesTS, ETS and ets_zscore is smaller than half the original
+            #   extend it to cover the full original length
+            diff = temperature.size - pred_score.size
+
+            time_series_temperature = np.linspace(
+                self.windowsize//2, temperature.size - self.windowsize//2 + 1,
+                temperature.size - diff)
+            #     temperature.size - self.windowsize + 1)
+
+            #time_series_temperature = np.linspace(diff // 2 + diff % 2, temperature.size - diff//2,
+            #                                      temperature.size - diff)
+
+            print(self.whoami + '   Entity: ' + str(entity) + ', result shape: ' + str(time_series_temperature.shape) +
+                  ' score shape: ' + str(pred_score.shape) + ' input shape: ' + str(temperature.shape))
+            logger.debug(self.whoami + '   Entity: ' + str(entity) + ', result shape: ' + str(time_series_temperature.shape) +
+                         ' score shape: ' + str(pred_score.shape))
+
+            # timesI = np.linspace(0, Size - 1, Size)
+            linear_interpolateK = sp.interpolate.interp1d(
+                time_series_temperature, pred_score, kind="linear", fill_value="extrapolate"
+            )
+
+            # kmeans_scoreI = np.interp(timesI, timesTS, pred_score)
+            gam_scoreI = linear_interpolateK(np.arange(0, temperature.size, 1))
+
+            dampen_anomaly_score(gam_scoreI, self.dampening)
+
+            zScoreII = merge_score(dfe, dfe_orig, self.output_item, gam_scoreI, mindelta)
+
+            # np.savetxt(self.whoami + '2.csv', zScoreII)
+
+            idx = pd.IndexSlice
+            df_copy.loc[idx[entity, :], self.output_item] = zScoreII
+
+        msg = "GeneralizedAnomalyScore"
+        self.trace_append(msg)
+        return df_copy
+
+    @classmethod
+    def build_ui(cls):
+        # define arguments that behave as function inputs
+        inputs = []
+        inputs.append(
+            UISingleItem(
+                name="input_item",
+                datatype=float,
+                description="Data item to analyze",
+            )
+        )
+
+        inputs.append(
+            UISingle(
+                name="windowsize",
+                datatype=int,
+                description="Size of each sliding window in data points. Typically set to 12."
+            )
+        )
+
+        inputs.append(UISingle(
+                name='normalize',
+                datatype=bool,
+                description='Flag for normalizing data.'
+                                              ))
+
+        # define arguments that behave as function outputs
+        outputs = []
+        outputs.append(
+            UIFunctionOutSingle(
+                name="output_item",
+                datatype=float,
+                description="Anomaly score (GeneralizedAnomaly)",
+            )
+        )
+        return (inputs, outputs)
+
+
 class NoDataAnomalyScore(GeneralizedAnomalyScore):
     '''
     An unsupervised anomaly detection function.
@@ -1532,6 +1758,76 @@ class FFTbasedGeneralizedAnomalyScore(GeneralizedAnomalyScore):
                 description="Size of each sliding window in data points. Typically set to 12."
             )
         )
+
+        # define arguments that behave as function outputs
+        outputs = []
+        outputs.append(
+            UIFunctionOutSingle(
+                name="output_item",
+                datatype=float,
+                description="Anomaly score (FFTbasedGeneralizedAnomalyScore)",
+            )
+        )
+        return (inputs, outputs)
+
+
+class FFTbasedGeneralizedAnomalyScorev2(GeneralizedAnomalyScorev2):
+    """
+    An unsupervised and robust anomaly detection function.
+     Extracts temporal features from time series data using Fast Fourier Transforms.
+     Applies the GeneralizedAnomalyScore to the features to detect outliers.
+     Moves a sliding window across the data signal and applies the anomaly models to each window.
+     The window size is typically set to 12 data points.
+     Try several anomaly detectors on your data and use the one that best fits your data.
+    """
+
+    def __init__(self, input_item, windowsize, output_item):
+        super().__init__(input_item, windowsize, output_item)
+
+        self.whoami = 'FFT'
+        self.normalizer = FFT_normalizer
+
+        logger.debug('FFT')
+
+    def feature_extract(self, temperature):
+
+        logger.debug(self.whoami + ': feature extract')
+
+        slices_ = skiutil.view_as_windows(
+            temperature, window_shape=(self.windowsize,), step=self.step
+        )
+        slicelist = []
+        for slice in slices_:
+            slicelist.append(fftpack.rfft(slice))
+
+        # return np.array(slicelist)
+        return np.stack(slicelist, axis=0)
+
+    @classmethod
+    def build_ui(cls):
+        # define arguments that behave as function inputs
+        inputs = []
+        inputs.append(
+            UISingleItem(
+                name="input_item",
+                datatype=float,
+                description="Data item to analyze",
+            )
+        )
+
+        inputs.append(
+            UISingle(
+                name="windowsize",
+                datatype=int,
+                description="Size of each sliding window in data points. Typically set to 12."
+            )
+        )
+
+        inputs.append(UISingle(
+                name='normalize',
+                datatype=bool,
+                description='Flag for normalizing data.'
+                                              ))
 
         # define arguments that behave as function outputs
         outputs = []
