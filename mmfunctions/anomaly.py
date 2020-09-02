@@ -1942,7 +1942,7 @@ class FFTbasedGeneralizedAnomalyScorev2(GeneralizedAnomalyScorev2):
     def __init__(self, input_item, windowsize, normalize, output_item):
         super().__init__(input_item, windowsize, normalize, output_item)
 
-        self.whoami = 'FFT'
+        self.whoami = 'FFTv2'
         self.normalizer = FFT_normalizer
 
         logger.debug('FFT')
@@ -2014,7 +2014,7 @@ class SaliencybasedGeneralizedAnomalyScorev2(GeneralizedAnomalyScorev2):
     def __init__(self, input_item, windowsize, normalize, output_item):
         super().__init__(input_item, windowsize, normalize, output_item)
 
-        self.whoami = 'Saliency'
+        self.whoami = 'Saliencyv2'
         self.saliency = Saliency(windowsize, 0, 0)
         self.normalizer = Saliency_normalizer
 
