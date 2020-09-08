@@ -227,13 +227,14 @@ def merge_score(dfEntity, dfEntityOrig, column_name, score, mindelta):
     return merged_score
 
 
+#####
+#  experimental function to interpolate over larger gaps
+####
 class Interpolator(BaseTransformer):
     '''
-     An unsupervised anomaly detection function.
-     Applies a spectral analysis clustering techniqueto extract features from time series data and to create z scores.
-     Moves a sliding window across the data signal and applies the anomalymodelto each window.
-     The window size is typically set to 12 data points.
-     Try several anomaly detectors on your data and use the one that fits your data best.
+    Interpolates NaN and data to be interpreted as NaN (for example 0 as invalid sensor reading)
+    The window size is typically set large enough to allow for "bridging" gaps
+    Missing indicates sensor readings to be interpreted as invalid.
     '''
     def __init__(self, input_item, windowsize, missing, output_item):
         super().__init__()
@@ -243,16 +244,13 @@ class Interpolator(BaseTransformer):
         # use 12 by default
         self.windowsize, self.windowoverlap = set_window_size_and_overlap(windowsize)
 
-        # assume 1 per sec for now
-        self.frame_rate = 1
-
         self.missing = missing
 
         self.output_item = output_item
 
         self.inv_zscore = None
 
-        self.whoami = 'Spectral'
+        self.whoami = 'Interpolator'
 
     def prepare_data(self, dfEntity):
 
