@@ -43,7 +43,7 @@ def on_publish(client, userdata, mid):
 
 class UnrollData(BaseTransformer):
     '''
-    Compute L2Norm of string encoded array
+    Unroll string encoded array and send it back to shadow device
     '''
     def __init__(self, group1_in, group2_in, group1_out, group2_out):
         super().__init__()
