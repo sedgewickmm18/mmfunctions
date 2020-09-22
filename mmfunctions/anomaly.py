@@ -2054,37 +2054,21 @@ class BayesRidgeRegressor(BaseEstimatorFunction):
         return Pipeline(steps)
 
     def set_estimators(self):
-        # gradient_boosted
         # params = {'gbr__n_estimators': [100, 250, 500, 1000],
-        #           'gbr__max_depth': [2, 4, 10],
-        #           'gbr__min_samples_split': [2, 5, 9],
-        #           'gbr__learning_rate': [0.01, 0.02, 0.05],
         #           'gbr__loss': ['ls']}
         params = {}
         # self.estimators['bayesianridge'] = (self.BRidgePipeline, params)
         self.estimators['bayesianridge'] = (linear_model.BayesianRidge, params)
 
-        # sgd
-        # params = {'sgd__max_iter': [250, 1000, 5000, 10000],
-        #           'sgd__tol': [0.001, 0.002, 0.005]}
-        # params = {'sgd__max_iter': [250, 1000, 5000, 10000],
-        #           'sgd__tol': [0.001, 0.002, 0.005]}
-        # self.estimators['sgd_regressor'] = (linear_model.SGDRegressor, params)
-        # self.estimators['sgd_regressor'] = (self.SGDPipeline, params)
         logger.info('Bayesian Ridge Regressor start searching for best model')
 
-    def __init__(self, features, targets, predictions=None,
-                 n_estimators=None, num_leaves=None, learning_rate=None, max_depth=None):
-        super().__init__(features=features, targets=targets, predictions=predictions)
+    def __init__(self, features, targets, predictions=None):
+        super().__init__(features=features, targets=targets, predictions=predictions, stddev=True)
 
         self.experiments_per_execution = 1
         self.auto_train = True
         self.correlation_threshold = 0
-
-        # do not run score and call transform instead of predict
-        self.is_scaler = True
-
-        # self.stop_auto_improve_at = -2
+        self.stop_auto_improve_at = -2
 
     def execute(self, df):
 
@@ -2092,7 +2076,7 @@ class BayesRidgeRegressor(BaseEstimatorFunction):
         entities = np.unique(df_copy.index.levels[0])
         logger.debug(str(entities))
 
-        missing_cols = [x for x in self.predictions if x not in df_copy.columns]
+        missing_cols = [x for x in self.predictions + self.pred_stddev if x not in df_copy.columns]
         for m in missing_cols:
             df_copy[m] = None
 
@@ -2101,9 +2085,11 @@ class BayesRidgeRegressor(BaseEstimatorFunction):
                 check_array(df_copy.loc[[entity]][self.features].values)
                 dfe = super()._execute(df_copy.loc[[entity]], entity)
                 print(df_copy.columns)
-                # for c in self.predictions:
+
+                # for c in self.predictions and pred_stddev
                 df_copy.loc[entity, self.predictions] = dfe[self.predictions]
-                # df_copy = df_copy.loc[[entity]] = dfe
+                df_copy.loc[entity, self.pred_stddev] = dfe[self.pred_stddev]
+
                 print(df_copy.columns)
             except Exception as e:
                 logger.info('Bayesian Ridge regressor for entity ' + str(entity) + ' failed with: ' + str(e))
@@ -2118,7 +2104,6 @@ class BayesRidgeRegressor(BaseEstimatorFunction):
         inputs.append(UIMultiItem(name='features', datatype=float, required=True))
         inputs.append(UIMultiItem(name='targets', datatype=float, required=True, output_item='predictions',
                                   is_output_datatype_derived=True))
-        return (inputs, [])
 
         # define arguments that behave as function outputs
         outputs = []
