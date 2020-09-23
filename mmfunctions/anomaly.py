@@ -2050,15 +2050,15 @@ class BayesRidgeRegressor(BaseEstimatorFunction):
     num_rounds_per_estimator = 3
 
     def BRidgePipeline(self):
-        steps = [('scaler', StandardScaler()), ('bridge', linear_model.BayesianRidge)]
+        steps = [('scaler', StandardScaler()), ('bridge', linear_model.BayesianRidge(compute_score=True))]
         return Pipeline(steps)
 
     def set_estimators(self):
         # params = {'gbr__n_estimators': [100, 250, 500, 1000],
         #           'gbr__loss': ['ls']}
         params = {}
-        # self.estimators['bayesianridge'] = (self.BRidgePipeline, params)
-        self.estimators['bayesianridge'] = (linear_model.BayesianRidge, params)
+        self.estimators['bayesianridge'] = (self.BRidgePipeline, params)
+        #self.estimators['bayesianridge'] = (linear_model.BayesianRidge, params)
 
         logger.info('Bayesian Ridge Regressor start searching for best model')
 
