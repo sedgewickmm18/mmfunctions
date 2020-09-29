@@ -16,6 +16,7 @@ import json
 import datetime as dt
 import pytz
 import base64
+import math
 
 # import re
 import pandas as pd
@@ -108,6 +109,9 @@ class UnrollData(BaseTransformer):
         for ix, row in df.iterrows():
             # columns with 15 elements
             #device_id = ix[0].replace('Device','Shadow') - device id is identical !
+            if row['device_id'] is None or math.isnan(row['device_id']):
+                print('missing device id')
+                continue
 
             None5 = [None, None, None, None, None]
             None15 = [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]
