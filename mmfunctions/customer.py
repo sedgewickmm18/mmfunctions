@@ -109,13 +109,44 @@ class UnrollData(BaseTransformer):
             # columns with 15 elements
             #device_id = ix[0].replace('Device','Shadow') - device id is identical !
 
-            vibx = eval(row['rms_x'])
-            viby = eval(row['rms_y'])
-            vibz = eval(row['rms_z'])
+            None5 = [None, None, None, None, None]
+            None15 = [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+
+            try:
+                vibx = eval(row['rms_x'])
+            except Exception as e1:
+                vibx = None15
+                print (' eval of ' + str(row['rms_x']) + ' failed with ' + str(e1))
+                pass
+
+            try:
+                viby = eval(row['rms_y'])
+            except Exception as e2:
+                viby = None15
+                print (' eval of ' + str(row['rms_y']) + ' failed with ' + str(e2))
+                pass
+
+            try:
+                vibz = eval(row['rms_z'])
+            except Exception as e3:
+                vibz = None15
+                print (' eval of ' + str(row['rms_z']) + ' failed with ' + str(e3))
+                pass
 
             # columns with 5 elements
-            speed = eval(row['accel_speed'])
-            power = eval(row['accel_power'])
+            try:
+                speed = eval(row['accel_speed'])
+            except Exception as e4:
+                speed = None5
+                print (' eval of ' + str(row['accel_speed']) + ' failed with ' + str(e4))
+                pass
+
+            try:
+                power = eval(row['accel_power'])
+            except Exception as e5:
+                power = None5
+                print (' eval of ' + str(row['accel_power']) + ' failed with ' + str(e5))
+                pass
 
             for i in range(15):
                 jsin = {'evt_timestamp': (ix[1] + pd.Timedelta(seconds=20*i - 300)).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + 'Z',
