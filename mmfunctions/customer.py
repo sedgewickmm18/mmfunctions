@@ -109,6 +109,7 @@ class UnrollData(BaseTransformer):
         for ix, row in df.iterrows():
             # columns with 15 elements
             #device_id = ix[0].replace('Device','Shadow') - device id is identical !
+            device_id = ix[0]
             if row['device_id'] is None or math.isnan(row['device_id']):
                 print('missing device id')
                 continue
