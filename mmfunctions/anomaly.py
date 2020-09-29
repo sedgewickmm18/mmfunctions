@@ -2041,7 +2041,7 @@ class SaliencybasedGeneralizedAnomalyScorev2(GeneralizedAnomalyScorev2):
 class BayesRidgeRegressor(BaseEstimatorFunction):
 
     '''
-    Regressor based on stochastic gradient descent and gradient boosting method as provided by sklearn
+    Linear regressor based on a probabilistic model as provided by sklearn
     '''
     eval_metric = staticmethod(metrics.r2_score)
 

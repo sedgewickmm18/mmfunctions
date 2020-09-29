@@ -15,6 +15,7 @@ The Built In Functions module contains customer specific helper functions
 import json
 import datetime as dt
 import pytz
+import base64
 
 # import re
 import pandas as pd
@@ -73,6 +74,15 @@ class UnrollData(BaseTransformer):
                 if 'identity' in auth_token.auth:
                     if 'orgId' in auth_token.auth.identity:
                         i_am_device = True
+        except Exception:
+            pass
+
+        try:
+            if 'pem' in auth_token:
+                base64_message = base64.b64decode(auth_token['pem'])
+                f = open("cafile.pem", "wb")
+                f.write(base64_message)
+                f.close()
         except Exception:
             pass
 
