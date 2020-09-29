@@ -119,6 +119,7 @@ class UnrollData(BaseTransformer):
             except Exception as e1:
                 vibx = None15
                 print (' eval of ' + str(row['rms_x']) + ' failed with ' + str(e1))
+                continue
                 pass
 
             try:
@@ -126,6 +127,7 @@ class UnrollData(BaseTransformer):
             except Exception as e2:
                 viby = None15
                 print (' eval of ' + str(row['rms_y']) + ' failed with ' + str(e2))
+                continue
                 pass
 
             try:
@@ -133,6 +135,7 @@ class UnrollData(BaseTransformer):
             except Exception as e3:
                 vibz = None15
                 print (' eval of ' + str(row['rms_z']) + ' failed with ' + str(e3))
+                continue
                 pass
 
             # columns with 5 elements
@@ -141,6 +144,7 @@ class UnrollData(BaseTransformer):
             except Exception as e4:
                 speed = None5
                 print (' eval of ' + str(row['accel_speed']) + ' failed with ' + str(e4))
+                continue
                 pass
 
             try:
@@ -148,14 +152,20 @@ class UnrollData(BaseTransformer):
             except Exception as e5:
                 power = None5
                 print (' eval of ' + str(row['accel_power']) + ' failed with ' + str(e5))
+                continue
                 pass
 
             for i in range(15):
-                jsin = {'evt_timestamp': (ix[1] + pd.Timedelta(seconds=20*i - 300)).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + 'Z',
-                        #'evt_timestamp': (ix[1] + pd.Timedelta(seconds=20*i - 300)).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
-                        # 2020-05-26T10:24:56.098000.
-                        'rms_x': vibx[i], 'rms_y': viby[i], 'rms_z': vibz[i],
-                        'speed': speed[i // 3], 'power': power[i // 3]}
+                try:
+                    jsin = {'evt_timestamp': (ix[1] + pd.Timedelta(seconds=20*i - 300)).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + 'Z',
+                            #'evt_timestamp': (ix[1] + pd.Timedelta(seconds=20*i - 300)).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
+                            # 2020-05-26T10:24:56.098000.
+                            'rms_x': vibx[i], 'rms_y': viby[i], 'rms_z': vibz[i],
+                            'speed': speed[i // 3], 'power': power[i // 3]}
+                except Exception as ee:
+                    print('Index', i, '   ', str(ee))
+                    break
+
                 jsdump = json.dumps(jsin)
                 js = json.loads(jsdump)
                 print('sending ', js, ' to ', device_id)
