@@ -43,6 +43,12 @@ def on_connect(client, userdata, flags, rc):
 def on_publish(client, userdata, mid):
     print("Message Published.")
 
+
+# on publish MQTT Callback.
+def on_disconnect(client, userdata, rc):
+    print("Disconnected with result code : " + str(rc))
+
+
 class UnrollData(BaseTransformer):
     '''
     Unroll string encoded array and send it back to shadow device
@@ -100,6 +106,7 @@ class UnrollData(BaseTransformer):
 
         client.on_connect = on_connect  # On Connect Callback.
         client.on_publish = on_publish  # On Publish Callback.
+        client.on_disconnect = on_disconnect # On Disconnect Callback.
         client.connect()
 
         Now = dt.datetime.now(pytz.timezone("UTC"))
@@ -179,6 +186,8 @@ class UnrollData(BaseTransformer):
 
         msg = 'UnrollData'
         self.trace_append(msg)
+
+        client.disconnect()
 
         return (df)
 
