@@ -16,6 +16,7 @@ import json
 import datetime as dt
 import pytz
 import base64
+import ast
 import math
 
 # import re
@@ -122,7 +123,7 @@ class UnrollData(BaseTransformer):
             None15 = [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]
 
             try:
-                vibx = eval(row['rms_x'])
+                vibx = ast.literal_eval(row['rms_x'])
             except Exception as e1:
                 vibx = None15
                 print (' eval of ' + str(row['rms_x']) + ' failed with ' + str(e1))
@@ -130,7 +131,7 @@ class UnrollData(BaseTransformer):
                 pass
 
             try:
-                viby = eval(row['rms_y'])
+                viby = ast.literal_eval(row['rms_y'])
             except Exception as e2:
                 viby = None15
                 print (' eval of ' + str(row['rms_y']) + ' failed with ' + str(e2))
@@ -138,7 +139,7 @@ class UnrollData(BaseTransformer):
                 pass
 
             try:
-                vibz = eval(row['rms_z'])
+                vibz = ast.literal_eval(row['rms_z'])
             except Exception as e3:
                 vibz = None15
                 print (' eval of ' + str(row['rms_z']) + ' failed with ' + str(e3))
@@ -147,7 +148,7 @@ class UnrollData(BaseTransformer):
 
             # columns with 5 elements
             try:
-                speed = eval(row['accel_speed'])
+                speed = ast.literal_eval(row['accel_speed'])
             except Exception as e4:
                 speed = None5
                 print (' eval of ' + str(row['accel_speed']) + ' failed with ' + str(e4))
@@ -155,7 +156,7 @@ class UnrollData(BaseTransformer):
                 pass
 
             try:
-                power = eval(row['accel_power'])
+                power = ast.literal_eval(row['accel_power'])
             except Exception as e5:
                 power = None5
                 print (' eval of ' + str(row['accel_power']) + ' failed with ' + str(e5))
