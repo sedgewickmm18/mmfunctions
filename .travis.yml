@@ -3,7 +3,7 @@ python:
   - "3.6"
 # command to install dependencies
 install:
-  - pip install git+https://github.com/ibm-watson-iot/functions.git@development
+  - pip install git+https://github.com/ibm-watson-iot/functions.git@dev
   - pip install .
 # command to run tests
 script:
