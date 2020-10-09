@@ -18,7 +18,7 @@ def test_anomaly_generators():
     # Run on the good pump first
     # Get stuff in
     print('Read Anomaly Sample data in')
-    df_i = pd.read_csv('./AzureAnomalysample.csv', index_col=False, parse_dates=['timestamp'])
+    df_i = pd.read_csv('./samples/AzureAnomalysample.csv', index_col=False, parse_dates=['timestamp'])
 
     df_i['id'] = 'MyRoom'
     df_i[Temperature] = df_i['value'] + 20
