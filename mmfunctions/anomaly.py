@@ -1749,8 +1749,10 @@ class BayesRidgeRegressor(BaseEstimatorFunction):
 
         logger.info('Bayesian Ridge Regressor start searching for best model')
 
-    def __init__(self, features, targets, predictions=None):
+    def __init__(self, features, targets, predictions=None, deviations=None):
         super().__init__(features=features, targets=targets, predictions=predictions, stddev=True)
+        if deviations is not None:
+            self.pred_stddev = deviations
 
         self.experiments_per_execution = 1
         self.auto_train = True
