@@ -1772,7 +1772,8 @@ class BayesRidgeRegressor(BaseEstimatorFunction):
 
         for entity in entities:
             try:
-                check_array(df_copy.loc[[entity]][self.features].values)
+                check_array(df_copy.loc[[entity]][self.features].values, allow_nd=2)
+                logger.debug('check passed')
                 dfe = super()._execute(df_copy.loc[[entity]], entity)
                 print(df_copy.columns)
 
