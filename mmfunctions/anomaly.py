@@ -1786,7 +1786,8 @@ class BayesRidgeRegressor(BaseEstimatorFunction):
     def build_ui(cls):
         # define arguments that behave as function inputs
         inputs = []
-        inputs.append(UIMultiItem(name='features', datatype=float, required=True))
+        inputs.append(UIMultiItem(name='features', datatype=float, required=True, output_item='deviations',
+                                  is_output_datatype_derived=True))
         inputs.append(UIMultiItem(name='targets', datatype=float, required=True, output_item='predictions',
                                   is_output_datatype_derived=True))
 
