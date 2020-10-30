@@ -1763,7 +1763,8 @@ class BayesRidgeRegressor(BaseEstimatorFunction):
 
         df_copy = df.copy()
         entities = np.unique(df_copy.index.levels[0])
-        logger.debug(str(entities))
+        logger.debug(str(entities) + ' predicting ' + str(self.targets) + ' from ' + str(self.features) +\
+                     ' to appear in ' + str(self.predictions) + ' with confidence interval ' + str(self.pred_stddev))
 
         missing_cols = [x for x in self.predictions + self.pred_stddev if x not in df_copy.columns]
         for m in missing_cols:
@@ -1782,6 +1783,7 @@ class BayesRidgeRegressor(BaseEstimatorFunction):
             except Exception as e:
                 logger.info('Bayesian Ridge regressor for entity ' + str(entity) + ' failed with: ' + str(e))
                 df_copy.loc[entity, self.predictions] = 0
+                df_copy.loc[entity, self.pred_stddev] = 0
         return df_copy
 
     @classmethod
