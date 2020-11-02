@@ -44,7 +44,7 @@ from statsmodels.tsa.arima.model import ARIMA
 
 from iotfunctions.base import (BaseTransformer, BaseRegressor, BaseEstimatorFunction, BaseSimpleAggregator)
 from iotfunctions.bif import (AlertHighValue)
-from iotfunctions.ui import (UISingle, UIMultiItem, UIFunctionOutSingle, UISingleItem, UIFunctionOutMulti)
+from iotfunctions.ui import (UISingle, UIMulti, UIMultiItem, UIFunctionOutSingle, UISingleItem, UIFunctionOutMulti)
 
 
 logger = logging.getLogger(__name__)
@@ -1999,6 +1999,75 @@ class SimpleAnomaly(BaseRegressor):
             UIFunctionOutMulti(name='alerts', datatype=bool, cardinality_from='targets', is_datatype_derived=False, ))
 
         return (inputs, outputs)
+
+#######################################################################################
+# Feature builder
+#######################################################################################
+
+class FeatureBuilder(BaseTransformer):
+
+    def __init__(self, features, lag, method, lagged_features):
+        super().__init__()
+
+        self.features = features
+        self.lagged_features = lagged_features
+
+        self.lag = lag   # list of integers (days) to define lags
+
+        self.method = method   #
+
+        self.whoami = 'FeatureBuilder'
+
+        print(self.whoami, self.features, self.lagged_features, self.lag, self.method)
+
+
+    def execute(self, df):
+
+        df_copy = df.copy()
+        entities = np.unique(df_copy.index.levels[0])
+        logger.debug(str(entities))
+
+        missing_cols = [x for x in self.lagged_features if x not in df_copy.columns]
+        for m in missing_cols:
+            df_copy[m] = None
+
+        for entity in entities:
+            # per entity - copy for later inplace operations
+            try:
+                check_array(df_copy.loc[[entity]][self.features].values, allow_nd=True)
+                dfe = df_copy.loc[[entity]]
+            except Exception as e:
+                logger.error(
+                    'Found Nan or infinite value in feature columns for entity ' + str(entity) + ' error: ' + str(e))
+                continue
+
+            dfroll = dfe[self.features].rolling(window=self.lag, min_periods=0)
+            if self.method == 'mean':
+                dfe[self.lagged_features] = dfroll.mean().shift(1)
+            elif self.method == 'stddev':
+                dfe[self.lagged_features] = dfroll.std().shift(1)
+            else:
+                dfe[self.lagged_features] = dfe[self.features].shift(1)
+
+            #dfe = super()._execute(df_copy.loc[[entity]], entity)
+            df_copy.loc[entity, self.lagged_features] = dfe[self.lagged_features]
+
+        return df_copy
+
+
+    @classmethod
+    def build_ui(cls):
+        # define arguments that behave as function inputs
+        inputs = []
+        inputs.append(UIMultiItem(name='features', datatype=float, required=True, output_item='lagged_features',
+                                  is_output_datatype_derived=True))
+        inputs.append(UISingle(name='lag', datatype=int, description='Lag for each input_item'))
+        inputs.append(UISingle(name='method', datatype=str, description='Method: Plain, Mean, Stddev'))
+        # define arguments that behave as function outputs
+        outputs = []
+        return (inputs, outputs)
+
+
 
 #######################################################################################
 # ARIMA
