@@ -2182,7 +2182,7 @@ class GBMForecaster(BaseEstimatorFunction):
             except Exception as e:
                 logger.error(
                     'Found Nan or infinite value in feature columns for entity ' + str(entity) + ' error: ' + str(e))
-                print(df_copy.loc[[entity]][self.features].head(20))
+                #print(df_copy.loc[[entity]][self.features].head(20))
                 continue
 
             dfe = super()._execute(df_copy.loc[[entity]], entity)
@@ -2197,7 +2197,7 @@ class GBMForecaster(BaseEstimatorFunction):
         inputs.append(UIMultiItem(name='features', datatype=float, required=True))
         inputs.append(UIMultiItem(name='targets', datatype=float, required=True, output_item='predictions',
                                   is_output_datatype_derived=True))
-        inputs.append(UIMulti(name='lags', datatype=str, description='Comma separated list of lags'))
+        inputs.append(UIMulti(name='lags', datatype=int, description='Comma separated list of lags'))
 
         # define arguments that behave as function outputs
         outputs = []
