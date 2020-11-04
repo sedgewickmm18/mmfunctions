@@ -2131,12 +2131,12 @@ class GBMForecaster(BaseEstimatorFunction):
         return (new_features, df)
 
 
-    def __init__(self, features, targets, predictions=None, lags=None, lagged_features=None):
+    def __init__(self, features, targets, predictions=None, lags=None):
         n_estimators = 500
         num_leaves = 50
         learning_rate = 0.001
         max_depth = -1
-        self.lagged_features = lagged_features
+        self.lagged_features = features
         self.lags = lags
 
         newfeatures,_ = self.lag_features()
@@ -2164,6 +2164,8 @@ class GBMForecaster(BaseEstimatorFunction):
 
         #df_copy = df.copy()
         _, df_copy = self.lag_features(df=df)
+
+        print('Here 1', type(df_copy))
 
         entities = np.unique(df_copy.index.levels[0])
         logger.debug(str(entities))
@@ -2196,7 +2198,6 @@ class GBMForecaster(BaseEstimatorFunction):
         inputs.append(UIMultiItem(name='targets', datatype=float, required=True, output_item='predictions',
                                   is_output_datatype_derived=True))
         inputs.append(UIMulti(name='lags', datatype=str, description='Comma separated list of lags'))
-        inputs.append(UIMultiItem(name='lagged_features', datatype=str, description='Comma separated list of features'))
 
         # define arguments that behave as function outputs
         outputs = []
