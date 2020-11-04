@@ -2068,137 +2068,138 @@ class FeatureBuilder(BaseTransformer):
         return (inputs, outputs)
 
 
-
-#######################################################################################
-# ARIMA
-#######################################################################################
-# totally useless, work in progress (but without lots of progress)
-
-#self.model_class = STLForecast(np.arange(0,1), ARIMA, model_kwargs=dict(order=(1,1,1), trend="c"), period=7*24)
-class ARIMAForecaster(BaseTransformer):
+class GBMForecaster(BaseEstimatorFunction):
     """
-    Provides a forecast for 'n_forecast' data points for from endogenous data in input_item
-    Data is returned as input_item shifted by n_forecast positions with the forecast appended
+    Regressor based on gradient boosting method as provided by lightGBM
     """
+    eval_metric = staticmethod(metrics.r2_score)
 
-    def __init__(self, input_item, n_forecast, output_item):
-        super().__init__()
+    # class variables
+    train_if_no_model = True
 
-        self.input_item = input_item
-        self.n_forecast = n_forecast
-        self.output_item = output_item
+    def GBMPipeline(self):
+        steps = [('scaler', StandardScaler()), ('gbm', lightgbm.LGBMRegressor())]
+        return Pipeline(steps=steps)
 
-        self.power = None    # used to store box cox lambda
+    def set_estimators(self):
+        # gradient_boosted
+        self.estimators['light_gradient_boosted_regressor'] = (self.GBMPipeline, self.params)
+        logger.info('GBMRegressor start searching for best model')
 
-        self.whoami = 'ARIMAForecaster'
+    #
+    # return list of new columns for the lagged features and dataframe extended with these new columns
+    #
+    def lag_features(self, df=None):
 
-    def prepare_data(self, dfEntity):
+        print ('lags ' + str(self.lags) + '  lagged_features ' + str(self.lagged_features))
+        create_feature_triplets = []
+        new_features = []
 
-        logger.debug(self.whoami + ': prepare Data')
+        if self.lags is None or self.lagged_features is None:
+            return (new_features, None)
 
-        # operate on simple timestamp index
-        if len(dfEntity.index.names) > 1:
-            index_names = dfEntity.index.names
-            dfe = dfEntity.reset_index().set_index(index_names[0])
+        for lagged_feature in self.lagged_features:
+            for lag in self.lags:
+                # collect triple of new column, original column and lag
+                create_feature_triplets.append((lagged_feature + '_' + str(lag), lagged_feature, lag))
+                new_features.append(lagged_feature + '_' + str(lag))
+
+        # add day of week and month of year as two feature pairs
+        new_features = np.concatenate((new_features, ['DayOfWeekCos', 'DayOfWeekSin', 'DayOfYearCos', 'DayOfYearSin']))
+
+        if df is not None:
+            missing_cols = [x[0] for x in create_feature_triplets if x not in df.columns]
+            for m in missing_cols:
+                df[m] = None
+
+            # I hope I can do that for all entities in one fell swoop
+            for new_feature in create_feature_triplets:
+                df[new_feature[0]] = df[new_feature[1]].shift(new_feature[2])
+
+            # get rid of NaN as result of shifting columns
+            df.dropna(inplace=True)
+
+            # add day of week and month of year as two feature pairs
+            # operate on simple timestamp index
+            df['DayOfWeekCos'] = np.cos(df.index.get_level_values(1).dayofweek / 7)
+            df['DayOfWeekSin'] = np.sin(df.index.get_level_values(1).dayofweek / 7)
+            df['DayOfYearCos'] = np.cos(df.index.get_level_values(1).dayofyear / 365)
+            df['DayOfYearSin'] = np.sin(df.index.get_level_values(1).dayofyear / 365)
+
+            #df = df[df[df.columns.intersection(new_features)].notna()]   # drop NaNs
+
+        return (new_features, df)
+
+
+    def __init__(self, features, targets, predictions=None, lags=None, lagged_features=None):
+        n_estimators = 500
+        num_leaves = 50
+        learning_rate = 0.001
+        max_depth = -1
+        self.lagged_features = lagged_features
+        self.lags = lags
+
+        newfeatures,_ = self.lag_features()
+
+        super().__init__(features=newfeatures, targets=targets, predictions=predictions, keep_current_models=True)
+
+        self.experiments_per_execution = 1
+        self.correlation_threshold = 0
+        self.auto_train = True
+
+        self.num_rounds_per_estimator = 1
+        self.parameter_tuning_iterations = 1
+        self.cv = 1
+
+        if n_estimators is not None or num_leaves is not None or learning_rate is not None:
+            self.params = {'gbm__n_estimators': [n_estimators], 'gbm__num_leaves': [num_leaves],
+                           'gbm__learning_rate': [learning_rate], 'gbm__max_depth': [max_depth], 'gbm__verbosity': [2]}
         else:
-            index_names = None
-            dfe = dfEntity
+            self.params = {'gbm__n_estimators': [500], 'gbm__num_leaves': [50], 'gbm__learning_rate': [0.001],
+                           'gbm__verbosity': [2]}
 
-        # remove Nan
-        dfe = dfe[dfe[self.input_item].notna()]
-
-        # interpolate gaps - data imputation
-        try:
-            dfe = dfe.interpolate(method="time")
-        except Exception as e:
-            logger.error('Prepare data error: ' + str(e))
-
-        # one dimensional time series - named temperature for catchyness
-        # replace NaN with self.missing
-        temperature = dfe[[self.input_item]].fillna(0).to_numpy(dtype=np.float64).reshape(-1, )
-
-
-        # Box Cox +
-        #self.power = PowerTransformer(method='box-cox'
-
-        #rbsc.fit_transform(df_input[['KW']])
-
-        return dfe, temperature
+        self.stop_auto_improve_at = -2
 
     def execute(self, df):
 
-        df_copy = df.copy()
-        entities = np.unique(df.index.levels[0])
+        #df_copy = df.copy()
+        _, df_copy = self.lag_features(df=df)
+
+        entities = np.unique(df_copy.index.levels[0])
         logger.debug(str(entities))
 
-        df_copy[self.output_item] = 0
-
-        # check data type
-        if df_copy[self.input_item].dtype != np.float64:
-            return (df_copy)
+        missing_cols = [x for x in self.predictions if x not in df_copy.columns]
+        for m in missing_cols:
+            df_copy[m] = None
 
         for entity in entities:
             # per entity - copy for later inplace operations
-            dfe = df_copy.loc[[entity]].dropna(how='all')
-            dfe_orig = df_copy.loc[[entity]].copy()
+            try:
+                print (self.features)
+                check_array(df_copy.loc[[entity]][self.features].values, allow_nd=True)
+            except Exception as e:
+                logger.error(
+                    'Found Nan or infinite value in feature columns for entity ' + str(entity) + ' error: ' + str(e))
+                print(df_copy.loc[[entity]][self.features].head(20))
+                continue
 
-            # get rid of entityid part of the index
-            # do it inplace as we copied the data before
-            dfe.reset_index(level=[0], inplace=True)
-            dfe.sort_index(inplace=True)
-            dfe_orig.reset_index(level=[0], inplace=True)
-            dfe_orig.sort_index(inplace=True)
+            dfe = super()._execute(df_copy.loc[[entity]], entity)
+            df_copy.loc[entity, self.predictions] = dfe[self.predictions]
 
-            # minimal time delta for merging
-            mindelta, dfe_orig = min_delta(dfe_orig)
-
-            logger.debug('Timedelta:' + str(mindelta) + ' Index: ' + str(dfe_orig.index))
-
-            # interpolate gaps - data imputation by default
-            #   for missing data detection we look at the timestamp gradient instead
-            dfe, temperature = self.prepare_data(dfe)
-
-            logger.debug('Module ARIMA Forecaster, Entity: ' + str(entity) + ', Input: ' + str(
-                self.input_item) + ', Forecasting: ' + str(self.n_forecast) + ', Output: ' + str(
-                self.output_item) + ', Inputsize: ' + str(temperature.size) + ', Fullsize: ' + str(
-                dfe_orig[self.input_item].values.shape))
-
-            if temperature.size <= self.n_forecast:
-                logger.debug(str(temperature.size) + ' <= ' + str(self.n_forecast))
-                dfe[self.output_item] = Error_SmallWindowsize
-            else:
-                logger.debug(str(temperature.size) + str(self.n_forecast))
-                temperatureII = None
-
-                try:
-                    # length of time_series_temperature, signal_energy and ets_zscore is smaller than half the original
-                    #   extend it to cover the full original length
-                    temperatureII = merge_score(dfe, dfe_orig, self.output_item, temperature, mindelta)
-
-                except Exception as e:
-                    logger.error('Spectral failed with ' + str(e))
-
-                idx = pd.IndexSlice
-                df_copy.loc[idx[entity, :], self.output_item] = temperatureII
-
-        msg = 'ARIMA'
-        self.trace_append(msg)
-
-        return (df_copy)
+        return df_copy
 
     @classmethod
     def build_ui(cls):
-
         # define arguments that behave as function inputs
         inputs = []
-        inputs.append(UISingleItem(name='input_item', datatype=float, description='Data item to interpolate'))
-
-        inputs.append(
-            UISingle(name='n_forecast', datatype=int, description='Forecasting n_forecast data points.'))
+        inputs.append(UIMultiItem(name='features', datatype=float, required=True))
+        inputs.append(UIMultiItem(name='targets', datatype=float, required=True, output_item='predictions',
+                                  is_output_datatype_derived=True))
+        inputs.append(UIMulti(name='lags', datatype=str, description='Comma separated list of lags'))
+        inputs.append(UIMultiItems(name='lagged_features', datatype=str, description='Comma separated list of features'))
 
         # define arguments that behave as function outputs
         outputs = []
-        outputs.append(UIFunctionOutSingle(name='output_item', datatype=float, description='Interpolated data'))
         return (inputs, outputs)
 
 
