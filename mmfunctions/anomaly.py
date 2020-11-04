@@ -2132,9 +2132,14 @@ class GBMForecaster(BaseEstimatorFunction):
 
 
     def __init__(self, features, targets, predictions=None, lags=None):
+        # from https://github.com/ashitole/Time-Series-Project/blob/main/Auto-Arima%20and%20LGBM.ipynb
         n_estimators = 500
-        num_leaves = 50
-        learning_rate = 0.001
+        num_leaves = 40
+        #learning_rate = 0.001
+        learning_rate = 0.2   # default 0.001
+        feature_fraction = 0.85  # default 1.0
+        reg_lambda = 2  # default 0
+        metric = "rmse"
         max_depth = -1
         self.lagged_features = features
         self.lags = lags
@@ -2153,6 +2158,7 @@ class GBMForecaster(BaseEstimatorFunction):
 
         if n_estimators is not None or num_leaves is not None or learning_rate is not None:
             self.params = {'gbm__n_estimators': [n_estimators], 'gbm__num_leaves': [num_leaves],
+                           'gbm__reg_lambda' : [reg_lambda], 'gbm__feature_fraction': [feature_fraction],
                            'gbm__learning_rate': [learning_rate], 'gbm__max_depth': [max_depth], 'gbm__verbosity': [2]}
         else:
             self.params = {'gbm__n_estimators': [500], 'gbm__num_leaves': [50], 'gbm__learning_rate': [0.001],
