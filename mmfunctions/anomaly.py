@@ -2196,7 +2196,7 @@ class GBMForecaster(BaseEstimatorFunction):
         inputs.append(UIMultiItem(name='targets', datatype=float, required=True, output_item='predictions',
                                   is_output_datatype_derived=True))
         inputs.append(UIMulti(name='lags', datatype=str, description='Comma separated list of lags'))
-        inputs.append(UIMultiItems(name='lagged_features', datatype=str, description='Comma separated list of features'))
+        inputs.append(UIMultiItem(name='lagged_features', datatype=str, description='Comma separated list of features'))
 
         # define arguments that behave as function outputs
         outputs = []
