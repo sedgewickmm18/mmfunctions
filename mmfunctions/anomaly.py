@@ -2095,9 +2095,8 @@ class GBMForecaster(BaseEstimatorFunction):
     #
     # return list of new columns for the lagged features and dataframe extended with these new columns
     #
-    def lag_features(self, df=None):
-
-        print ('lags ' + str(self.lags) + '  lagged_features ' + str(self.lagged_features))
+    def lag_features(self, df=None, Train=True):
+        print ('lags ' + str(self.lags) + '  lagged_features ' + str(self.lagged_features) + ' Train mode: ' + str(Train))
         create_feature_triplets = []
         new_features = []
 
@@ -2107,34 +2106,41 @@ class GBMForecaster(BaseEstimatorFunction):
         for lagged_feature in self.lagged_features:
             for lag in self.lags:
                 # collect triple of new column, original column and lag
-                create_feature_triplets.append((lagged_feature + '_' + str(lag), lagged_feature, lag))
+                if Train:
+                    create_feature_triplets.append((lagged_feature + '_' + str(lag), lagged_feature, lag))
+                else:
+                    create_feature_triplets.append((lagged_feature + '_' + str(lag), lagged_feature, lag - self.forecast))
+
                 new_features.append(lagged_feature + '_' + str(lag))
 
         # add day of week and month of year as two feature pairs
-        new_features = np.concatenate((new_features, ['DayOfWeekCos', 'DayOfWeekSin', 'DayOfYearCos', 'DayOfYearSin']))
+        new_features = np.concatenate((new_features, ['_DayOfWeekCos_', '_DayOfWeekSin_', '_DayOfYearCos_', '_DayOfYearSin_']))
 
         if df is not None:
-            missing_cols = [x[0] for x in create_feature_triplets if x not in df.columns]
+            df_copy = df.copy()
+            missing_cols = [x[0] for x in create_feature_triplets if x not in df_copy.columns]
             for m in missing_cols:
-                df[m] = None
+                df_copy[m] = None
 
             # I hope I can do that for all entities in one fell swoop
             for new_feature in create_feature_triplets:
-                df[new_feature[0]] = df[new_feature[1]].shift(new_feature[2])
+                df_copy[new_feature[0]] = df[new_feature[1]].shift(new_feature[2])
 
             # get rid of NaN as result of shifting columns
-            df.dropna(inplace=True)
+            df_copy.dropna(inplace=True)
 
             # add day of week and month of year as two feature pairs
             # operate on simple timestamp index
-            df['DayOfWeekCos'] = np.cos(df.index.get_level_values(1).dayofweek / 7)
-            df['DayOfWeekSin'] = np.sin(df.index.get_level_values(1).dayofweek / 7)
-            df['DayOfYearCos'] = np.cos(df.index.get_level_values(1).dayofyear / 365)
-            df['DayOfYearSin'] = np.sin(df.index.get_level_values(1).dayofyear / 365)
+            df_copy['_DayOfWeekCos_'] = np.cos(df_copy.index.get_level_values(1).dayofweek / 7)
+            df_copy['_DayOfWeekSin_'] = np.sin(df_copy.index.get_level_values(1).dayofweek / 7)
+            df_copy['_DayOfYearCos_'] = np.cos(df_copy.index.get_level_values(1).dayofyear / 365)
+            df_copy['_DayOfYearSin_'] = np.sin(df_copy.index.get_level_values(1).dayofyear / 365)
 
             #df = df[df[df.columns.intersection(new_features)].notna()]   # drop NaNs
+        else:
+            df_copy = df
 
-        return (new_features, df)
+        return (new_features, df_copy)
 
 
     def __init__(self, features, targets, predictions=None, lags=None):
@@ -2150,7 +2156,7 @@ class GBMForecaster(BaseEstimatorFunction):
         self.lagged_features = features
         self.lags = lags
 
-        self.forecast = - min(lags)  # forecast = number to shift features back is the negative minimum lag
+        self.forecast = min(lags)  # forecast = number to shift features back is the negative minimum lag
 
         newfeatures,_ = self.lag_features()
 
@@ -2177,12 +2183,37 @@ class GBMForecaster(BaseEstimatorFunction):
     def execute(self, df):
 
         #df_copy = df.copy()
-        _, df_copy = self.lag_features(df=df)
+        _, df_copy = self.lag_features(df=df, Train=True)
 
         print('Here 1', type(df_copy))
 
         entities = np.unique(df_copy.index.levels[0])
         logger.debug(str(entities))
+
+        missing_cols = [x for x in self.predictions if x not in df_copy.columns]
+        for m in missing_cols:
+            df_copy[m] = None
+
+        # make sure to train a model
+        for entity in entities:
+            # per entity - copy for later inplace operations
+            try:
+                print (self.features)
+                check_array(df_copy.loc[[entity]][self.features].values, allow_nd=True)
+            except Exception as e:
+                logger.error(
+                    'Found Nan or infinite value in feature columns for entity ' + str(entity) + ' error: ' + str(e))
+                #print(df_copy.loc[[entity]][self.features].head(20))
+                continue
+
+            dfe = super()._execute(df_copy.loc[[entity]], entity)
+            df_copy.loc[entity, self.predictions] = dfe[self.predictions]
+
+        # preserve predictions based on full lag
+        df_pred = df_copy[self.predictions].rename(columns={self.predictions[0] : '__forecast__'})
+
+        # use the model for inferencing - with less lag
+        strip_features, df_copy = self.lag_features(df=df, Train=False)
 
         missing_cols = [x for x in self.predictions if x not in df_copy.columns]
         for m in missing_cols:
@@ -2201,6 +2232,10 @@ class GBMForecaster(BaseEstimatorFunction):
 
             dfe = super()._execute(df_copy.loc[[entity]], entity)
             df_copy.loc[entity, self.predictions] = dfe[self.predictions]
+
+            df_copy.drop(columns = strip_features, inplace=True)
+
+            #df_copy = pd.merge(df_copy, df_pred, left_index=True, right_index=True, how='outer')
 
         return df_copy
 
