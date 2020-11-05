@@ -1777,6 +1777,9 @@ class BayesRidgeRegressor(BaseEstimatorFunction):
                 dfe = super()._execute(df_copy.loc[[entity]], entity)
                 print(df_copy.columns)
 
+                print('BayesianRidge: Entity ', entity, ' Type of pred, stddev arrays ',
+                      type(dfe[self.predictions]), type(dfe[self.pred_stddev].values))
+
                 df_copy.loc[entity, self.predictions] = dfe[self.predictions]
                 df_copy.loc[entity, self.pred_stddev] = dfe[self.pred_stddev]
 
@@ -2143,6 +2146,8 @@ class GBMForecaster(BaseEstimatorFunction):
         max_depth = -1
         self.lagged_features = features
         self.lags = lags
+
+        self.forecast = - min(lags)  # forecast = number to shift features back is the negative minimum lag
 
         newfeatures,_ = self.lag_features()
 
