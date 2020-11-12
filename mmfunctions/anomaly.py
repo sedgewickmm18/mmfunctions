@@ -2076,7 +2076,7 @@ class FeatureBuilder(BaseTransformer):
 
 class GBMForecaster(BaseEstimatorFunction):
     """
-    Regressor based on gradient boosting method as provided by lightGBM
+    Forecasting regressor based on gradient boosting method as provided by lightGBM
     """
     eval_metric = staticmethod(metrics.r2_score)
 
@@ -2144,7 +2144,10 @@ class GBMForecaster(BaseEstimatorFunction):
 
 
     def __init__(self, features, targets, predictions=None, lags=None):
+        #
         # from https://github.com/ashitole/Time-Series-Project/blob/main/Auto-Arima%20and%20LGBM.ipynb
+        #   as taken from https://www.kaggle.com/rohanrao/ashrae-half-and-half
+        #
         n_estimators = 500
         num_leaves = 40
         #learning_rate = 0.001
@@ -2233,9 +2236,10 @@ class GBMForecaster(BaseEstimatorFunction):
             dfe = super()._execute(df_copy.loc[[entity]], entity)
             df_copy.loc[entity, self.predictions] = dfe[self.predictions]
 
-            df_copy.drop(columns = strip_features, inplace=True)
-
             #df_copy = pd.merge(df_copy, df_pred, left_index=True, right_index=True, how='outer')
+
+        logger.debug('Drop artificial features ' + str(strip_features))
+        df_copy.drop(columns = strip_features, inplace=True)
 
         return df_copy
 
