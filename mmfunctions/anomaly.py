@@ -41,6 +41,7 @@ import statsmodels.api as sm
 from statsmodels.tsa.seasonal import STL
 from statsmodels.tsa.forecasting.stl import STLForecast
 from statsmodels.tsa.arima.model import ARIMA
+from statsmodels.nonparametric.kernel_density import KDEMultivariate
 
 from iotfunctions.base import (BaseTransformer, BaseRegressor, BaseEstimatorFunction, BaseSimpleAggregator)
 from iotfunctions.bif import (AlertHighValue)
@@ -2256,6 +2257,131 @@ class GBMForecaster(BaseEstimatorFunction):
         outputs = []
         return (inputs, outputs)
 
+
+#
+# following Jake Vanderplas Data Science Handbook
+#   https://jakevdp.github.io/PythonDataScienceHandbook/05.13-kernel-density-estimation.html
+#
+
+class KDEAnomalyScore(BaseTransformer):
+    """
+    A supervised anomaly detection function.
+     Uses kernel density estimate to assign an anomaly score
+    """
+    def __init__(self, threshold, features, targets, predictions=None):
+        logger.debug("init KDE Estimator")
+        super().__init__()
+
+        self.threshold = threshold
+        self.features = features
+        self.targets = targets
+        self.name = "KDEAnomalyScore"
+        self.models = {}
+        if predictions is None:
+            predictions = ['predicted_%s' % x for x in self.targets]
+        self.predictions = predictions
+
+    def get_model_name(self, prefix='model', suffix=None):
+
+        name = []
+        if prefix is not None:
+            name.append(prefix)
+
+        name.extend([self._entity_type.name, self.name])
+        name.extend(self.targets)
+        if suffix is not None:
+            name.append(suffix)
+        name = '.'.join(name)
+        return name
+
+    def execute(self, df):
+
+        df_copy = df.copy()
+        db = self._entity_type.db
+
+        print('Here 1', type(df_copy))
+
+        entities = np.unique(df_copy.index.levels[0])
+        logger.debug(str(entities))
+
+        missing_cols = [x for x in self.predictions if x not in df_copy.columns]
+        for m in missing_cols:
+            df_copy[m] = None
+
+        # make sure to train a model
+        for entity in entities:
+            # check data okay
+            try:
+                print (self.features)
+                check_array(df_copy.loc[[entity]][self.features].values, allow_nd=True)
+            except Exception as e:
+                logger.error(
+                    'Found Nan or infinite value in feature columns for entity ' + str(entity) + ' error: ' + str(e))
+                continue
+
+            # per entity - copy for later inplace operations
+            model_name = self.get_model_name(suffix=entity)
+            kde_model = None
+            try:
+                kde_model = db.model_store.retrieve_model(model_name)
+                logger.info('load model %s' % str(kde_model))
+            except Exception as e:
+                logger.error('Model retrieval failed with ' + str(e))
+                pass
+
+            xy = np.hstack([df_copy.loc[[entity]][self.features].values, df_copy.loc[[entity]][self.targets].values])
+
+            # train new model
+            if kde_model is None:
+
+                # all variables should be continuous
+                kde_model = KDEMultivariate(xy, var_type= "c" * (len(self.features) + len(self.targets)))
+                logger.debug('Created KDE ' + str(kde_model))
+
+                try:
+                    db.model_store.store_model(model_name, kde_model)
+                except Exception as e:
+                    logger.error('Model store failed with ' + str(e))
+                    pass
+
+            self.models[entity] = kde_model
+
+            predictions = kde_model.pdf(xy)
+            #predictions[predictions < SmallEnergy] = SmallEnergy
+            #predictions = self.threshold / predictions
+            df_copy.loc[entity, self.predictions] = predictions
+
+        return df_copy
+
+
+    @classmethod
+    def build_ui(cls):
+        # define arguments that behave as function inputs
+        inputs = []
+        inputs.append(UISingle(name="threshold", datatype=float,
+                               description="Probability threshold for outliers. Typically set to 10e-6.", required=True))
+        inputs.append(UIMultiItem(name='features', datatype=float, required=True))
+        inputs.append(UIMultiItem(name='targets', datatype=float, required=True, output_item='predictions',
+                                  is_output_datatype_derived=True))
+        # define arguments that behave as function outputs
+        outputs = []
+        return (inputs, outputs)
+
+'''
+    def fit(self, X, y):
+        xy = np.vstack(X, y).T
+        self.kde = KDEMultivariate(xy, var_type='cc')
+        return self
+
+    def predict_proba(self, X):
+        logprobs = np.vstack([model.score_samples(X)
+                              for model in self.models_]).T
+        result = np.exp(logprobs + self.logpriors_)
+        return result / result.sum(1, keepdims=True)
+
+    def predict(self, X):
+        return self.classes_[np.argmax(self.predict_proba(X), 1)]
+'''
 
 
 #######################################################################################
