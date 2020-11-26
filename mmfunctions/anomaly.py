@@ -47,6 +47,14 @@ from iotfunctions.base import (BaseTransformer, BaseRegressor, BaseEstimatorFunc
 from iotfunctions.bif import (AlertHighValue)
 from iotfunctions.ui import (UISingle, UIMulti, UIMultiItem, UIFunctionOutSingle, UISingleItem, UIFunctionOutMulti)
 
+# VAE
+import torch
+import torch.autograd
+from torch.autograd import Variable
+import torch.nn as nn
+import torch.optim as optim
+from torch.utils.data import DataLoader, Dataset, TensorDataset
+
 
 logger = logging.getLogger(__name__)
 PACKAGE_URL = 'git+https://github.com/sedgewickmm18/mmfunctions.git'
@@ -2383,6 +2391,198 @@ class KDEAnomalyScore(BaseTransformer):
         return self.classes_[np.argmax(self.predict_proba(X), 1)]
 '''
 
+#######################################################################################
+# Variational Autoencoder
+#   to approximate probability distribution of targets with respect to features
+#######################################################################################
+# from https://www.ritchievink.com/blog/2019/09/16/variational-inference-from-scratch/
+#   usual ELBO with standard prior N(0,1), standard reparametrization
+
+class VI(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+        self.q_mu = nn.Sequential(
+            nn.Linear(1, 20),
+            nn.ReLU(),
+            nn.Linear(20, 10),
+            nn.ReLU(),
+            nn.Linear(10, 1)
+        )
+        self.q_log_var = nn.Sequential(
+            nn.Linear(1, 20),
+            nn.ReLU(),
+            nn.Linear(20, 10),
+            nn.ReLU(),
+            nn.Linear(10, 1)
+        )
+
+    # draw from N(mu, sigma)
+    def reparameterize(self, mu, log_var):
+        # std can not be negative, thats why we use log variance
+        sigma = torch.exp(0.5 * log_var) + 1e-5
+        eps = torch.randn_like(sigma)
+        return mu + sigma * eps
+
+    # sample from the one-dimensional normal distribution N(mu, exp(log_var))
+    def forward(self, x):
+        mu = self.q_mu(x)
+        log_var = self.q_log_var(x)
+        return self.reparameterize(mu, log_var), mu, log_var
+
+# helper functions
+
+def ll_gaussian(y, mu, log_var):
+    sigma = torch.exp(0.5 * log_var)
+    return -0.5 * torch.log(2 * np.pi * sigma**2) - (1 / (2 * sigma**2))* (y-mu)**2
+
+def elbo(y_pred, y, mu, log_var):
+    # likelihood of observing y given Variational mu and sigma
+    likelihood = ll_gaussian(y, mu, log_var)
+
+    # prior probability of y_pred
+    log_prior = ll_gaussian(y_pred, 0, torch.log(torch.tensor(1.)))
+
+    # variational probability of y_pred
+    log_p_q = ll_gaussian(y_pred, mu, log_var)
+
+    # by taking the mean we approximate the expectation
+    return (likelihood + log_prior - log_p_q).mean()
+
+class VIAnomalyScore(BaseTransformer):
+    """
+    A supervised anomaly detection function.
+     Uses VAE based density approximation to assign an anomaly score
+    """
+    def __init__(self, features, targets, predictions=None, pred_stddev=None):
+        logger.debug("init KDE Estimator")
+        super().__init__()
+
+        self.features = features
+        self.targets = targets
+        self.name = "VIAnomalyScore"
+        self.models = {}
+        if predictions is None:
+            predictions = ['predicted_%s' % x for x in self.targets]
+        if pred_stddev is None:
+            pred_stddev = ['pred_dev_%s' % x for x in self.targets]
+        self.predictions = predictions
+        self.pred_stddev = pred_stddev
+
+    def get_model_name(self, prefix='model', suffix=None):
+
+        name = []
+        if prefix is not None:
+            name.append(prefix)
+
+        name.extend([self._entity_type.name, self.name])
+        name.extend(self.targets)
+        if suffix is not None:
+            name.append(suffix)
+        name = '.'.join(name)
+        return name
+
+    def execute(self, df):
+
+        df_copy = df.copy()
+        db = self._entity_type.db
+
+        print('Here 1', type(df_copy))
+
+        entities = np.unique(df_copy.index.levels[0])
+        logger.debug(str(entities))
+
+        missing_cols = [x for x in (self.predictions + self.pred_stddev) if x not in df_copy.columns]
+        for m in missing_cols:
+            df_copy[m] = None
+
+        # make sure to train a model
+        for entity in entities:
+            # check data okay
+            try:
+                print (self.features)
+                check_array(df_copy.loc[[entity]][self.features].values, allow_nd=True)
+            except Exception as e:
+                logger.error(
+                    'Found Nan or infinite value in feature columns for entity ' + str(entity) + ' error: ' + str(e))
+                continue
+
+            # per entity - copy for later inplace operations
+            model_name = self.get_model_name(suffix=entity)
+            vi_model = None
+            try:
+                vi_model = db.model_store.retrieve_model(model_name)
+                logger.info('load model %s' % str(vi_model))
+            except Exception as e:
+                logger.error('Model retrieval failed with ' + str(e))
+                pass
+
+            xy = np.hstack([df_copy.loc[[entity]][self.features].values, df_copy.loc[[entity]][self.targets].values])
+
+            # TODO: assumption is cardinality of One for features and targets !!!
+            ind = np.lexsort((xy[:,1], xy[:,0]))
+            ind_r = np.argsort(ind)
+
+            X = torch.tensor(xy[ind][:,0].reshape(-1,1), dtype=torch.float)
+            Y = torch.tensor(xy[ind][:,1].reshape(-1,1), dtype=torch.float)
+
+            # train new model
+            if vi_model is None:
+
+                # all variables should be continuous
+                epochs = 1500
+                learning_rate = 0.005
+
+                vi_model = VI()
+                optim = torch.optim.Adam(vi_model.parameters(), lr=learning_rate)
+
+                for epoch in range(epochs):
+                    optim.zero_grad()
+                    y_pred, mu, log_var = vi_model(X)
+                    #loss = det_loss(y_pred, Y, mu, log_var)
+                    loss = -elbo(y_pred, Y, mu, log_var)
+                    if epoch % 10 == 0:
+                        print ('Epoch', epoch, 'Loss', loss)
+                    loss.backward()
+                    grad_norm = 0
+                    optim.step()
+
+                logger.debug('Created VAE ' + str(vi_model))
+
+                try:
+                    db.model_store.store_model(model_name, vi_model)
+                except Exception as e:
+                    logger.error('Model store failed with ' + str(e))
+                    pass
+
+            self.models[entity] = vi_model
+
+            mu = None
+            q1 = None
+            with torch.no_grad():
+                mu_and_log_sigma = vi_model(X)
+                mue = mu_and_log_sigma[1]
+                sigma = torch.exp(0.5 * mu_and_log_sigma[2]) + 1e-5
+                mu = sp.stats.norm.ppf(0.5, loc=mue, scale=sigma).reshape(-1,)
+                q1 = sp.stats.norm.ppf(0.95, loc=mue, scale=sigma).reshape(-1,)
+
+            df_copy.loc[entity, self.predictions] = mu[ind_r]
+            df_copy.loc[entity, self.pred_stddev] = q1[ind_r]
+
+        return df_copy
+
+
+    @classmethod
+    def build_ui(cls):
+        # define arguments that behave as function inputs
+        inputs = []
+        inputs.append(UIMultiItem(name='features', datatype=float, required=True,
+                                  output_item='pred_stddev', is_output_datatype_derived=True))
+        inputs.append(UIMultiItem(name='targets', datatype=float, required=True,
+                                  output_item='predictions', is_output_datatype_derived=True))
+        # define arguments that behave as function outputs
+        outputs = []
+        return (inputs, outputs)
 
 #######################################################################################
 # Crude change point detection
