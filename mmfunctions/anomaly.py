@@ -2398,8 +2398,17 @@ class KDEAnomalyScore(BaseTransformer):
 # from https://www.ritchievink.com/blog/2019/09/16/variational-inference-from-scratch/
 #   usual ELBO with standard prior N(0,1), standard reparametrization
 
+# helper function
+def ll_gaussian(y, mu, log_var):
+    sigma = torch.exp(0.5 * log_var)
+    return -0.5 * torch.log(2 * np.pi * sigma**2) - (1 / (2 * sigma**2))* (y-mu)**2
+
+
 class VI(nn.Module):
-    def __init__(self):
+    def __init__(self, prior_mu=0.0, prior_sigma=1.0, beta=1.0):
+        self.prior_mu = prior_mu
+        self.prior_sigma = prior_sigma
+        self.beta = beta
         super().__init__()
 
         self.q_mu = nn.Sequential(
@@ -2410,9 +2419,11 @@ class VI(nn.Module):
             nn.Linear(10, 1)
         )
         self.q_log_var = nn.Sequential(
-            nn.Linear(1, 20),
+            nn.Linear(1, 50),    # more parameters for sigma
             nn.ReLU(),
-            nn.Linear(20, 10),
+            nn.Linear(50, 35),
+            nn.ReLU(),
+            nn.Linear(35, 10),
             nn.ReLU(),
             nn.Linear(10, 1)
         )
@@ -2430,24 +2441,23 @@ class VI(nn.Module):
         log_var = self.q_log_var(x)
         return self.reparameterize(mu, log_var), mu, log_var
 
-# helper functions
+    def elbo(self, y_pred, y, mu, log_var):
+        # likelihood of observing y given Variational mu and sigma
+        likelihood = ll_gaussian(y, mu, log_var)
 
-def ll_gaussian(y, mu, log_var):
-    sigma = torch.exp(0.5 * log_var)
-    return -0.5 * torch.log(2 * np.pi * sigma**2) - (1 / (2 * sigma**2))* (y-mu)**2
+        # prior probability of y_pred N(0,1)
+        log_prior = ll_gaussian(y_pred, self.prior_mu, torch.log(torch.tensor(self.prior_sigma)))
 
-def elbo(y_pred, y, mu, log_var):
-    # likelihood of observing y given Variational mu and sigma
-    likelihood = ll_gaussian(y, mu, log_var)
+        # variational probability of y_pred
+        log_p_q = ll_gaussian(y_pred, mu, log_var)
 
-    # prior probability of y_pred
-    log_prior = ll_gaussian(y_pred, 0, torch.log(torch.tensor(1.)))
+        # by taking the mean we approximate the expectation
+        return (likelihood + self.beta * (log_prior - log_p_q)).mean()
 
-    # variational probability of y_pred
-    log_p_q = ll_gaussian(y_pred, mu, log_var)
+    # Minimizing negative ELBO
+    def det_loss(self, y_pred, y, mu, log_var):
+        return -elbo(y_pred, y, mu, log_var)
 
-    # by taking the mean we approximate the expectation
-    return (likelihood + log_prior - log_p_q).mean()
 
 class VIAnomalyScore(BaseTransformer):
     """
@@ -2533,16 +2543,16 @@ class VIAnomalyScore(BaseTransformer):
                 epochs = 1500
                 learning_rate = 0.005
 
-                vi_model = VI()
+                vi_model = VI()   # default, beta 1, prior N(0,1)
                 optim = torch.optim.Adam(vi_model.parameters(), lr=learning_rate)
 
                 for epoch in range(epochs):
                     optim.zero_grad()
                     y_pred, mu, log_var = vi_model(X)
                     #loss = det_loss(y_pred, Y, mu, log_var)
-                    loss = -elbo(y_pred, Y, mu, log_var)
+                    loss = -vi_model.elbo(y_pred, Y, mu, log_var)
                     if epoch % 10 == 0:
-                        print ('Epoch', epoch, 'Loss', loss)
+                        logger.debug('Epoch: ' + str(epoch) + ', Loss: ' + str(loss.item()))
                     loss.backward()
                     grad_norm = 0
                     optim.step()
