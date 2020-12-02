@@ -194,7 +194,7 @@ class AlertOnConstant(BaseEvent):
         self.expression_constant = expression_constant
         self.alert_name = alert_name
         self.expression = None
-        logger.info('AlertOnConstant  expression constant: ' + str(expression_name) + '  alert: ' + str(alert_name))
+        logger.info('AlertOnConstant  expression constant: ' + str(expression_constant) + '  alert: ' + str(alert_name))
         super().__init__()
 
     # evaluate alerts by entity
