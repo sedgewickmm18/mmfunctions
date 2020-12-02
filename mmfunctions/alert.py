@@ -209,7 +209,8 @@ class AlertOnConstant(BaseEvent):
         logger.info('AlertExpressionWithFilter  exp: ' + expr + '  input: ' + str(df.columns))
 
         try:
-            evl = ast.literal_eval(expr)
+            #evl = ast.literal_eval(expr)
+            evl = eval(expr)
             np_res = np.where(evl, 1, 0)
 
             # get time index
