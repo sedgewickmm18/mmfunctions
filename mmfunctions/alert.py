@@ -217,9 +217,6 @@ class AlertOnConstant(BaseEvent):
             # get time index
             ts_ind = df.index.get_level_values(self._entity_type._timestamp)
 
-            if self.alert_end is not None:
-                df[self.alert_end] = df.index[0]
-
             logger.info('AlertOnConstant shapes ' + str(np_res.shape) + '  results\n - ' + str(np_res))
             df[self.alert_name] = np_res
 
