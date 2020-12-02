@@ -14,6 +14,7 @@ This alert module will be integrated into bif.py every now and then
 '''
 
 import re
+import ast
 import datetime as dt
 import numpy as np
 import pandas as pd
@@ -23,7 +24,7 @@ from iotfunctions.base import (BaseEvent)
 from iotfunctions.ui import (UISingle, UIFunctionOutSingle, UISingleItem, UIExpression)
 
 logger = logging.getLogger(__name__)
-PACKAGE_URL = 'git+https://github.com/sedgewickmm18/mmfunctions.git@'
+PACKAGE_URL = 'git+https://github.com/sedgewickmm18/mmfunctions.git'
 _IS_PREINSTALLED = False
 
 
@@ -183,3 +184,92 @@ class AlertExpressionWithFilterExt(AlertExpressionWithFilter):
         outputs.append(UIFunctionOutSingle(name='alert_name', datatype=bool, description='Output of alert function'))
         outputs.append(UIFunctionOutSingle(name='alert_end', datatype=dt.datetime, description='End of pulse triggered alert'))
         return (inputs, outputs)
+
+class AlertOnConstant(BaseEvent):
+    '''
+    Create alerts that are triggered when data values the expression is True
+    '''
+
+    def __init__(self, expression_constant, alert_name, **kwargs):
+        self.expression_constant = expression_constant
+        self.alert_name = alert_name
+        self.expression = None
+        logger.info('AlertOnConstant  expression constant: ' + str(expression_name) + '  alert: ' + str(alert_name))
+        super().__init__()
+
+    # evaluate alerts by entity
+    def _calc(self, df):
+        # c = self._entity_type.get_attributes_dict()
+        df = df.copy()
+        logger.info('AlertExpressionWithFilter  exp: ' + self.expression + '  input: ' + str(df.columns))
+
+        expr = self.expression
+
+        try:
+            evl = ast.literal_eval(expr)
+            np_res = np.where(evl, 1, 0)
+
+            # get time index
+            ts_ind = df.index.get_level_values(self._entity_type._timestamp)
+
+            if self.alert_end is not None:
+                df[self.alert_end] = df.index[0]
+
+            logger.info('AlertOnConstant shapes ' + str(np_res.shape) + '  results\n - ' + str(np_res))
+            df[self.alert_name] = np_res
+
+        except Exception as e:
+            logger.info('AlertExpressionWithFilter  eval for ' + expr + ' failed with ' + str(e))
+            df[self.alert_name] = None
+            pass
+
+        return df
+
+    def execute(self, df):
+        '''
+        Load the expression constant and proceed with the superclass
+        '''
+        c = self._entity_type.get_attributes_dict()
+        try:
+            expr = c[self.expression_constant]
+            print('Expression ' , str(expr))
+        except Exception as ee:
+            print('Expression not found' , str(ee))
+
+        if '${' in expr:
+            expr = re.sub(r"\$\{(\w+)\}", r"df['\1']", expr)
+            msg = 'Expression converted to %s. ' % expr
+        else:
+            msg = 'Expression (%s). ' % expr
+
+        self.trace_append(msg)
+
+        expr = str(expr)
+        logger.info('AlertOnConstant - evaluate expression: ' + expr)
+
+        self.expression = expr
+
+        return super().execute(df)
+
+    '''
+    def get_input_items(self):
+        items = set(self.dimension_name)
+        items = items | self.get_expression_items(self.expression)
+        return items
+    '''
+
+    @classmethod
+    def build_ui(cls):
+        # define arguments that behave as function inputs
+        inputs = []
+        inputs.append(UIExpression(name='expression_constant',
+                                   description="Define alert expression to load as constant using pandas systax. \
+                                                Example: df['inlet_temperature']>50. ${pressure} will be substituted \
+                                                with df['pressure'] before evaluation, ${} with df[<dimension_name>]"))
+
+        # define arguments that behave as function outputs
+        outputs = []
+        outputs.append(UIFunctionOutSingle(name='alert_name', datatype=bool, description='Output of alert function'))
+        return (inputs, outputs)
+
+
