@@ -200,10 +200,13 @@ class AlertOnConstant(BaseEvent):
     # evaluate alerts by entity
     def _calc(self, df):
         # c = self._entity_type.get_attributes_dict()
-        df = df.copy()
-        logger.info('AlertExpressionWithFilter  exp: ' + self.expression + '  input: ' + str(df.columns))
-
         expr = self.expression
+
+        if expr is None:
+            return df
+
+        df = df.copy()
+        logger.info('AlertExpressionWithFilter  exp: ' + expr + '  input: ' + str(df.columns))
 
         try:
             evl = ast.literal_eval(expr)
@@ -230,22 +233,25 @@ class AlertOnConstant(BaseEvent):
         Load the expression constant and proceed with the superclass
         '''
         c = self._entity_type.get_attributes_dict()
+        msg = ''
         try:
             expr = c[self.expression_constant]
             print('Expression ' , str(expr))
+            if '${' in expr:
+                expr = re.sub(r"\$\{(\w+)\}", r"df['\1']", expr)
+                msg = 'Expression converted to %s. ' % expr
+            else:
+                msg = 'Expression (%s). ' % expr
+            expr = str(expr)
+            logger.info('AlertOnConstant - evaluate expression: ' + expr)
+
         except Exception as ee:
             print('Expression not found' , str(ee))
-
-        if '${' in expr:
-            expr = re.sub(r"\$\{(\w+)\}", r"df['\1']", expr)
-            msg = 'Expression converted to %s. ' % expr
-        else:
-            msg = 'Expression (%s). ' % expr
+            expr = None
+            msg = 'Expression NOT FOUND'
+            pass
 
         self.trace_append(msg)
-
-        expr = str(expr)
-        logger.info('AlertOnConstant - evaluate expression: ' + expr)
 
         self.expression = expr
 
