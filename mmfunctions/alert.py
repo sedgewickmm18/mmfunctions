@@ -210,7 +210,7 @@ class AlertOnConstant(BaseEvent):
 
         try:
             #evl = ast.literal_eval(expr)
-            print (type(df['accelx']))
+            print (type(df['accelx'].values[0]))
             evl = eval(expr)
             np_res = np.where(evl, 1, 0)
 
