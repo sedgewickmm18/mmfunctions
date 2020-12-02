@@ -235,7 +235,8 @@ class AlertOnConstant(BaseEvent):
         c = self._entity_type.get_attributes_dict()
         msg = ''
         try:
-            expr = c[self.expression_constant]
+            expr_json= c[self.expression_constant]
+            expr = expr_json['expression']
             print('Expression ' , str(expr))
             if '${' in expr:
                 expr = re.sub(r"\$\{(\w+)\}", r"df['\1']", expr)
