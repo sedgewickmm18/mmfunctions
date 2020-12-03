@@ -38,9 +38,6 @@ from sklearn.base import BaseEstimator, RegressorMixin
 from sklearn.utils import check_array
 
 #import statsmodels.api as sm
-from statsmodels.tsa.seasonal import STL
-from statsmodels.tsa.forecasting.stl import STLForecast
-from statsmodels.tsa.arima.model import ARIMA
 from statsmodels.nonparametric.kernel_density import KDEMultivariate
 
 from iotfunctions.base import (BaseTransformer, BaseRegressor, BaseEstimatorFunction, BaseSimpleAggregator)
