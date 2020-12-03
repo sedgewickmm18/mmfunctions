@@ -2449,9 +2449,9 @@ class VI(nn.Module):
         log_p_q = ll_gaussian(y_pred, mu, log_var)
 
         # by taking the mean we approximate the expectation according to the law of large numbers
-        converge = np.sqrt(torch.var(likelihood + self.beta * (log_prior - log_p_q)) / likelihood.shape[0])
-        if converge > 0.1:
-            logger.debug('Elbo: approximating expectation ' + str(converge))
+        #converge = np.sqrt(torch.var(likelihood + self.beta * (log_prior - log_p_q)) / likelihood.shape[0])
+        #if converge > 0.1:
+        #    logger.debug('Elbo: approximating expectation ' + str(converge))
         return (likelihood + self.beta * (log_prior - log_p_q)).mean()
 
     # Minimizing negative ELBO
