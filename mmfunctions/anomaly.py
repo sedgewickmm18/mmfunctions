@@ -37,7 +37,7 @@ from sklearn.preprocessing import (StandardScaler, RobustScaler, MinMaxScaler,
 from sklearn.base import BaseEstimator, RegressorMixin
 from sklearn.utils import check_array
 
-import statsmodels.api as sm
+#import statsmodels.api as sm
 from statsmodels.tsa.seasonal import STL
 from statsmodels.tsa.forecasting.stl import STLForecast
 from statsmodels.tsa.arima.model import ARIMA
