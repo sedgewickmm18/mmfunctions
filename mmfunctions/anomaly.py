@@ -2406,6 +2406,7 @@ class VI(nn.Module):
         self.prior_mu = prior_mu
         self.prior_sigma = prior_sigma
         self.beta = beta
+        self.onnx_session = None
         super().__init__()
 
         self.q_mu = nn.Sequential(
@@ -2471,13 +2472,23 @@ class VIAnomalyScore(BaseTransformer):
         self.features = features
         self.targets = targets
         self.name = "VIAnomalyScore"
+
         self.models = {}
+        self.Input = {}
+        self.Output = {}
+        self.mu = {}
+        self.quantile095 = {}
+
         if predictions is None:
             predictions = ['predicted_%s' % x for x in self.targets]
         if pred_stddev is None:
             pred_stddev = ['pred_dev_%s' % x for x in self.targets]
         self.predictions = predictions
         self.pred_stddev = pred_stddev
+
+        self.prior_mu = 0.0
+        self.prior_sigma = 1.0
+        self.beta = 1.0
 
     def get_model_name(self, prefix='model', suffix=None):
 
@@ -2533,6 +2544,8 @@ class VIAnomalyScore(BaseTransformer):
             ind = np.lexsort((xy[:,1], xy[:,0]))
             ind_r = np.argsort(ind)
 
+            self.Input[entity] = xy[ind][:,0]
+
             X = torch.tensor(xy[ind][:,0].reshape(-1,1), dtype=torch.float)
             Y = torch.tensor(xy[ind][:,1].reshape(-1,1), dtype=torch.float)
 
@@ -2543,7 +2556,8 @@ class VIAnomalyScore(BaseTransformer):
                 epochs = 1500
                 learning_rate = 0.005
 
-                vi_model = VI()   # default, beta 1, prior N(0,1)
+                vi_model = VI(self.prior_mu, self.prior_sigma, self.beta)   # default: beta 1, prior N(0,1)
+
                 optim = torch.optim.Adam(vi_model.parameters(), lr=learning_rate)
 
                 for epoch in range(epochs):
@@ -2575,6 +2589,8 @@ class VIAnomalyScore(BaseTransformer):
                 sigma = torch.exp(0.5 * mu_and_log_sigma[2]) + 1e-5
                 mu = sp.stats.norm.ppf(0.5, loc=mue, scale=sigma).reshape(-1,)
                 q1 = sp.stats.norm.ppf(0.95, loc=mue, scale=sigma).reshape(-1,)
+                self.mu[entity] = mu
+                self.quantile095[entity] = q1
 
             df_copy.loc[entity, self.predictions] = mu[ind_r]
             df_copy.loc[entity, self.pred_stddev] = q1[ind_r]
