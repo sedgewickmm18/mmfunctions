@@ -12,6 +12,7 @@
 The Built In Functions module contains preinstalled functions
 """
 
+import itertools as it
 import datetime as dt
 import logging
 
@@ -25,7 +26,7 @@ from pyod.models.cblof import CBLOF
 from scipy import signal, fftpack
 #   for KMeans
 #  import skimage as ski
-from skimage import util as skiutil  # for nifty windowing
+#from skimage import util as skiutil  # for nifty windowing
 from sklearn import ensemble
 from sklearn import linear_model
 from sklearn import metrics
@@ -34,7 +35,6 @@ from sklearn.covariance import MinCovDet
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import (StandardScaler, RobustScaler, MinMaxScaler,
                                    minmax_scale, PowerTransformer)
-from sklearn.base import BaseEstimator, RegressorMixin
 from sklearn.utils import check_array
 
 #import statsmodels.api as sm
@@ -69,6 +69,19 @@ Spectral_normalizer = 100 / 2.8
 FFT_normalizer = 1
 Saliency_normalizer = 1
 Generalized_normalizer = 1 / 300
+
+
+# from
+# https://stackoverflow.com/questions/44790072/sliding-window-on-time-series-data
+def view_as_windows(temperature, length, step):
+    print(temperature.shape, length, step)
+
+    def moving_window(x, length, step):
+        streams = it.tee(x, length)
+        return zip(*[it.islice(stream, i, None, step) for stream, i in zip(streams, it.count(step=1))])
+
+    x_=list(moving_window(temperature, length, step))
+    return np.asarray(x_)
 
 
 def custom_resampler(array_like):
@@ -890,7 +903,8 @@ class KMeansAnomalyScore(BaseTransformer):
                 logger.debug(str(temperature.size) + ',' + str(self.windowsize))
 
                 # Chop into overlapping windows
-                slices = skiutil.view_as_windows(temperature, window_shape=(self.windowsize,), step=self.step)
+                #slices = skiutil.view_as_windows(temperature, window_shape=(self.windowsize,), step=self.step)
+                slices = view_as_windows(temperature, self.windowsize, self.step)
 
                 if self.windowsize > 1:
                     n_cluster = 40
@@ -1005,7 +1019,9 @@ class GeneralizedAnomalyScore(BaseTransformer):
 
         logger.debug(self.whoami + ': feature extract')
 
-        slices = skiutil.view_as_windows(temperature, window_shape=(self.windowsize,), step=self.step)
+        #slices = skiutil.view_as_windows(temperature, window_shape=(self.windowsize,), step=self.step)
+        slices = view_as_windows(temperature, self.windowsize, self.step)
+
         return slices
 
     def execute(self, df):
@@ -1212,7 +1228,9 @@ class FFTbasedGeneralizedAnomalyScore(GeneralizedAnomalyScore):
     def feature_extract(self, temperature):
         logger.debug(self.whoami + ': feature extract')
 
-        slices_ = skiutil.view_as_windows(temperature, window_shape=(self.windowsize,), step=self.step)
+        #slices_ = skiutil.view_as_windows(temperature, window_shape=(self.windowsize,), step=self.step)
+        slices_ = view_as_windows(temperature, self.windowsize, self.step)
+
         slicelist = []
         for slice in slices_:
             slicelist.append(fftpack.rfft(slice))
@@ -1267,7 +1285,9 @@ class FFTbasedGeneralizedAnomalyScore2(GeneralizedAnomalyScore):
     def feature_extract(self, temperature):
         logger.debug(self.whoami + ': feature extract')
 
-        slices_ = skiutil.view_as_windows(temperature, window_shape=(self.windowsize,), step=self.step)
+        #slices_ = skiutil.view_as_windows(temperature, window_shape=(self.windowsize,), step=self.step)
+        slices_ = view_as_windows(temperature, self.windowsize, self.step)
+
         slicelist = []
         for slice in slices_:
             slicelist.append(fftpack.rfft(slice))
@@ -1325,7 +1345,9 @@ class SaliencybasedGeneralizedAnomalyScore(GeneralizedAnomalyScore):
 
         temperature_saliency = self.saliency.transform_spectral_residual(temperature)
 
-        slices = skiutil.view_as_windows(temperature_saliency, window_shape=(self.windowsize,), step=self.step)
+        #slices = skiutil.view_as_windows(temperature_saliency, window_shape=(self.windowsize,), step=self.step)
+        slices = view_as_windows(temperature, self.windowsize, self.step)
+
         return slices
 
     def execute(self, df):
@@ -1421,7 +1443,8 @@ class KMeansAnomalyScoreV2(Standard_Scaler):
             logger.debug(str(temperature.size) + ',' + str(self.windowsize))
 
             # Chop into overlapping windows
-            slices = skiutil.view_as_windows(temperature, window_shape=(self.windowsize,), step=self.step)
+            #slices = skiutil.view_as_windows(temperature, window_shape=(self.windowsize,), step=self.step)
+            slices = view_as_windows(temperature, self.windowsize, self.step)
 
             if self.windowsize > 1:
                 n_cluster = 40
@@ -1522,7 +1545,9 @@ class GeneralizedAnomalyScoreV2(Standard_Scaler):
 
         logger.debug(self.whoami + ': feature extract')
 
-        slices = skiutil.view_as_windows(temperature, window_shape=(self.windowsize,), step=self.step)
+        #slices = skiutil.view_as_windows(temperature, window_shape=(self.windowsize,), step=self.step)
+        slices = view_as_windows(temperature, self.windowsize, self.step)
+
         return slices
 
     def kexecute(self, entity, df_copy):
@@ -1652,7 +1677,9 @@ class FFTbasedGeneralizedAnomalyScoreV2(GeneralizedAnomalyScoreV2):
     def feature_extract(self, temperature):
         logger.debug(self.whoami + ': feature extract')
 
-        slices_ = skiutil.view_as_windows(temperature, window_shape=(self.windowsize,), step=self.step)
+        #slices_ = skiutil.view_as_windows(temperature, window_shape=(self.windowsize,), step=self.step)
+        slices_ = view_as_windows(temperature, self.windowsize, self.step)
+
         slicelist = []
         for slice in slices_:
             slicelist.append(fftpack.rfft(slice))
@@ -1703,7 +1730,9 @@ class SaliencybasedGeneralizedAnomalyScoreV2(GeneralizedAnomalyScoreV2):
 
         temperature_saliency = self.saliency.transform_spectral_residual(temperature)
 
-        slices = skiutil.view_as_windows(temperature_saliency, window_shape=(self.windowsize,), step=self.step)
+        #slices = skiutil.view_as_windows(temperature_saliency, window_shape=(self.windowsize,), step=self.step)
+        slices = view_as_windows(temperature, self.windowsize, self.step)
+
         return slices
 
     def execute(self, df):
