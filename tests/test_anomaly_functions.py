@@ -3,7 +3,7 @@ import pandas as pd
 from sklearn.metrics import r2_score
 from sqlalchemy import Column, Float
 from mmfunctions.anomaly import SaliencybasedGeneralizedAnomalyScore, SpectralAnomalyScore, \
-                                 FFTbasedGeneralizedAnomalyScore, KMeansAnomalyScore
+                                FFTbasedGeneralizedAnomalyScore, KMeansAnomalyScore, MatrixProfileAnomalyScore
 from nose.tools import assert_true
 
 # constants
@@ -13,6 +13,7 @@ fft = 'TemperatureFFTScore'
 spectral = 'TemperatureSpectralScore'
 sal = 'SaliencyAnomalyScore'
 gen = 'TemperatureGeneralizedScore'
+mat = 'MatrixProfileAnomalyScore'
 
 
 def test_anomaly_scores():
@@ -57,12 +58,18 @@ def test_anomaly_scores():
     kmi = KMeansAnomalyScore(Temperature, 12, kmeans)
     et = kmi._build_entity_type(columns=[Column(Temperature, Float())])
     kmi._entity_type = et
-    df_comp = kmi.execute(df=df_i)
+    df_i = kmi.execute(df=df_i)
+
+    print('Compute MatrixProfile Anomaly Score')
+    mmi = MatrixProfileAnomalyScore(Temperature, 12, mat)
+    et = mmi._build_entity_type(columns=[Column(Temperature, Float())])
+    mmi._entity_type = et
+    df_comp = mmi.execute(df=df_i)
 
     print("Executed Anomaly functions")
 
     # generate comparison data
-    #df_comp.to_csv('AzureAnomalysampleOutput.csv')
+    #df_comp.to_csv('./samples/AzureAnomalysampleOutput.csv')
 
     df_o = pd.read_csv('./samples/AzureAnomalysampleOutput.csv')
 
@@ -73,7 +80,8 @@ def test_anomaly_scores():
     comp2 = {spectral: r2_score(df_o[spectral].values, df_comp[spectral].values),
              fft: r2_score(df_o[fft].values, df_comp[fft].values),
              sal: r2_score(df_o[sal].values, df_comp[sal].values),
-             kmeans: r2_score(df_o[kmeans].values, df_comp[kmeans].values)}
+             kmeans: r2_score(df_o[kmeans].values, df_comp[kmeans].values),
+             mat: r2_score(df_o[mat].values, df_comp[mat].values)}
 
     print(comp2)
 
@@ -81,6 +89,7 @@ def test_anomaly_scores():
     assert_true(comp2[fft] > 0.9)
     assert_true(comp2[sal] > 0.9)
     assert_true(comp2[kmeans] > 0.9)
+    assert_true(comp2[mat] > 0.9)
 
     df_agg = df_i.copy()
 
@@ -113,12 +122,19 @@ def test_anomaly_scores():
     ffti._entity_type = et
     df_agg = ffti.execute(df=df_agg)
 
+    print('Compute MatrixProfile Anomaly Score')
+    mmi = MatrixProfileAnomalyScore(Temperature, 12, mat)
+    et = mmi._build_entity_type(columns=[Column(Temperature, Float())])
+    mmi._entity_type = et
+    df_agg = mmi.execute(df=df_agg)
+
     print(df_agg.describe())
 
     comp3 = {spectral: r2_score(df_o[spectral].values, df_agg[spectral].values),
              fft: r2_score(df_o[fft].values, df_agg[fft].values),
              sal: r2_score(df_o[sal].values, df_agg[sal].values),
-             kmeans: r2_score(df_o[kmeans].values, df_agg[kmeans].values)}
+             kmeans: r2_score(df_o[kmeans].values, df_agg[kmeans].values),
+             mat: r2_score(df_o[mat].values, df_agg[mat].values)}
 
     print(comp3)
 

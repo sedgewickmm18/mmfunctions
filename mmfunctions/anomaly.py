@@ -1275,7 +1275,7 @@ class MatrixProfileAnomalyScore(BaseTransformer):
     INIT_SCORES = 1e-20
     ERROR_SCORES = 1e-16
 
-    def __init__(self, input_item, output_item, window_size):
+    def __init__(self, input_item, window_size, output_item):
         super().__init__()
         logger.debug(f'Input item: {input_item}')
         self.input_item = input_item
