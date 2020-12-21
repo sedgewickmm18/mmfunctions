@@ -35,7 +35,7 @@ from sklearn.preprocessing import (StandardScaler, RobustScaler, MinMaxScaler,
                                    minmax_scale, PowerTransformer)
 from sklearn.utils import check_array
 # for Matrix Profile
-import stumpy
+# import stumpy
 
 #import statsmodels.api as sm
 from statsmodels.nonparametric.kernel_density import KDEMultivariate
@@ -1262,7 +1262,7 @@ class FFTbasedGeneralizedAnomalyScore(GeneralizedAnomalyScore):
                                            description="Anomaly score (FFTbasedGeneralizedAnomalyScore)", ))
         return (inputs, outputs)
 
-
+'''
 class MatrixProfileAnomalyScore(BaseTransformer):
     """
     An unsupervised anomaly detection function.
@@ -1365,6 +1365,7 @@ class MatrixProfileAnomalyScore(BaseTransformer):
         outputs = [UIFunctionOutSingle(name="output_item", datatype=float,
                                        description="Anomaly score (MatrixProfileAnomalyScore)", )]
         return inputs, outputs
+'''
 
 
 #####
