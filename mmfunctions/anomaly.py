@@ -25,17 +25,17 @@ from pyod.models.cblof import CBLOF
 #  for Spectral Analysis
 from scipy import signal, fftpack
 #   for KMeans
-#  import skimage as ski
 #from skimage import util as skiutil  # for nifty windowing
 from sklearn import ensemble
 from sklearn import linear_model
 from sklearn import metrics
-
 from sklearn.covariance import MinCovDet
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import (StandardScaler, RobustScaler, MinMaxScaler,
                                    minmax_scale, PowerTransformer)
 from sklearn.utils import check_array
+# for Matrix Profile
+import stumpy
 
 #import statsmodels.api as sm
 from statsmodels.nonparametric.kernel_density import KDEMultivariate
@@ -74,14 +74,18 @@ Generalized_normalizer = 1 / 300
 # from
 # https://stackoverflow.com/questions/44790072/sliding-window-on-time-series-data
 def view_as_windows(temperature, length, step):
-    print(temperature.shape, length, step)
+    logger.info('VIEW ' + str(temperature.shape) + ' ' + str(length) + ' ' + str(step))
 
-    def moving_window(x, length, step):
+    def moving_window(x, length, _step=1):
+        if type(step) != 'int' or _step < 1:
+            logger.info('MOVE ' + str(_step))
+            _step = 1
         streams = it.tee(x, length)
-        return zip(*[it.islice(stream, i, None, step) for stream, i in zip(streams, it.count(step=1))])
+        return zip(*[it.islice(stream, i, None, _step) for stream, i in zip(streams, it.count(step=1))])
 
     x_=list(moving_window(temperature, length, step))
     return np.asarray(x_)
+
 
 
 def custom_resampler(array_like):
@@ -119,7 +123,6 @@ def min_delta(df):
 
 
 def set_window_size_and_overlap(windowsize, trim_value=2 * DefaultWindowSize):
-
     # make sure it exists
     if windowsize is None:
         windowsize = DefaultWindowSize
@@ -817,7 +820,7 @@ class KMeansAnomalyScore(BaseTransformer):
      Applies a k-means analysis clustering technique to time series data.
      Moves a sliding window across the data signal and applies the anomaly model to each window.
      The window size is typically set to 12 data points.
-     Try several anomaly models on your data and use the one that fits your databest.
+     Try several anomaly models on your data and use the one that fits your data best.
     """
 
     def __init__(self, input_item, windowsize, output_item, expr=None):
@@ -1214,7 +1217,7 @@ class FFTbasedGeneralizedAnomalyScore(GeneralizedAnomalyScore):
      Applies the GeneralizedAnomalyScore to the features to detect outliers.
      Moves a sliding window across the data signal and applies the anomaly models to each window.
      The window size is typically set to 12 data points.
-     Try several anomaly detectors on your data and use the one that best fits your data.
+     Try several anomaly detectors on your data and use the one that fits your data best.
     """
 
     def __init__(self, input_item, windowsize, output_item):
@@ -1260,6 +1263,110 @@ class FFTbasedGeneralizedAnomalyScore(GeneralizedAnomalyScore):
         return (inputs, outputs)
 
 
+class MatrixProfileAnomalyScore(BaseTransformer):
+    """
+    An unsupervised anomaly detection function.
+     Applies matrix profile analysis on time series data.
+     Moves a sliding window across the data signal to calculate the euclidean distance from one window to all others to build a distance profile.
+     The window size is typically set to 12 data points.
+     Try several anomaly models on your data and use the one that fits your data best.
+    """
+    DATAPOINTS_AFTER_LAST_WINDOW = 1e-15
+    INIT_SCORES = 1e-20
+    ERROR_SCORES = 1e-16
+
+    def __init__(self, input_item, output_item, window_size):
+        super().__init__()
+        logger.debug(f'Input item: {input_item}')
+        self.input_item = input_item
+        self.window_size = window_size
+        self.output_item = output_item
+        self.whoami = 'MatrixProfile'
+
+    def prepare_data(self, df_entity):
+
+        logger.debug(self.whoami + ': prepare Data')
+
+        # operate on simple timestamp index
+        if len(df_entity.index.names) > 1:
+            index_names = df_entity.index.names
+            dfe = df_entity.reset_index().set_index(index_names[0])
+        else:
+            index_names = None
+            dfe = df_entity
+
+        # interpolate gaps - data imputation
+        try:
+            dfe = dfe.interpolate(method="time")
+        except Exception as e:
+            logger.error('Prepare data error: ' + str(e))
+
+        # one dimensional time series
+        analysis_input = dfe[[self.input_item]].fillna(0).to_numpy(dtype=np.float64).reshape(-1, )
+
+        return dfe, analysis_input
+
+    def execute(self, df):
+        df_copy = df.copy()
+        entities = np.unique(df_copy.index.levels[0])
+        logger.debug(f'Entities: {str(entities)}')
+        df_copy[self.output_item] = self.INIT_SCORES
+
+        # check data type
+        if df_copy[self.input_item].dtype != np.float64:
+            return df_copy
+
+        for entity in entities:
+            # per entity - copy for later inplace operations
+            dfe = df_copy.loc[[entity]].dropna(how='all')
+            dfe_orig = df_copy.loc[[entity]].copy()
+            logger.debug(f' Original df shape: {df_copy.shape} Entity df shape: {dfe.shape}')
+
+            # get rid of entity_id part of the index
+            # do it inplace as we copied the data before
+            dfe.reset_index(level=[0], inplace=True)
+            dfe.sort_index(inplace=True)
+            dfe_orig.reset_index(level=[0], inplace=True)
+            dfe_orig.sort_index(inplace=True)
+
+            # minimal time delta for merging
+            mindelta, dfe_orig = min_delta(dfe_orig)
+
+            if dfe.size >= self.window_size:
+                # interpolate gaps - data imputation by default
+                dfe, matrix_profile_input = self.prepare_data(dfe)
+                try:  # calculate scores
+                    matrix_profile = stumpy.aamp(matrix_profile_input, m=self.window_size)[:, 0]
+                    # fill in a small value for newer data points outside the last possible window
+                    fillers = np.array([self.DATAPOINTS_AFTER_LAST_WINDOW] * (self.window_size - 1))
+                    matrix_profile = np.append(matrix_profile, fillers)
+                except Exception as er:
+                    logger.warning(f' Error in calculating Matrix Profile Scores. {er}')
+                    matrix_profile = np.array([self.ERROR_SCORES] * dfe.shape[0])
+            else:
+                logger.warning(f' Not enough data to calculate Matrix Profile for entity. {entity}')
+                matrix_profile = np.array([self.ERROR_SCORES] * dfe.shape[0])
+
+            anomaly_score = merge_score(dfe, dfe_orig, self.output_item, matrix_profile, mindelta)
+
+            idx = pd.IndexSlice
+            df_copy.loc[idx[entity, :], self.output_item] = anomaly_score
+
+        return df_copy
+
+    @classmethod
+    def build_ui(cls):
+        # define arguments that behave as function inputs
+        inputs = [UISingleItem(name="input_item", datatype=float, description="Time series data item to analyze", ),
+                  UISingle(name="window_size", datatype=int,
+                           description="Size of each sliding window in data points. Typically set to 12.")]
+
+        # define arguments that behave as function outputs
+        outputs = [UIFunctionOutSingle(name="output_item", datatype=float,
+                                       description="Anomaly score (MatrixProfileAnomalyScore)", )]
+        return inputs, outputs
+
+
 #####
 #  experimental function with dampening factor
 ####
@@ -1270,7 +1377,7 @@ class FFTbasedGeneralizedAnomalyScore2(GeneralizedAnomalyScore):
      Applies the GeneralizedAnomalyScore to the features to detect outliers.
      Moves a sliding window across the data signal and applies the anomaly models to each window.
      The window size is typically set to 12 data points.
-     Try several anomaly detectors on your data and use the one that best fits your data.
+     Try several anomaly detectors on your data and use the one that fits your data best.
     """
 
     def __init__(self, input_item, windowsize, dampening, output_item):
@@ -1328,7 +1435,7 @@ class SaliencybasedGeneralizedAnomalyScore(GeneralizedAnomalyScore):
      It applies GeneralizedAnomalyScore to the reconstructed signal.
      The function moves a sliding window across the data signal and applies its analysis to each window.
      The window size is typically set to 12 data points.
-     Try several anomaly detectors on your data and use the one that fits your data.
+     Try several anomaly detectors on your data and use the one that fits your data best.
     """
 
     def __init__(self, input_item, windowsize, output_item):
@@ -1383,7 +1490,7 @@ class KMeansAnomalyScoreV2(Standard_Scaler):
      Moves a sliding window across the data signal and applies the anomaly model to each window.
      The window size is typically set to 12 data points.
      The normalize switch allows to learn and apply a standard scaler prior to computing the anomaly score.
-     Try several anomaly models on your data and use the one that fits your databest.
+     Try several anomaly models on your data and use the one that fits your data best.
     """
     eval_metric = staticmethod(metrics.r2_score)
 
@@ -1663,7 +1770,7 @@ class FFTbasedGeneralizedAnomalyScoreV2(GeneralizedAnomalyScoreV2):
      Moves a sliding window across the data signal and applies the anomaly models to each window.
      The window size is typically set to 12 data points.
      The normalize switch allows to learn and apply a standard scaler prior to computing the anomaly score.
-     Try several anomaly detectors on your data and use the one that best fits your data.
+     Try several anomaly detectors on your data and use the one that fits your data best.
     """
 
     def __init__(self, input_item, windowsize, normalize, output_item):
@@ -1713,7 +1820,7 @@ class SaliencybasedGeneralizedAnomalyScoreV2(GeneralizedAnomalyScoreV2):
      The function moves a sliding window across the data signal and applies its analysis to each window.
      The window size is typically set to 12 data points.
      The normalize switch allows to learn and apply a standard scaler prior to computing the anomaly score.
-     Try several anomaly detectors on your data and use the one that fits your data.
+     Try several anomaly detectors on your data and use the one that fits your data best.
     """
 
     def __init__(self, input_item, windowsize, normalize, output_item):
@@ -2042,7 +2149,7 @@ class SimpleAnomaly(BaseRegressor):
         return (inputs, outputs)
 
 #######################################################################################
-# Feature builder
+# Forecasting
 #######################################################################################
 
 class FeatureBuilder(BaseTransformer):
