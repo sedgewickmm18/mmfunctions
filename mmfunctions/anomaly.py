@@ -2606,6 +2606,9 @@ class VIAnomalyScore(BaseTransformer):
         logger.debug("init KDE Estimator")
         super().__init__()
 
+        self.epochs = 1500
+        self.learning_rate = 0.005
+
         self.features = features
         self.targets = targets
         self.name = "VIAnomalyScore"
@@ -2690,14 +2693,14 @@ class VIAnomalyScore(BaseTransformer):
             if vi_model is None:
 
                 # all variables should be continuous
-                epochs = 1500
-                learning_rate = 0.005
+                #epochs = 1500
+                #learning_rate = 0.005
 
                 vi_model = VI(self.prior_mu, self.prior_sigma, self.beta)   # default: beta 1, prior N(0,1)
 
-                optim = torch.optim.Adam(vi_model.parameters(), lr=learning_rate)
+                optim = torch.optim.Adam(vi_model.parameters(), lr=self.learning_rate)
 
-                for epoch in range(epochs):
+                for epoch in range(self.epochs):
                     optim.zero_grad()
                     y_pred, mu, log_var = vi_model(X)
                     #loss = det_loss(y_pred, Y, mu, log_var)
