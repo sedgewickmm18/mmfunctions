@@ -88,7 +88,8 @@ class UnrollData(BaseTransformer):
         try:
             if 'pem' in auth_token:
                 base64_message = base64.b64decode(auth_token['pem'])
-                f = open("cafile.pem", "wb")
+                #f = open("cafile.pem", "wb")
+                f = open("----cafile.pem", "wb")
                 f.write(base64_message)
                 f.close()
         except Exception:
