@@ -124,7 +124,7 @@ class UnrollData(BaseTransformer):
             None15 = [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]
 
             try:
-                vibx = ast.literal_eval(row['rms_x'])
+                vibx = float(ast.literal_eval(row['rms_x']))
             except Exception as e1:
                 vibx = None15
                 print (' eval of ' + str(row['rms_x']) + ' failed with ' + str(e1))
@@ -132,7 +132,7 @@ class UnrollData(BaseTransformer):
                 pass
 
             try:
-                viby = ast.literal_eval(row['rms_y'])
+                viby = float(ast.literal_eval(row['rms_y']))
             except Exception as e2:
                 viby = None15
                 print (' eval of ' + str(row['rms_y']) + ' failed with ' + str(e2))
@@ -140,7 +140,7 @@ class UnrollData(BaseTransformer):
                 pass
 
             try:
-                vibz = ast.literal_eval(row['rms_z'])
+                vibz = float(ast.literal_eval(row['rms_z']))
             except Exception as e3:
                 vibz = None15
                 print (' eval of ' + str(row['rms_z']) + ' failed with ' + str(e3))
@@ -149,7 +149,7 @@ class UnrollData(BaseTransformer):
 
             # columns with 5 elements
             try:
-                speed = ast.literal_eval(row['accel_speed'])
+                speed = float(ast.literal_eval(row['accel_speed']))
             except Exception as e4:
                 speed = None5
                 print (' eval of ' + str(row['accel_speed']) + ' failed with ' + str(e4))
@@ -157,7 +157,7 @@ class UnrollData(BaseTransformer):
                 pass
 
             try:
-                power = ast.literal_eval(row['accel_power'])
+                power = float(ast.literal_eval(row['accel_power']))
             except Exception as e5:
                 power = None5
                 print (' eval of ' + str(row['accel_power']) + ' failed with ' + str(e5))
