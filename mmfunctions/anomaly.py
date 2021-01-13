@@ -452,15 +452,19 @@ class Standard_Scaler(BaseEstimatorFunction):
             df_copy[m] = None
 
         for entity in entities:
+
+            normalize_entity = self.normalize
+
             try:
                 check_array(df_copy.loc[[entity]][self.features].values, allow_nd=True)
             except Exception as e:
+                normalize_entity = False
                 logger.error(
                     'Found Nan or infinite value in feature columns for entity ' + str(entity) + ' error: ' + str(e))
-                continue
+                pass
 
             # support for optional scaling in subclasses
-            if self.normalize:
+            if normalize_entity:
                 dfe = super()._execute(df_copy.loc[[entity]], entity)
                 df_copy.loc[entity, self.predictions] = dfe[self.predictions]
 
@@ -1262,7 +1266,7 @@ class FFTbasedGeneralizedAnomalyScore(GeneralizedAnomalyScore):
                                            description="Anomaly score (FFTbasedGeneralizedAnomalyScore)", ))
         return (inputs, outputs)
 
-'''
+
 class MatrixProfileAnomalyScore(BaseTransformer):
     """
     An unsupervised anomaly detection function.
@@ -1365,7 +1369,6 @@ class MatrixProfileAnomalyScore(BaseTransformer):
         outputs = [UIFunctionOutSingle(name="output_item", datatype=float,
                                        description="Anomaly score (MatrixProfileAnomalyScore)", )]
         return inputs, outputs
-'''
 
 
 #####
