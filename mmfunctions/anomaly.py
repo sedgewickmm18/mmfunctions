@@ -467,8 +467,11 @@ class Standard_Scaler(BaseEstimatorFunction):
             if normalize_entity:
                 dfe = super()._execute(df_copy.loc[[entity]], entity)
                 df_copy.loc[entity, self.predictions] = dfe[self.predictions]
+            else:
+                self.prediction = self.features[0]
 
             df_copy = self.kexecute(entity, df_copy)
+            self.prediction = self.predictions[0]
 
         return df_copy
 
