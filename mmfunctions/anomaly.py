@@ -473,6 +473,8 @@ class Standard_Scaler(BaseEstimatorFunction):
             df_copy = self.kexecute(entity, df_copy)
             self.prediction = self.predictions[0]
 
+        logger.info('Standard_Scaler: Found columns ' + str(df_copy.columns))
+
         return df_copy
 
     @classmethod
