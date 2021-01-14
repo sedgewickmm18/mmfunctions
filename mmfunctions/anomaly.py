@@ -451,10 +451,6 @@ class Standard_Scaler(BaseEstimatorFunction):
         for m in missing_cols:
             df_copy[m] = None
 
-        missing_cols = [x for x in self.targets if x not in df_copy.targets]
-        for m in missing_cols:
-            df_copy[m] = None
-
         for entity in entities:
 
             normalize_entity = self.normalize
