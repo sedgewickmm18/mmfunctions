@@ -451,7 +451,7 @@ class Standard_Scaler(BaseEstimatorFunction):
         for m in missing_cols:
             df_copy[m] = None
 
-        missing_cols = [x for x in self.features if x not in df_copy.columns]
+        missing_cols = [x for x in self.targets if x not in df_copy.targets]
         for m in missing_cols:
             df_copy[m] = None
 
@@ -1601,7 +1601,7 @@ class KMeansAnomalyScoreV2(Standard_Scaler):
             idx = pd.IndexSlice
             df_copy.loc[idx[entity, :], self.output_item] = z_score_ii
 
-            return df_copy
+        return df_copy
 
     @classmethod
     def build_ui(cls):
