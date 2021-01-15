@@ -15,10 +15,9 @@ The Built In Functions module contains preinstalled functions
 import itertools as it
 import datetime as dt
 import logging
-import matplotlib.pyplot as plt
 
 # for gradient boosting
-import lightgbm
+#import lightgbm
 import numpy as np
 import pandas as pd
 import scipy as sp
@@ -1958,7 +1957,7 @@ class BayesRidgeRegressor(BaseEstimatorFunction):
         outputs = []
         return (inputs, outputs)
 
-
+'''
 class GBMRegressor(BaseEstimatorFunction):
     """
     Regressor based on gradient boosting method as provided by lightGBM
@@ -2038,6 +2037,7 @@ class GBMRegressor(BaseEstimatorFunction):
         # define arguments that behave as function outputs
         outputs = []
         return (inputs, outputs)
+'''
 
 
 class SimpleRegressor(BaseEstimatorFunction):
@@ -2225,7 +2225,7 @@ class FeatureBuilder(BaseTransformer):
         outputs = []
         return (inputs, outputs)
 
-
+'''
 class GBMForecaster(BaseEstimatorFunction):
     """
     Forecasting regressor based on gradient boosting method as provided by lightGBM
@@ -2407,7 +2407,7 @@ class GBMForecaster(BaseEstimatorFunction):
         # define arguments that behave as function outputs
         outputs = []
         return (inputs, outputs)
-
+'''
 
 #
 # following Jake Vanderplas Data Science Handbook
