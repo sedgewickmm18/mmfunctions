@@ -36,6 +36,7 @@ from sklearn.preprocessing import (StandardScaler, RobustScaler, MinMaxScaler,
 from sklearn.utils import check_array
 # for Matrix Profile
 import stumpy
+import matplotlib.pyplot as plt
 
 #import statsmodels.api as sm
 from statsmodels.nonparametric.kernel_density import KDEMultivariate
