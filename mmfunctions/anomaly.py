@@ -15,6 +15,7 @@ The Built In Functions module contains preinstalled functions
 import itertools as it
 import datetime as dt
 import logging
+import matplotlib.pyplot as plt
 
 # for gradient boosting
 import lightgbm
@@ -36,7 +37,6 @@ from sklearn.preprocessing import (StandardScaler, RobustScaler, MinMaxScaler,
 from sklearn.utils import check_array
 # for Matrix Profile
 import stumpy
-import matplotlib.pyplot as plt
 
 #import statsmodels.api as sm
 from statsmodels.nonparametric.kernel_density import KDEMultivariate
