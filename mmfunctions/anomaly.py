@@ -1876,6 +1876,11 @@ class SaliencybasedGeneralizedAnomalyScoreV2(GeneralizedAnomalyScoreV2):
         return (inputs, outputs)
 
 
+KMeansAnomalyScorev2 = KMeansAnomalyScoreV2
+FFTbasedGeneralizedAnomalyScorev2 = FFTbasedGeneralizedAnomalyScoreV2
+SaliencybasedGeneralizedAnomalyScorev2 = SaliencybasedGeneralizedAnomalyScoreV2
+GeneralizedAnomalyScorev2 = GeneralizedAnomalyScoreV2
+
 #######################################################################################
 # Regressors
 #######################################################################################
