@@ -1838,6 +1838,8 @@ class SaliencybasedGeneralizedAnomalyScoreV2(GeneralizedAnomalyScoreV2):
         super().__init__(input_item, windowsize, normalize, output_item)
 
         self.whoami = 'SaliencyV2'
+        if windowsize is None:
+            windowsize = 12
         self.saliency = Saliency(windowsize, 0, 0)
         self.normalizer = Saliency_normalizer
 
