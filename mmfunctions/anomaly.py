@@ -185,6 +185,7 @@ def series_filter(values, kernel_size=3):
     :return: The list of filtered average
     """
     filter_values = np.cumsum(values, dtype=float)
+    logger.info('SERIES_FILTER: ' + str(values.shape) + ',' + str(filter_values.shape))
 
     filter_values[kernel_size:] = filter_values[kernel_size:] - filter_values[:-kernel_size]
     filter_values[kernel_size:] = filter_values[kernel_size:] / kernel_size
@@ -1763,7 +1764,7 @@ class GeneralizedAnomalyScoreV2(Standard_Scaler):
         inputs.append(UISingle(name="windowsize", datatype=int,
                                description="Size of each sliding window in data points. Typically set to 12."))
 
-        inputs.append(UISingle(name='normalize', datatype=bool, description='Flag for normalizing data.'))
+        # inputs.append(UISingle(name='normalize', datatype=bool, description='Flag for normalizing data.'))
 
         # define arguments that behave as function outputs
         outputs = []
