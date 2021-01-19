@@ -185,7 +185,7 @@ def series_filter(values, kernel_size=3):
     :return: The list of filtered average
     """
     filter_values = np.cumsum(values, dtype=float)
-    logger.info('SERIES_FILTER: ' + str(values.shape) + ',' + str(filter_values.shape))
+    logger.info('SERIES_FILTER: ' + str(values.shape) + ',' + str(filter_values.shape + ',' + str(kernel_size))
 
     filter_values[kernel_size:] = filter_values[kernel_size:] - filter_values[:-kernel_size]
     filter_values[kernel_size:] = filter_values[kernel_size:] / kernel_size
