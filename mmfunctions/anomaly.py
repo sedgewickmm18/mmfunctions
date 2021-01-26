@@ -1272,7 +1272,6 @@ class FFTbasedGeneralizedAnomalyScore(GeneralizedAnomalyScore):
                                            description="Anomaly score (FFTbasedGeneralizedAnomalyScore)", ))
         return (inputs, outputs)
 
-'''
 class MatrixProfileAnomalyScore(BaseTransformer):
     """
     An unsupervised anomaly detection function.
@@ -1375,7 +1374,6 @@ class MatrixProfileAnomalyScore(BaseTransformer):
         outputs = [UIFunctionOutSingle(name="output_item", datatype=float,
                                        description="Anomaly score (MatrixProfileAnomalyScore)", )]
         return inputs, outputs
-'''
 
 
 #####
@@ -1966,7 +1964,6 @@ class BayesRidgeRegressor(BaseEstimatorFunction):
         outputs = []
         return (inputs, outputs)
 
-'''
 class GBMRegressor(BaseEstimatorFunction):
     """
     Regressor based on gradient boosting method as provided by lightGBM
@@ -2046,7 +2043,6 @@ class GBMRegressor(BaseEstimatorFunction):
         # define arguments that behave as function outputs
         outputs = []
         return (inputs, outputs)
-'''
 
 
 class SimpleRegressor(BaseEstimatorFunction):
@@ -2234,7 +2230,6 @@ class FeatureBuilder(BaseTransformer):
         outputs = []
         return (inputs, outputs)
 
-'''
 class GBMForecaster(BaseEstimatorFunction):
     """
     Forecasting regressor based on gradient boosting method as provided by lightGBM
@@ -2416,7 +2411,6 @@ class GBMForecaster(BaseEstimatorFunction):
         # define arguments that behave as function outputs
         outputs = []
         return (inputs, outputs)
-'''
 
 #
 # following Jake Vanderplas Data Science Handbook
