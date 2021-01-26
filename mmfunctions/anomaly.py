@@ -17,7 +17,7 @@ import datetime as dt
 import logging
 
 # for gradient boosting
-#import lightgbm
+import lightgbm
 import numpy as np
 import pandas as pd
 import scipy as sp
@@ -35,7 +35,7 @@ from sklearn.preprocessing import (StandardScaler, RobustScaler, MinMaxScaler,
                                    minmax_scale, PowerTransformer)
 from sklearn.utils import check_array
 # for Matrix Profile
-#import stumpy
+import stumpy
 
 #import statsmodels.api as sm
 from statsmodels.nonparametric.kernel_density import KDEMultivariate
