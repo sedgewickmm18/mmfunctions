@@ -70,6 +70,17 @@ class UnrollData(BaseTransformer):
 
     def execute(self, df):
 
+        list_of_entity = []
+        list_of_ts = []
+        list_of_vibx = []
+        list_of_viby = []
+        list_of_vibz = []
+        list_of_speed = []
+        list_of_power = []
+        list_of_log_id = []
+        list_of_eventtype = []
+        list_of_format = []
+
         #
         c = self._entity_type.get_attributes_dict()
         try:
@@ -198,19 +209,21 @@ class UnrollData(BaseTransformer):
                 except Exception:
                     pass
 
-            list_of_rows = []
             for i in range(15):
                 print (len(vibx), len(viby), len(vibz), len(speed), len(power))
                 try:
                     # device_id, timestamp
-                    ts = ix[1] + pd.Timedelta(seconds=20*i - 300)
-                    list_of_rows.append([device_id, ts,
-                                         # rms, accel
-                                         vibx[i], viby[i], vibz[i], speed[i // 3], power[i // 3],
-                                         # logicalinterface_id,  eventtype, format
-                                         'Shadow_pump_de_gen5', 'ShadowPumpDeGen5', 'json',
-                                         # rcv_timestamp_utc, updated_utc
-                                         ts, ts])
+                    list_of_entity.append(device_id)
+                    list_of_ts.append(ix[1] + pd.Timedelta(seconds=20*i - 300))
+                    list_of_vibx.append(vibx[i])
+                    list_of_viby.append(viby[i])
+                    list_of_vibz.append(vibz[i])
+                    list_of_speed.append(speed[i // 3])
+                    list_of_power.append(power[i // 3])
+                    list_of_log_id.append('Shadow_pump_de_gen5')
+                    list_of_eventtype.append('ShadowPumpDeGen5')
+                    list_of_format.append('json')
+
                 except Exception as ee:
                     print('Index - ', i, '   ', str(ee))
                     break
@@ -238,10 +251,12 @@ class UnrollData(BaseTransformer):
                                                         #client.publishEvent(typeId="MMDeviceTypeShadow", deviceId=device_id, eventId="MMEventOutputType",
                         #                    msgFormat="json", data=js, qos=0)  # , onPublish=eventPublishCallback)
         if USING_DB:
-            print('writing ', len(list_of_rows))
+            print('writing ', len(list_of_ts))
             db = self.get_db()
             print('DataBase is ', db)
-            df_new = pd.DataFrame(list_of_rows,
+            df_new = pd.DataFrame(list(zip(list_of_entity, list_of_ts, list_of_vibx, list_of_viby, list_of_vibz,
+                                           list_of_speed, list_of_power, list_of_log_id, list_of_eventtype,
+                                           list_of_format, list_of_ts, list_of_ts)),
                                   columns=['evt_timestamp', 'deviceid', 'rms_x', 'rms_y', 'rms_z', 'power', 'speed',
                                            'logicalinterface_id', 'eventtype', 'format', 'rcv_timestamp_utc', 'updated_utc'])
 
