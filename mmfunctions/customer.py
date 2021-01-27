@@ -34,6 +34,8 @@ logger = logging.getLogger(__name__)
 PACKAGE_URL = 'git+https://github.com/sedgewickmm18/mmfunctions.git'
 _IS_PREINSTALLED = False
 
+USING_DB = True
+
 
 # On connect MQTT Callback.
 def on_connect(client, userdata, flags, rc):
@@ -67,6 +69,9 @@ class UnrollData(BaseTransformer):
         #               "auth": {"token": "mmshadow1"}}
 
     def execute(self, df):
+
+        df_new = pd.DataFrame(columns=['evt_timestamp', 'deviceid', 'rms_x', 'rms_y', 'rms_z', 'power', 'speed',
+                                       'logicalinterface_id', 'eventtype', 'format', 'rcv_timestamp_utc', 'updated_utc'])
 
         #
         c = self._entity_type.get_attributes_dict()
@@ -191,7 +196,17 @@ class UnrollData(BaseTransformer):
                 except Exception:
                     pass
 
+            list_of_rows = []
             for i in range(15):
+                # device_id, timestamp
+                list_of_rows.append([device_id, ix[1] + pd.Timedelta(seconds=20*i - 300),
+                                     # rms, accel
+                                     vibx[i], viby[i], vibz[i], speed[i // 3], power[i // 3],
+                                     # logicalinterface_id,  eventtype, format
+                                     'Shadow_pump_de_gen5', 'ShadowPumpDeGen5', 'json',
+                                     # rcv_timestamp_utc, updated_utc
+                                     ix[1] + pd.Timedelta(seconds=20*i - 300), ix[1] + pd.Timedelta(seconds=20*i - 300)])
+
                 try:
                     jsin = {'evt_timestamp': (ix[1] + pd.Timedelta(seconds=20*i - 300)).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + 'Z',
                             #'evt_timestamp': (ix[1] + pd.Timedelta(seconds=20*i - 300)).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
@@ -204,14 +219,22 @@ class UnrollData(BaseTransformer):
 
                 jsdump = json.dumps(jsin)
                 js = json.loads(jsdump)
-                print('sending ', js, ' to ', device_id)
-                if i_am_device:
-                    client.publishEvent(eventId="MMEventOutputType", msgFormat="json", data=js)
-                else:
-                    client.publishEvent(typeId="Shadow_pump_de_gen5", deviceId=device_id, eventId="ShadowPumpDeGen5",
-                                        msgFormat="json", data=js, qos=0)
-                    #client.publishEvent(typeId="MMDeviceTypeShadow", deviceId=device_id, eventId="MMEventOutputType",
-                    #                    msgFormat="json", data=js, qos=0)  # , onPublish=eventPublishCallback)
+
+                if not USING_DB:
+                    print('sending ', js, ' to ', device_id)
+                    if i_am_device:
+                        client.publishEvent(eventId="MMEventOutputType", msgFormat="json", data=js)
+                    else:
+                        client.publishEvent(typeId="Shadow_pump_de_gen5", deviceId=device_id, eventId="ShadowPumpDeGen5",
+                                            msgFormat="json", data=js, qos=0)
+                                                        #client.publishEvent(typeId="MMDeviceTypeShadow", deviceId=device_id, eventId="MMEventOutputType",
+                        #                    msgFormat="json", data=js, qos=0)  # , onPublish=eventPublishCallback)
+        if USING_DB:
+            print('writing ', df_new.columns, ' to ', device_id)
+            db = self.get_db()
+            print('DataBase is ', db)
+            db.write_frame(df_new, 'IOT_SHADOW_PUMP_DE_GEN')
+            print('DONE')
 
         msg = 'UnrollData'
         self.trace_append(msg)
