@@ -253,12 +253,15 @@ class UnrollData(BaseTransformer):
         if USING_DB:
             print('writing ', len(list_of_ts))
             db = self.get_db()
-            print('DataBase is ', db)
+            table = db.get_table('IOT_SHADOW_PUMP_DE_GEN5')
+            cols = [column.key for column in table.columns]
+            print('DataBase is ', db, ' columns are ', cols)
             df_new = pd.DataFrame(list(zip(list_of_entity, list_of_ts, list_of_vibx, list_of_viby, list_of_vibz,
                                            list_of_speed, list_of_power, list_of_log_id, list_of_eventtype,
                                            list_of_format, list_of_ts, list_of_ts)),
-                                  columns=['EVT_TIMESTAMP', 'RMS_X', 'RMS_Y', 'RMS_Z', 'POWER', 'SPEED', 'DEVICEID',
-                                           'LOGICALINTERFACE_ID', 'EVENTTYPE', 'FORMAT', 'RCV_TIMESTAMP_UTC', 'UPDATED_UTC'])
+                                  columns=cols)
+                                  #columns=['EVT_TIMESTAMP', 'RMS_X', 'RMS_Y', 'RMS_Z', 'POWER', 'SPEED', 'DEVICEID',
+                                  #         'LOGICALINTERFACE_ID', 'EVENTTYPE', 'FORMAT', 'RCV_TIMESTAMP_UTC', 'UPDATED_UTC'])
 
             db.write_frame(df_new, 'IOT_SHADOW_PUMP_DE_GEN5')
             print('DONE')
