@@ -94,7 +94,10 @@ class UnrollData(BaseTransformer):
         except Exception:
             pass
 
-        del auth_token['options']
+        try:
+            del auth_token['options']
+        except Exception:
+            pass
 
         # ONE ENTITY FOR NOW
         # connect
