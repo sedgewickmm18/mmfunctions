@@ -123,79 +123,84 @@ class UnrollData(BaseTransformer):
         for ix, row in df.iterrows():
             # columns with 15 elements
             #device_id = ix[0].replace('Device','Shadow') - device id is identical !
-            print('Row is ', row)
             device_id = ix[0]
 
             None5 = [None, None, None, None, None]
             None15 = [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]
 
             try:
-                vibx = ast.literal_eval(row['rms_x'])
+                vibx_ = ast.literal_eval(row['rms_x'])
             except Exception as e1:
-                vibx = None15
+                vibx_ = None15
                 #print (' eval of ' + str(row['rms_x']) + ' failed with ' + str(e1))
                 continue
                 pass
 
             try:
-                viby = ast.literal_eval(row['rms_y'])
+                viby_ = ast.literal_eval(row['rms_y'])
             except Exception as e2:
-                viby = None15
-                print (' eval of ' + str(row['rms_y']) + ' failed with ' + str(e2))
+                viby_ = None15
+                #print (' eval of ' + str(row['rms_y']) + ' failed with ' + str(e2))
                 continue
                 pass
 
             try:
-                vibz = ast.literal_eval(row['rms_z'])
+                vibz_ = ast.literal_eval(row['rms_z'])
             except Exception as e3:
-                vibz = None15
-                print (' eval of ' + str(row['rms_z']) + ' failed with ' + str(e3))
+                vibz_ = None15
+                #print (' eval of ' + str(row['rms_z']) + ' failed with ' + str(e3))
                 continue
                 pass
 
             # columns with 5 elements
             try:
-                speed = ast.literal_eval(row['accel_speed'])
+                speed_ = ast.literal_eval(row['accel_speed'])
             except Exception as e4:
-                speed = None5
-                print (' eval of ' + str(row['accel_speed']) + ' failed with ' + str(e4))
+                speed_ = None5
+                #print (' eval of ' + str(row['accel_speed']) + ' failed with ' + str(e4))
                 continue
                 pass
 
             try:
-                power = ast.literal_eval(row['accel_power'])
+                power_ = ast.literal_eval(row['accel_power'])
             except Exception as e5:
-                power = None5
-                print (' eval of ' + str(row['accel_power']) + ' failed with ' + str(e5))
+                power_ = None5
+                #print (' eval of ' + str(row['accel_power']) + ' failed with ' + str(e5))
                 continue
                 pass
 
+            vibx = None15
+            viby = None15
+            vibz = None15
+            power = None5
+            speed = None5
             for i in range(15):
                 try:
-                    vibx[i] = float(vibx[i])
+                    vibx[i] = float(vibx_[i])
                 except Exception:
                     pass
                 try:
-                    viby[i] = float(viby[i])
+                    viby[i] = float(viby_[i])
                 except Exception:
                     pass
                 try:
-                    vibz[i] = float(vibz[i])
+                    vibz[i] = float(vibz_[i])
                 except Exception:
                     pass
 
             for i in range(5):
                 try:
-                    speed[i] = float(speed[i])
+                    speed[i] = float(speed_[i])
                 except Exception:
                     pass
                 try:
-                    power[i] = float(power[i])
+                    power[i] = float(power_[i])
                 except Exception:
                     pass
 
             list_of_rows = []
             for i in range(15):
+                print (len(vibx), len(viby), len(vibz), len(speed), len(power))
                 try:
                     # device_id, timestamp
                     ts = ix[1] + pd.Timedelta(seconds=20*i - 300)
@@ -208,7 +213,7 @@ class UnrollData(BaseTransformer):
                                          ts, ts])
                 except Exception as ee:
                     print('Index - ', i, '   ', str(ee))
-                    pass
+                    break
 
                 try:
                     jsin = {'evt_timestamp': (ix[1] + pd.Timedelta(seconds=20*i - 300)).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + 'Z',
