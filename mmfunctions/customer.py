@@ -77,6 +77,7 @@ class UnrollData(BaseTransformer):
         list_of_vibz = []
         list_of_speed = []
         list_of_power = []
+        list_of_devicetype = []
         list_of_log_id = []
         list_of_eventtype = []
         list_of_format = []
@@ -220,6 +221,7 @@ class UnrollData(BaseTransformer):
                     list_of_vibz.append(vibz[i])
                     list_of_speed.append(speed[i // 3])
                     list_of_power.append(power[i // 3])
+                    list_of_devicetype.append('pump_de_gen5')
                     list_of_log_id.append('Shadow_pump_de_gen5')
                     list_of_eventtype.append('ShadowPumpDeGen5')
                     list_of_format.append('json')
@@ -256,12 +258,12 @@ class UnrollData(BaseTransformer):
             table = db.get_table('IOT_SHADOW_PUMP_DE_GEN5')
             cols = [column.key for column in table.columns]
             print('DataBase is ', db, ' columns are ', cols)
-            df_new = pd.DataFrame(list(zip(list_of_entity, list_of_ts, list_of_vibx, list_of_viby, list_of_vibz,
-                                           list_of_speed, list_of_power, list_of_log_id, list_of_eventtype,
-                                           list_of_format, list_of_ts, list_of_ts)),
+            df_new = pd.DataFrame(list(zip(list_of_ts, list_of_vibx, list_of_viby, list_of_vibz,
+                                           list_of_power, list_of_speed, list_of_devicetype, list_of_entity,
+                                           list_of_log_id, list_of_eventtype, list_of_format, list_of_ts, list_of_ts)),
                                   columns=cols)
-                                  #columns=['EVT_TIMESTAMP', 'RMS_X', 'RMS_Y', 'RMS_Z', 'POWER', 'SPEED', 'DEVICEID',
-                                  #         'LOGICALINTERFACE_ID', 'EVENTTYPE', 'FORMAT', 'RCV_TIMESTAMP_UTC', 'UPDATED_UTC'])
+            #['evt_timestamp', 'rms_x', 'rms_z', 'rms_y', 'POWER', 'spee
+            #d', 'devicetype', 'deviceid', 'logicalinterface_id', 'eventtype', 'format', 'rcv_timestamp_utc', 'updated_utc']
 
             db.write_frame(df_new, 'IOT_SHADOW_PUMP_DE_GEN5')
             print('DONE')
