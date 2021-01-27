@@ -198,14 +198,18 @@ class UnrollData(BaseTransformer):
 
             list_of_rows = []
             for i in range(15):
-                # device_id, timestamp
-                list_of_rows.append([device_id, ix[1] + pd.Timedelta(seconds=20*i - 300),
-                                     # rms, accel
-                                     vibx[i], viby[i], vibz[i], speed[i // 3], power[i // 3],
-                                     # logicalinterface_id,  eventtype, format
-                                     'Shadow_pump_de_gen5', 'ShadowPumpDeGen5', 'json',
-                                     # rcv_timestamp_utc, updated_utc
-                                     ix[1] + pd.Timedelta(seconds=20*i - 300), ix[1] + pd.Timedelta(seconds=20*i - 300)])
+                try:
+                    # device_id, timestamp
+                    list_of_rows.append([device_id, ix[1] + pd.Timedelta(seconds=20*i - 300),
+                                         # rms, accel
+                                         vibx[i], viby[i], vibz[i], speed[i // 3], power[i // 3],
+                                         # logicalinterface_id,  eventtype, format
+                                         'Shadow_pump_de_gen5', 'ShadowPumpDeGen5', 'json',
+                                         # rcv_timestamp_utc, updated_utc
+                                         ix[1] + pd.Timedelta(seconds=20*i - 300), ix[1] + pd.Timedelta(seconds=20*i - 300)])
+                except Exception as ee:
+                    print('Index - ', i, '   ', str(ee))
+                    break
 
                 try:
                     jsin = {'evt_timestamp': (ix[1] + pd.Timedelta(seconds=20*i - 300)).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + 'Z',
