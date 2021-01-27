@@ -260,7 +260,7 @@ class UnrollData(BaseTransformer):
                                   columns=['evt_timestamp', 'deviceid', 'rms_x', 'rms_y', 'rms_z', 'power', 'speed',
                                            'logicalinterface_id', 'eventtype', 'format', 'rcv_timestamp_utc', 'updated_utc'])
 
-            db.write_frame(df_new, 'IOT_SHADOW_PUMP_DE_GEN')
+            db.write_frame(df_new, 'IOT_SHADOW_PUMP_DE_GEN5')
             print('DONE')
 
         msg = 'UnrollData'
