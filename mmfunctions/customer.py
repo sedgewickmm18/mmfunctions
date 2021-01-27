@@ -257,8 +257,8 @@ class UnrollData(BaseTransformer):
             df_new = pd.DataFrame(list(zip(list_of_entity, list_of_ts, list_of_vibx, list_of_viby, list_of_vibz,
                                            list_of_speed, list_of_power, list_of_log_id, list_of_eventtype,
                                            list_of_format, list_of_ts, list_of_ts)),
-                                  columns=['evt_timestamp', 'deviceid', 'rms_x', 'rms_y', 'rms_z', 'power', 'speed',
-                                           'logicalinterface_id', 'eventtype', 'format', 'rcv_timestamp_utc', 'updated_utc'])
+                                  columns=['EVT_TIMESTAMP', 'RMS_X', 'RMS_Y', 'RMS_Z', 'POWER', 'SPEED', 'DEVICEID',
+                                           'LOGICALINTERFACE_ID', 'EVENTTYPE', 'FORMAT', 'RCV_TIMESTAMP_UTC', 'UPDATED_UTC'])
 
             db.write_frame(df_new, 'IOT_SHADOW_PUMP_DE_GEN5')
             print('DONE')
