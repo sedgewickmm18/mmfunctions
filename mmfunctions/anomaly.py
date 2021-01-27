@@ -35,7 +35,9 @@ from sklearn.preprocessing import (StandardScaler, RobustScaler, MinMaxScaler,
                                    minmax_scale, PowerTransformer)
 from sklearn.utils import check_array
 # for Matrix Profile
-#import stumpy
+import iotfunctions
+if iotfunctions.__version__ != '8.2.1':
+    import stumpy
 
 #import statsmodels.api as sm
 from statsmodels.nonparametric.kernel_density import KDEMultivariate
@@ -1272,110 +1274,110 @@ class FFTbasedGeneralizedAnomalyScore(GeneralizedAnomalyScore):
                                            description="Anomaly score (FFTbasedGeneralizedAnomalyScore)", ))
         return (inputs, outputs)
 
-'''
-class MatrixProfileAnomalyScore(BaseTransformer):
-    """
-    An unsupervised anomaly detection function.
-     Applies matrix profile analysis on time series data.
-     Moves a sliding window across the data signal to calculate the euclidean distance from one window to all others to build a distance profile.
-     The window size is typically set to 12 data points.
-     Try several anomaly models on your data and use the one that fits your data best.
-    """
-    DATAPOINTS_AFTER_LAST_WINDOW = 1e-15
-    INIT_SCORES = 1e-20
-    ERROR_SCORES = 1e-16
 
-    def __init__(self, input_item, window_size, output_item):
-        super().__init__()
-        logger.debug(f'Input item: {input_item}')
-        self.input_item = input_item
-        self.window_size = window_size
-        self.output_item = output_item
-        self.whoami = 'MatrixProfile'
+if iotfunctions.__version__ != '8.2.1':
+    class MatrixProfileAnomalyScore(BaseTransformer):
+        """
+        An unsupervised anomaly detection function.
+         Applies matrix profile analysis on time series data.
+         Moves a sliding window across the data signal to calculate the euclidean distance from one window to all others to build a distance profile.
+         The window size is typically set to 12 data points.
+         Try several anomaly models on your data and use the one that fits your data best.
+        """
+        DATAPOINTS_AFTER_LAST_WINDOW = 1e-15
+        INIT_SCORES = 1e-20
+        ERROR_SCORES = 1e-16
 
-    def prepare_data(self, df_entity):
+        def __init__(self, input_item, window_size, output_item):
+            super().__init__()
+            logger.debug(f'Input item: {input_item}')
+            self.input_item = input_item
+            self.window_size = window_size
+            self.output_item = output_item
+            self.whoami = 'MatrixProfile'
 
-        logger.debug(self.whoami + ': prepare Data')
+        def prepare_data(self, df_entity):
 
-        # operate on simple timestamp index
-        if len(df_entity.index.names) > 1:
-            index_names = df_entity.index.names
-            dfe = df_entity.reset_index().set_index(index_names[0])
-        else:
-            index_names = None
-            dfe = df_entity
+            logger.debug(self.whoami + ': prepare Data')
 
-        # interpolate gaps - data imputation
-        try:
-            dfe = dfe.interpolate(method="time")
-        except Exception as e:
-            logger.error('Prepare data error: ' + str(e))
+            # operate on simple timestamp index
+            if len(df_entity.index.names) > 1:
+                index_names = df_entity.index.names
+                dfe = df_entity.reset_index().set_index(index_names[0])
+            else:
+                index_names = None
+                dfe = df_entity
 
-        # one dimensional time series
-        analysis_input = dfe[[self.input_item]].fillna(0).to_numpy(dtype=np.float64).reshape(-1, )
+            # interpolate gaps - data imputation
+            try:
+                dfe = dfe.interpolate(method="time")
+            except Exception as e:
+                logger.error('Prepare data error: ' + str(e))
 
-        return dfe, analysis_input
+            # one dimensional time series
+            analysis_input = dfe[[self.input_item]].fillna(0).to_numpy(dtype=np.float64).reshape(-1, )
 
-    def execute(self, df):
-        df_copy = df.copy()
-        entities = np.unique(df_copy.index.levels[0])
-        logger.debug(f'Entities: {str(entities)}')
-        df_copy[self.output_item] = self.INIT_SCORES
+            return dfe, analysis_input
 
-        # check data type
-        if df_copy[self.input_item].dtype != np.float64:
+        def execute(self, df):
+            df_copy = df.copy()
+            entities = np.unique(df_copy.index.levels[0])
+            logger.debug(f'Entities: {str(entities)}')
+            df_copy[self.output_item] = self.INIT_SCORES
+
+            # check data type
+            if df_copy[self.input_item].dtype != np.float64:
+                return df_copy
+
+            for entity in entities:
+                # per entity - copy for later inplace operations
+                dfe = df_copy.loc[[entity]].dropna(how='all')
+                dfe_orig = df_copy.loc[[entity]].copy()
+                logger.debug(f' Original df shape: {df_copy.shape} Entity df shape: {dfe.shape}')
+
+                # get rid of entity_id part of the index
+                # do it inplace as we copied the data before
+                dfe.reset_index(level=[0], inplace=True)
+                dfe.sort_index(inplace=True)
+                dfe_orig.reset_index(level=[0], inplace=True)
+                dfe_orig.sort_index(inplace=True)
+
+                # minimal time delta for merging
+                mindelta, dfe_orig = min_delta(dfe_orig)
+
+                if dfe.size >= self.window_size:
+                    # interpolate gaps - data imputation by default
+                    dfe, matrix_profile_input = self.prepare_data(dfe)
+                    try:  # calculate scores
+                        matrix_profile = stumpy.aamp(matrix_profile_input, m=self.window_size)[:, 0]
+                        # fill in a small value for newer data points outside the last possible window
+                        fillers = np.array([self.DATAPOINTS_AFTER_LAST_WINDOW] * (self.window_size - 1))
+                        matrix_profile = np.append(matrix_profile, fillers)
+                    except Exception as er:
+                        logger.warning(f' Error in calculating Matrix Profile Scores. {er}')
+                        matrix_profile = np.array([self.ERROR_SCORES] * dfe.shape[0])
+                else:
+                    logger.warning(f' Not enough data to calculate Matrix Profile for entity. {entity}')
+                    matrix_profile = np.array([self.ERROR_SCORES] * dfe.shape[0])
+
+                anomaly_score = merge_score(dfe, dfe_orig, self.output_item, matrix_profile, mindelta)
+
+                idx = pd.IndexSlice
+                df_copy.loc[idx[entity, :], self.output_item] = anomaly_score
+
             return df_copy
 
-        for entity in entities:
-            # per entity - copy for later inplace operations
-            dfe = df_copy.loc[[entity]].dropna(how='all')
-            dfe_orig = df_copy.loc[[entity]].copy()
-            logger.debug(f' Original df shape: {df_copy.shape} Entity df shape: {dfe.shape}')
+        @classmethod
+        def build_ui(cls):
+            # define arguments that behave as function inputs
+            inputs = [UISingleItem(name="input_item", datatype=float, description="Time series data item to analyze", ),
+                      UISingle(name="window_size", datatype=int,
+                               description="Size of each sliding window in data points. Typically set to 12.")]
 
-            # get rid of entity_id part of the index
-            # do it inplace as we copied the data before
-            dfe.reset_index(level=[0], inplace=True)
-            dfe.sort_index(inplace=True)
-            dfe_orig.reset_index(level=[0], inplace=True)
-            dfe_orig.sort_index(inplace=True)
-
-            # minimal time delta for merging
-            mindelta, dfe_orig = min_delta(dfe_orig)
-
-            if dfe.size >= self.window_size:
-                # interpolate gaps - data imputation by default
-                dfe, matrix_profile_input = self.prepare_data(dfe)
-                try:  # calculate scores
-                    matrix_profile = stumpy.aamp(matrix_profile_input, m=self.window_size)[:, 0]
-                    # fill in a small value for newer data points outside the last possible window
-                    fillers = np.array([self.DATAPOINTS_AFTER_LAST_WINDOW] * (self.window_size - 1))
-                    matrix_profile = np.append(matrix_profile, fillers)
-                except Exception as er:
-                    logger.warning(f' Error in calculating Matrix Profile Scores. {er}')
-                    matrix_profile = np.array([self.ERROR_SCORES] * dfe.shape[0])
-            else:
-                logger.warning(f' Not enough data to calculate Matrix Profile for entity. {entity}')
-                matrix_profile = np.array([self.ERROR_SCORES] * dfe.shape[0])
-
-            anomaly_score = merge_score(dfe, dfe_orig, self.output_item, matrix_profile, mindelta)
-
-            idx = pd.IndexSlice
-            df_copy.loc[idx[entity, :], self.output_item] = anomaly_score
-
-        return df_copy
-
-    @classmethod
-    def build_ui(cls):
-        # define arguments that behave as function inputs
-        inputs = [UISingleItem(name="input_item", datatype=float, description="Time series data item to analyze", ),
-                  UISingle(name="window_size", datatype=int,
-                           description="Size of each sliding window in data points. Typically set to 12.")]
-
-        # define arguments that behave as function outputs
-        outputs = [UIFunctionOutSingle(name="output_item", datatype=float,
-                                       description="Anomaly score (MatrixProfileAnomalyScore)", )]
-        return inputs, outputs
-'''
+            # define arguments that behave as function outputs
+            outputs = [UIFunctionOutSingle(name="output_item", datatype=float,
+                                           description="Anomaly score (MatrixProfileAnomalyScore)", )]
+            return inputs, outputs
 
 
 #####

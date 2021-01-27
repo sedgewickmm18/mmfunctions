@@ -70,9 +70,6 @@ class UnrollData(BaseTransformer):
 
     def execute(self, df):
 
-        df_new = pd.DataFrame(columns=['evt_timestamp', 'deviceid', 'rms_x', 'rms_y', 'rms_z', 'power', 'speed',
-                                       'logicalinterface_id', 'eventtype', 'format', 'rcv_timestamp_utc', 'updated_utc'])
-
         #
         c = self._entity_type.get_attributes_dict()
         try:
@@ -200,16 +197,17 @@ class UnrollData(BaseTransformer):
             for i in range(15):
                 try:
                     # device_id, timestamp
-                    list_of_rows.append([device_id, ix[1] + pd.Timedelta(seconds=20*i - 300),
+                    ts = ix[1] + pd.Timedelta(seconds=20*i - 300)
+                    list_of_rows.append([device_id, ts,
                                          # rms, accel
                                          vibx[i], viby[i], vibz[i], speed[i // 3], power[i // 3],
                                          # logicalinterface_id,  eventtype, format
                                          'Shadow_pump_de_gen5', 'ShadowPumpDeGen5', 'json',
                                          # rcv_timestamp_utc, updated_utc
-                                         ix[1] + pd.Timedelta(seconds=20*i - 300), ix[1] + pd.Timedelta(seconds=20*i - 300)])
+                                         ts, ts])
                 except Exception as ee:
                     print('Index - ', i, '   ', str(ee))
-                    break
+                    pass
 
                 try:
                     jsin = {'evt_timestamp': (ix[1] + pd.Timedelta(seconds=20*i - 300)).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + 'Z',
@@ -234,9 +232,13 @@ class UnrollData(BaseTransformer):
                                                         #client.publishEvent(typeId="MMDeviceTypeShadow", deviceId=device_id, eventId="MMEventOutputType",
                         #                    msgFormat="json", data=js, qos=0)  # , onPublish=eventPublishCallback)
         if USING_DB:
-            print('writing ', df_new.columns, ' to ', device_id)
+            print('writing ', len(list_of_rows))
             db = self.get_db()
             print('DataBase is ', db)
+            df_new = pd.DataFrame(list_of_rows,
+                                  columns=['evt_timestamp', 'deviceid', 'rms_x', 'rms_y', 'rms_z', 'power', 'speed',
+                                           'logicalinterface_id', 'eventtype', 'format', 'rcv_timestamp_utc', 'updated_utc'])
+
             db.write_frame(df_new, 'IOT_SHADOW_PUMP_DE_GEN')
             print('DONE')
 
