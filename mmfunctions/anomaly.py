@@ -89,7 +89,6 @@ def view_as_windows(temperature, length, step):
     return np.asarray(x_)
 
 
-
 def custom_resampler(array_like):
     # initialize
     if 'gap' not in dir():
@@ -1766,7 +1765,7 @@ class GeneralizedAnomalyScoreV2(Standard_Scaler):
         inputs.append(UISingle(name="windowsize", datatype=int,
                                description="Size of each sliding window in data points. Typically set to 12."))
 
-        # inputs.append(UISingle(name='normalize', datatype=bool, description='Flag for normalizing data.'))
+        inputs.append(UISingle(name='normalize', datatype=bool, description='Flag for normalizing data.'))
 
         # define arguments that behave as function outputs
         outputs = []
@@ -1913,6 +1912,7 @@ class BayesRidgeRegressor(BaseEstimatorFunction):
 
     def __init__(self, features, targets, predictions=None, deviations=None):
         super().__init__(features=features, targets=targets, predictions=predictions, stddev=True)
+
         if deviations is not None:
             self.pred_stddev = deviations
 
@@ -1925,6 +1925,7 @@ class BayesRidgeRegressor(BaseEstimatorFunction):
 
         df_copy = df.copy()
         entities = np.unique(df_copy.index.levels[0])
+
         logger.debug(str(entities) + ' predicting ' + str(self.targets) + ' from ' + str(self.features) +\
                      ' to appear in ' + str(self.predictions) + ' with confidence interval ' + str(self.pred_stddev))
 
@@ -1937,22 +1938,20 @@ class BayesRidgeRegressor(BaseEstimatorFunction):
                 #check_array(df_copy.loc[[entity]][self.features].values, allow_nd=2)
                 logger.debug('check passed')
                 dfe = super()._execute(df_copy.loc[[entity]], entity)
-                print(df_copy.columns)
 
-                print('BayesianRidge: Entity ', entity, ' Type of pred, stddev arrays ',
-                      type(dfe[self.predictions]), type(dfe[self.pred_stddev].values))
+                logger.debug('BayesianRidge: Entity ' + str(entity) + ' Type of pred, stddev arrays ' + \
+                             str(type(dfe[self.predictions])) + str(type(dfe[self.pred_stddev].values)))
 
-                #print('BayesianRidge: Entity ', entity, ' stddev elements', dfe[self.pred_stddev].values)
                 dfe.fillna(0, inplace=True)
 
                 df_copy.loc[entity, self.predictions] = dfe[self.predictions]
                 df_copy.loc[entity, self.pred_stddev] = dfe[self.pred_stddev]
 
-                print(df_copy.columns)
             except Exception as e:
                 logger.info('Bayesian Ridge regressor for entity ' + str(entity) + ' failed with: ' + str(e))
                 df_copy.loc[entity, self.predictions] = 0
                 df_copy.loc[entity, self.pred_stddev] = 0
+
         return df_copy
 
     @classmethod
@@ -1967,6 +1966,7 @@ class BayesRidgeRegressor(BaseEstimatorFunction):
         # define arguments that behave as function outputs
         outputs = []
         return (inputs, outputs)
+
 
 class GBMRegressor(BaseEstimatorFunction):
     """
@@ -2553,19 +2553,40 @@ def ll_gaussian(y, mu, log_var):
     sigma = torch.exp(0.5 * log_var)
     return -0.5 * torch.log(2 * np.pi * sigma**2) - (1 / (2 * sigma**2))* (y-mu)**2
 
+def l_gaussian(y, mu, log_var):
+    sigma = torch.exp(0.5 * log_var)
+    return 1/torch.sqrt(2 * np.pi * sigma**2) / torch.exp((1 / (2 * sigma**2))* (y-mu)**2)
+
+def kl_div(mu1, mu2, lg_sigma1, lg_sigma2):
+    return 0.5 * (2 * lg_sigma2 - 2 * lg_sigma1 + (lg_sigma1.exp() ** 2 + (mu1 - mu2)**2)/lg_sigma2.exp()**2 - 1)
 
 class VI(nn.Module):
-    def __init__(self, prior_mu=0.0, prior_sigma=1.0, beta=1.0):
+    def __init__(self, scaler, prior_mu=0.0, prior_sigma=1.0, beta=1.0, version=None):
         self.prior_mu = prior_mu
         self.prior_sigma = prior_sigma
         self.beta = beta
         self.onnx_session = None
+        self.version = version
+        self.build_time = pd.Timestamp.now()
+        self.scaler = scaler
+        self.show_once = True
         super().__init__()
 
+        '''
         self.q_mu = nn.Sequential(
             nn.Linear(1, 20),
             nn.ReLU(),
             nn.Linear(20, 10),
+            nn.ReLU(),
+            nn.Linear(10, 1)
+        )
+        '''
+        self.q_mu = nn.Sequential(
+            nn.Linear(1, 50),
+            nn.ReLU(),
+            nn.Linear(50, 35),
+            nn.ReLU(),
+            nn.Linear(35, 10),
             nn.ReLU(),
             nn.Linear(10, 1)
         )
@@ -2593,8 +2614,44 @@ class VI(nn.Module):
         return self.reparameterize(mu, log_var), mu, log_var
 
     def elbo(self, y_pred, y, mu, log_var):
+        # likelihood of observing y given Variational mu and sigma - reconstruction error
+        loglikelihood = ll_gaussian(y, mu, log_var)
+
+        # KL - prior probability of y_pred N(0,1)
+        log_prior = ll_gaussian(y_pred, self.prior_mu, torch.log(torch.tensor(self.prior_sigma)))
+
+        # KL - variational probability of y_pred
+        log_p_q = ll_gaussian(y_pred, mu, log_var)
+
+        if self.show_once:
+            logger.info('Cardinalities: Mu: ' + str(mu.shape) + ' Sigma: ' + str(log_var.shape) +
+                        ' loglikelihood: ' + str(loglikelihood.shape) + ' KL value: ' +
+                        str((log_prior - log_p_q).mean()))
+
+        # by taking the mean we approximate the expectation according to the law of large numbers
+        return (loglikelihood + self.beta * (log_prior - log_p_q)).mean()
+
+    # simplified when everything is Gaussian
+    #  KL(q, p) = \log \frac{\sigma_1}{\sigma_2} + \frac{\sigma_2^2 + (\mu_2 - \mu_1)^2}{2 \sigma_1^2} - \frac{1}{2}
+    def elbo_gauss(self, y, y_pred, mu, log_var):
+        # likelihood of observing y given Variational mu and sigma - reconstruction error
+        loglikelihood = ll_gaussian(y, mu, log_var)
+
+        kl_divergence = kl_div(mu, torch.tensor(self.prior_mu), log_var, torch.log(torch.tensor(self.prior_sigma)))
+
+        if self.show_once:
+            self.show_once = False
+            logger.info('Cardinalities: Mu: ' + str(mu.shape) + ' Sigma: ' + str(log_var.shape) +
+                        ' loglikelihood: ' + str(loglikelihood.shape) + ' KL: ' + str(kl_divergence.shape) +
+                        ' KL value: ' + str(kl_divergence))
+
+        return (loglikelihood - kl_divergence).mean()
+
+
+    # Unfinished - the stuff here is crap !
+    def iwae(self, y_pred, y, mu, log_var):
         # likelihood of observing y given Variational mu and sigma
-        likelihood = ll_gaussian(y, mu, log_var)
+        likelihood = l_gaussian(y, mu, log_var)
 
         # prior probability of y_pred N(0,1)
         log_prior = ll_gaussian(y_pred, self.prior_mu, torch.log(torch.tensor(self.prior_sigma)))
@@ -2603,31 +2660,74 @@ class VI(nn.Module):
         log_p_q = ll_gaussian(y_pred, mu, log_var)
 
         # by taking the mean we approximate the expectation according to the law of large numbers
-        #converge = np.sqrt(torch.var(likelihood + self.beta * (log_prior - log_p_q)) / likelihood.shape[0])
-        #if converge > 0.1:
-        #    logger.debug('Elbo: approximating expectation ' + str(converge))
         return (likelihood + self.beta * (log_prior - log_p_q)).mean()
 
     # Minimizing negative ELBO
-    def det_loss(self, y_pred, y, mu, log_var):
+    def det_loss_old(self, y_pred, y, mu, log_var):
         return -elbo(y_pred, y, mu, log_var)
 
+class SupervisedLearningTransformer(BaseTransformer):
 
-class VIAnomalyScore(BaseTransformer):
+    name = 'SupervisedLearningTransformer'
+
+    """
+    Base class for anomaly scorers that can be trained with historic data in a notebook
+    and automatically store a trained model in the tenant database
+    Inferencing is run in the pipeline
+    """
+    def __init__(self, features=None, targets=None):
+        super().__init__()
+
+        logging.debug("__init__" + self.name)
+
+        # do NOT automatically train if no model is found (subclasses)
+        self.auto_train = False
+        self.delete_model = False
+
+        self.features = features
+        self.targets = targets
+        parms = []
+        if features is not None:
+            parms.extend(features)
+        if targets is not None:
+            parms.extend(targets)
+        parms = '.'.join(parms)
+        logging.debug("__init__ done with parameters: " + parms)
+
+    '''
+    Generate unique model name from entity, optionally features and target for consistency checks
+    '''
+    def get_model_name(self, prefix='model', features=None, targets=None, suffix=None):
+
+        name = []
+        if prefix is not None:
+            name.append(prefix)
+
+        name.extend([self._entity_type.name, self.name])
+        if features is not None:
+            name.extend(features)
+        if targets is not None:
+            name.extend(targets)
+        if suffix is not None:
+            name.append(suffix)
+        name = '.'.join(name)
+        return name
+
+
+
+class VIAnomalyScore(SupervisedLearningTransformer):
     """
     A supervised anomaly detection function.
      Uses VAE based density approximation to assign an anomaly score
     """
+    # set self.auto_train and self.delete_model
     def __init__(self, features, targets, predictions=None, pred_stddev=None):
-        logger.debug("init KDE Estimator")
-        super().__init__()
+
+        self.name = "VIAnomalyScore"
+        super().__init__(features, targets)
 
         self.epochs = 1500
         self.learning_rate = 0.005
-
-        self.features = features
-        self.targets = targets
-        self.name = "VIAnomalyScore"
 
         self.models = {}
         self.Input = {}
@@ -2639,32 +2739,24 @@ class VIAnomalyScore(BaseTransformer):
             predictions = ['predicted_%s' % x for x in self.targets]
         if pred_stddev is None:
             pred_stddev = ['pred_dev_%s' % x for x in self.targets]
+
         self.predictions = predictions
         self.pred_stddev = pred_stddev
 
         self.prior_mu = 0.0
         self.prior_sigma = 1.0
         self.beta = 1.0
+        self.adjust_mean = 0.0
 
-    def get_model_name(self, prefix='model', suffix=None):
-
-        name = []
-        if prefix is not None:
-            name.append(prefix)
-
-        name.extend([self._entity_type.name, self.name])
-        name.extend(self.targets)
-        if suffix is not None:
-            name.append(suffix)
-        name = '.'.join(name)
-        return name
+    # in super class
+    #def get_model_name(self, prefix='model', suffix=None):
 
     def execute(self, df):
 
         df_copy = df.copy()
         db = self._entity_type.db
 
-        print('Here 1', type(df_copy))
+        logger.debug('VIAnomalyScore execute: ' + str(type(df_copy)))
 
         entities = np.unique(df_copy.index.levels[0])
         logger.debug(str(entities))
@@ -2685,7 +2777,7 @@ class VIAnomalyScore(BaseTransformer):
                 continue
 
             # per entity - copy for later inplace operations
-            model_name = self.get_model_name(suffix=entity)
+            model_name = self.get_model_name(targets=self.targets, suffix=entity)
             vi_model = None
             try:
                 vi_model = db.model_store.retrieve_model(model_name)
@@ -2694,7 +2786,31 @@ class VIAnomalyScore(BaseTransformer):
                 logger.error('Model retrieval failed with ' + str(e))
                 pass
 
-            xy = np.hstack([df_copy.loc[[entity]][self.features].values, df_copy.loc[[entity]][self.targets].values])
+            # ditch old model
+            version = 1
+            if self.delete_model:
+                if vi_model is not None:
+                    version = vi_model.version + 1
+                    logger.debug('Deleting VI model ' + str(vi_model.version) + ' for entity: ' + str(entity))
+                    vi_model = None
+
+            # learn to scale features
+            scaler = None
+            if vi_model is not None:
+                scaler = vi_model.scaler
+            else:
+                scaler = StandardScaler().fit(df_copy.loc[[entity]][self.features].values)
+
+            features = scaler.transform(df_copy.loc[[entity]][self.features].values)
+            targets = df_copy.loc[[entity]][self.targets].values
+
+            # deal with negative means - are the issues related to ReLU ?
+            #  adjust targets to have mean == 0
+            if vi_model is None:
+                self.adjust_mean = targets.mean()
+            targets -= self.adjust_mean
+
+            xy = np.hstack([features, targets])
 
             # TODO: assumption is cardinality of One for features and targets !!!
             ind = np.lexsort((xy[:,1], xy[:,0]))
@@ -2704,15 +2820,20 @@ class VIAnomalyScore(BaseTransformer):
 
             X = torch.tensor(xy[ind][:,0].reshape(-1,1), dtype=torch.float)
             Y = torch.tensor(xy[ind][:,1].reshape(-1,1), dtype=torch.float)
+            #X = torch.tensor(df_copy.loc[[entity]][self.features].values.reshape(-1,1), dtype=torch.float)
+            #Y = torch.tensor(df_copy.loc[[entity]][self.targets].values.reshape(-1,1), dtype=torch.float)
 
-            # train new model
-            if vi_model is None:
+            # train new model if there is none and autotrain is set
+            if vi_model is None and self.auto_train:
 
-                # all variables should be continuous
-                #epochs = 1500
-                #learning_rate = 0.005
+                # default: beta 1, prior N(0,1)
+                #   instead: beta 1, prior N(mean(target), sigma(target))
+                self.prior_sigma = targets.std()
+                vi_model = VI(scaler, prior_mu=self.prior_mu,
+                              prior_sigma=self.prior_sigma, beta=self.beta, version=version)
 
-                vi_model = VI(self.prior_mu, self.prior_sigma, self.beta)   # default: beta 1, prior N(0,1)
+                logger.debug('Training VI model ' + str(vi_model.version) + ' for entity: ' + str(entity) +
+                             'Prior mean: ' + str(self.prior_mu) + ', sigma: ' + str(self.prior_sigma))
 
                 optim = torch.optim.Adam(vi_model.parameters(), lr=self.learning_rate)
 
@@ -2721,8 +2842,10 @@ class VIAnomalyScore(BaseTransformer):
                     y_pred, mu, log_var = vi_model(X)
                     #loss = det_loss(y_pred, Y, mu, log_var)
                     loss = -vi_model.elbo(y_pred, Y, mu, log_var)
+                    lossg = -vi_model.elbo_gauss(y_pred, Y, mu, log_var)
                     if epoch % 10 == 0:
-                        logger.debug('Epoch: ' + str(epoch) + ', Loss: ' + str(loss.item()))
+                        logger.debug('Epoch: ' + str(epoch) + ', neg ELBO: ' + str(loss.item()) +
+                                     ' neg ELBO G: ' + str(lossg.item()))
                     loss.backward()
                     grad_norm = 0
                     optim.step()
@@ -2735,21 +2858,25 @@ class VIAnomalyScore(BaseTransformer):
                     logger.error('Model store failed with ' + str(e))
                     pass
 
-            self.models[entity] = vi_model
+            # if training was not allowed or failed
+            if vi_model is not None:
+                self.models[entity] = vi_model
 
-            mu = None
-            q1 = None
-            with torch.no_grad():
-                mu_and_log_sigma = vi_model(X)
-                mue = mu_and_log_sigma[1]
-                sigma = torch.exp(0.5 * mu_and_log_sigma[2]) + 1e-5
-                mu = sp.stats.norm.ppf(0.5, loc=mue, scale=sigma).reshape(-1,)
-                q1 = sp.stats.norm.ppf(0.95, loc=mue, scale=sigma).reshape(-1,)
-                self.mu[entity] = mu
-                self.quantile095[entity] = q1
+                mu = None
+                q1 = None
+                with torch.no_grad():
+                    mu_and_log_sigma = vi_model(X)
+                    mue = mu_and_log_sigma[1]
+                    sigma = torch.exp(0.5 * mu_and_log_sigma[2]) + 1e-5
+                    mu = sp.stats.norm.ppf(0.5, loc=mue, scale=sigma).reshape(-1,)
+                    q1 = sp.stats.norm.ppf(0.95, loc=mue, scale=sigma).reshape(-1,)
+                    self.mu[entity] = mu
+                    self.quantile095[entity] = q1
 
-            df_copy.loc[entity, self.predictions] = mu[ind_r]
-            df_copy.loc[entity, self.pred_stddev] = q1[ind_r]
+                df_copy.loc[entity, self.predictions] = mu[ind_r] + self.adjust_mean
+                df_copy.loc[entity, self.pred_stddev] = q1[ind_r]
+            else:
+                logger.debug('No VI model for entity: ' + str(entity))
 
         return df_copy
 
