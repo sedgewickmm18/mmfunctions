@@ -12,6 +12,7 @@
 The Built In Functions module contains customer specific helper functions
 '''
 
+import collections
 import json
 import datetime as dt
 import pytz
@@ -36,6 +37,12 @@ _IS_PREINSTALLED = False
 
 USING_DB = True
 
+class DateRecorder:
+    def __init__(self):
+        self.last_date_per_entity = collections.OrderedDict()
+
+None5 = [None, None, None, None, None]
+None15 = [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]
 
 # On connect MQTT Callback.
 def on_connect(client, userdata, flags, rc):
@@ -131,14 +138,30 @@ class UnrollData(BaseTransformer):
         Now = dt.datetime.now(pytz.timezone("UTC"))
         print(Now)
 
+        # retrieve last recorded timestamps by entity
+        db = self.get_db()
+        try:
+            date_recorder = db.model_store.retrieve_model('Armstark')
+        except Exception:
+            date_recorder = DateRecorder()
+
         # assume single entity
         for ix, row in df.iterrows():
             # columns with 15 elements
             #device_id = ix[0].replace('Device','Shadow') - device id is identical !
             device_id = ix[0]
 
-            None5 = [None, None, None, None, None]
-            None15 = [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+            # ignore row if time is smaller than last recorded time
+            last_date = dt.datetime.strptime('2021-01-12 19:19:30', '%Y-%m-%d %H:%M:%S') #Now
+            try:
+                last_date = date_recorder.last_date_per_entity[device_id]
+            except Exception:
+                pass
+            if ix[1] < last_date:
+                logger.debug('Unroller got old data')
+                continue
+            else:
+                date_recorder.last_date_per_entity[device_id] = ix[1]
 
             try:
                 vibx_ = ast.literal_eval(row['rms_x'])
@@ -243,6 +266,7 @@ class UnrollData(BaseTransformer):
                 jsdump = json.dumps(jsin)
                 js = json.loads(jsdump)
 
+
                 if not USING_DB:
                     print('sending ', js, ' to ', device_id)
                     if i_am_device:
@@ -252,6 +276,14 @@ class UnrollData(BaseTransformer):
                                             msgFormat="json", data=js, qos=0)
                                                         #client.publishEvent(typeId="MMDeviceTypeShadow", deviceId=device_id, eventId="MMEventOutputType",
                         #                    msgFormat="json", data=js, qos=0)  # , onPublish=eventPublishCallback)
+
+        # write back last recorded date
+        try:
+            db.model_store.store_model('Armstark', date_recorder)
+        except Exception:
+            pass
+
+
         if USING_DB:
             print('writing ', len(list_of_ts))
             db = self.get_db()

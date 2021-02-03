@@ -2823,9 +2823,9 @@ class VIAnomalyScore(SupervisedLearningTransformer):
 
                 # default: beta 1, prior N(0,1)
                 #   instead: beta 1, prior N(mean(target), sigma(target))
-                #self.prior_sigma = targets.std()
+                self.prior_sigma = targets.std()
                 #self.prior_sigma = 1.0
-                self.prior_sigma = 1.0 + (targets.std() - 1.0)/2
+                #self.prior_sigma = 1.0 + (targets.std() - 1.0)/2
 
                 vi_model = VI(scaler, prior_mu=self.prior_mu,
                               prior_sigma=self.prior_sigma, beta=self.beta, version=version)
