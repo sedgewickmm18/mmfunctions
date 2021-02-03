@@ -53,6 +53,7 @@ from torch.autograd import Variable
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader, Dataset, TensorDataset
+import torch.nn.functional as torchfunc
 
 
 logger = logging.getLogger(__name__)
@@ -2572,7 +2573,6 @@ class VI(nn.Module):
         self.show_once = True
         super().__init__()
 
-        '''
         self.q_mu = nn.Sequential(
             nn.Linear(1, 20),
             nn.ReLU(),
@@ -2580,16 +2580,7 @@ class VI(nn.Module):
             nn.ReLU(),
             nn.Linear(10, 1)
         )
-        '''
-        self.q_mu = nn.Sequential(
-            nn.Linear(1, 50),
-            nn.ReLU(),
-            nn.Linear(50, 35),
-            nn.ReLU(),
-            nn.Linear(35, 10),
-            nn.ReLU(),
-            nn.Linear(10, 1)
-        )
+
         self.q_log_var = nn.Sequential(
             nn.Linear(1, 50),    # more parameters for sigma
             nn.ReLU(),
@@ -2603,7 +2594,7 @@ class VI(nn.Module):
     # draw from N(mu, sigma)
     def reparameterize(self, mu, log_var):
         # std can not be negative, thats why we use log variance
-        sigma = torch.exp(0.5 * log_var) + 1e-5
+        sigma = torch.exp(0.5 * log_var) + 1e-7
         eps = torch.randn_like(sigma)
         return mu + sigma * eps
 
@@ -2613,6 +2604,7 @@ class VI(nn.Module):
         log_var = self.q_log_var(x)
         return self.reparameterize(mu, log_var), mu, log_var
 
+    # see 2.3 in https://arxiv.org/pdf/1312.6114.pdf
     def elbo(self, y_pred, y, mu, log_var):
         # likelihood of observing y given Variational mu and sigma - reconstruction error
         loglikelihood = ll_gaussian(y, mu, log_var)
@@ -2633,11 +2625,14 @@ class VI(nn.Module):
 
     # simplified when everything is Gaussian
     #  KL(q, p) = \log \frac{\sigma_1}{\sigma_2} + \frac{\sigma_2^2 + (\mu_2 - \mu_1)^2}{2 \sigma_1^2} - \frac{1}{2}
+    # unfortunately I don't get it to work properly
     def elbo_gauss(self, y, y_pred, mu, log_var):
         # likelihood of observing y given Variational mu and sigma - reconstruction error
         loglikelihood = ll_gaussian(y, mu, log_var)
 
-        kl_divergence = kl_div(mu, torch.tensor(self.prior_mu), log_var, torch.log(torch.tensor(self.prior_sigma)))
+        #kl_divergence = kl_div(mu, torch.tensor(self.prior_mu), log_var, torch.log(torch.tensor(self.prior_sigma)))
+        #  see 3 - https://arxiv.org/pdf/1312.6114.pdf
+        kl_divergence = (-0.5 * torch.sum(1 + log_var - mu**2 - log_var.exp()))
 
         if self.show_once:
             self.show_once = False
@@ -2645,7 +2640,7 @@ class VI(nn.Module):
                         ' loglikelihood: ' + str(loglikelihood.shape) + ' KL: ' + str(kl_divergence.shape) +
                         ' KL value: ' + str(kl_divergence))
 
-        return (loglikelihood - kl_divergence).mean()
+        return loglikelihood.mean() - kl_divergence
 
 
     # Unfinished - the stuff here is crap !
@@ -2828,7 +2823,10 @@ class VIAnomalyScore(SupervisedLearningTransformer):
 
                 # default: beta 1, prior N(0,1)
                 #   instead: beta 1, prior N(mean(target), sigma(target))
-                self.prior_sigma = targets.std()
+                #self.prior_sigma = targets.std()
+                #self.prior_sigma = 1.0
+                self.prior_sigma = 1.0 + (targets.std() - 1.0)/2
+
                 vi_model = VI(scaler, prior_mu=self.prior_mu,
                               prior_sigma=self.prior_sigma, beta=self.beta, version=version)
 
