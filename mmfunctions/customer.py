@@ -212,7 +212,7 @@ class UnrollData(BaseTransformer):
             try:
                 speed_ = ast.literal_eval(row['accel_speed'])
                 if once2 > 0:
-                    print ('Speed is ', speed)
+                    print ('Speed is ', speed_)
             except Exception as e4:
                 speed_ = None5
                 #print (' eval of ' + str(row['accel_speed']) + ' failed with ' + str(e4))
@@ -222,7 +222,7 @@ class UnrollData(BaseTransformer):
             try:
                 power_ = ast.literal_eval(row['accel_power'])
                 if once2 > 0:
-                    print ('Power is ', power)
+                    print ('Power is ', power_)
             except Exception as e5:
                 power_ = None5
                 #print (' eval of ' + str(row['accel_power']) + ' failed with ' + str(e5))
