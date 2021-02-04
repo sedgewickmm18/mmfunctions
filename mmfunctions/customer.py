@@ -298,11 +298,16 @@ class UnrollData(BaseTransformer):
             db = self.get_db()
             table = db.get_table('IOT_SHADOW_PUMP_DE_GEN5')
             cols = [column.key for column in table.columns]
-            print('DataBase is ', db, ' columns are ', cols)
+            my_cols = ['evt_timestamp', 'rms_x', 'rms_y', 'rms_z', 'POWER', 'speed', 'devicetype', 'deviceid',
+                       'logicalinterface_id', 'eventtype', 'format', 'rcv_timestamp_utc', 'updated_utc']
+
+            print('DataBase is ', db, ' columns are ', cols, ' ,writing to ', my_cols)
+            print('list of power ', list_of_power[0], ', list of speed ', list_of_speed[0])
+
             df_new = pd.DataFrame(list(zip(list_of_ts, list_of_vibx, list_of_viby, list_of_vibz,
                                            list_of_power, list_of_speed, list_of_devicetype, list_of_entity,
                                            list_of_log_id, list_of_eventtype, list_of_format, list_of_ts, list_of_ts)),
-                                  columns=cols)
+                                  columns=my_cols)
 
             df_new = df_new.set_index(['deviceid', 'evt_timestamp'])
             df_new = df_new[~df_new.index.duplicated(keep='first')]
