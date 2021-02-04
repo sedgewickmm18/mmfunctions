@@ -120,26 +120,31 @@ class UnrollData(BaseTransformer):
         # connect
         print('Unroll Data execute')
         #client = wiotp.sdk.device.DeviceClient(config=self.config, logHandlers=None)
-        client = None
-        if i_am_device:
-            client = wiotp.sdk.device.DeviceClient(config=auth_token, logHandlers=None)
-        else:
-            client = wiotp.sdk.application.ApplicationClient(config=auth_token, logHandlers=None)
 
-        client.on_connect = on_connect  # On Connect Callback.
-        client.on_publish = on_publish  # On Publish Callback.
-        client.on_disconnect = on_disconnect # On Disconnect Callback.
-        client.connect()
+
+        if not USING_DB:
+            client = None
+            if i_am_device:
+                client = wiotp.sdk.device.DeviceClient(config=auth_token, logHandlers=None)
+            else:
+                client = wiotp.sdk.application.ApplicationClient(config=auth_token, logHandlers=None)
+
+            client.on_connect = on_connect  # On Connect Callback.
+            client.on_publish = on_publish  # On Publish Callback.
+            client.on_disconnect = on_disconnect # On Disconnect Callback.
+            client.connect()
 
         Now = dt.datetime.now(pytz.timezone("UTC"))
         print(Now)
 
         # retrieve last recorded timestamps by entity
-        date_recorder = OrderedDict()
         db = self.get_db()
         try:
             date_recorder = db.model_store.retrieve_model('Armstark')
+            if date_recorder is None:
+                date_recorder = OrderedDict()
         except Exception:
+            date_recorder = OrderedDict()
             pass
 
         # Count rows with old data
@@ -152,14 +157,18 @@ class UnrollData(BaseTransformer):
             device_id = ix[0]
 
             # ignore row if time is smaller than last recorded time
-            last_date = dt.datetime.strptime('2021-01-12 19:19:30', '%Y-%m-%d %H:%M:%S') #Now
+            #last_date = dt.datetime.strptime('2021-01-12 19:19:30', '%Y-%m-%d %H:%M:%S') #Now
+            last_date = Now
             try:
                 last_date = date_recorder[device_id]
             except Exception:
                 pass
+
+            logger.info('last date for ' + str(device_id) + ' is ' + str(last_date))
+
             if ix[1] < last_date:
                 #logger.debug('Unroller got old data')
-                date_recorder[device_id] = last_date
+                #date_recorder[device_id] = last_date
                 old_data_rows += 1
                 continue
             else:
