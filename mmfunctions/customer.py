@@ -119,6 +119,12 @@ class UnrollData(BaseTransformer):
         # ONE ENTITY FOR NOW
         # connect
         print('Unroll Data execute')
+        try:
+            print('SPEED : ', df['accel_speed'][1:4])
+            print('POWER : ', df['accel_power'][1:4])
+        except Exception:
+            print('NO SPEED, NO POWER')
+            pass
         #client = wiotp.sdk.device.DeviceClient(config=self.config, logHandlers=None)
 
 
