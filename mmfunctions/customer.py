@@ -148,6 +148,8 @@ class UnrollData(BaseTransformer):
             date_recorder = OrderedDict()
             pass
 
+        new_date_recorder = date_recorder.deepcopy()
+
         # Count rows with old data
         old_data_rows = 0
         once = True
@@ -180,7 +182,7 @@ class UnrollData(BaseTransformer):
                 old_data_rows += 1
                 continue
             else:
-                date_recorder[device_id] = ix[1]
+                new_date_recorder[device_id] = ix[1]
 
             try:
                 vibx_ = ast.literal_eval(row['rms_x'])
@@ -335,7 +337,7 @@ class UnrollData(BaseTransformer):
         # write back last recorded date
         try:
             logger.debug('Ignored ' + str(old_data_rows) + ' old events')
-            db.model_store.store_model('Armstark', date_recorder)
+            db.model_store.store_model('Armstark', new_date_recorder)
         except Exception:
             pass
 
