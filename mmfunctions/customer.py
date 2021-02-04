@@ -120,8 +120,8 @@ class UnrollData(BaseTransformer):
         # connect
         print('Unroll Data execute')
         try:
-            print('SPEED : ', df['accel_speed'][1:4])
-            print('POWER : ', df['accel_power'][1:4])
+            print('SPEED : ', df['accel_speed'][1:40])
+            print('POWER : ', df['accel_power'][1:40])
         except Exception:
             print('NO SPEED, NO POWER')
             pass
