@@ -153,7 +153,8 @@ class UnrollData(BaseTransformer):
         # Count rows with old data
         old_data_rows = 0
         once =  100
-        once2 = 20
+        once2 = 100
+        once2 = 100
 
         # assume single entity
         for ix, row in df.iterrows():
