@@ -12,7 +12,7 @@
 The Built In Functions module contains customer specific helper functions
 '''
 
-import collections
+from collections import OrderedDict
 import json
 import datetime as dt
 import pytz
@@ -36,10 +36,6 @@ PACKAGE_URL = 'git+https://github.com/sedgewickmm18/mmfunctions.git'
 _IS_PREINSTALLED = False
 
 USING_DB = True
-
-class DateRecorder:
-    def __init__(self):
-        self.last_date_per_entity = collections.OrderedDict()
 
 None5 = [None, None, None, None, None]
 None15 = [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]
@@ -139,7 +135,7 @@ class UnrollData(BaseTransformer):
         print(Now)
 
         # retrieve last recorded timestamps by entity
-        date_recorder = DateRecorder()
+        date_recorder = collections.OrderedDict()
         db = self.get_db()
         try:
             date_recorder = db.model_store.retrieve_model('Armstark')
@@ -158,16 +154,16 @@ class UnrollData(BaseTransformer):
             # ignore row if time is smaller than last recorded time
             last_date = dt.datetime.strptime('2021-01-12 19:19:30', '%Y-%m-%d %H:%M:%S') #Now
             try:
-                last_date = date_recorder.last_date_per_entity[device_id]
+                last_date = date_recorder[device_id]
             except Exception:
                 pass
             if ix[1] < last_date:
                 #logger.debug('Unroller got old data')
-                date_recorder.last_date_per_entity[device_id] = last_date
+                date_recorder[device_id] = last_date
                 old_data_rows += 1
                 continue
             else:
-                date_recorder.last_date_per_entity[device_id] = ix[1]
+                date_recorder[device_id] = ix[1]
 
             try:
                 vibx_ = ast.literal_eval(row['rms_x'])
