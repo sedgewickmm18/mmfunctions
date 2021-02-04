@@ -119,12 +119,6 @@ class UnrollData(BaseTransformer):
         # ONE ENTITY FOR NOW
         # connect
         print('Unroll Data execute')
-        try:
-            print('SPEED : ', df['accel_speed'][1:40])
-            print('POWER : ', df['accel_power'][1:40])
-        except Exception:
-            print('NO SPEED, NO POWER')
-            pass
         #client = wiotp.sdk.device.DeviceClient(config=self.config, logHandlers=None)
 
 
@@ -158,7 +152,7 @@ class UnrollData(BaseTransformer):
 
         # Count rows with old data
         old_data_rows = 0
-        once = True
+        once =  100
         once2 = 20
 
         # assume single entity
@@ -167,9 +161,9 @@ class UnrollData(BaseTransformer):
             #device_id = ix[0].replace('Device','Shadow') - device id is identical !
             device_id = ix[0]
 
-            if once:
-                once = False
-                print('First row is ', row)
+            if once > 0:
+                once -= 1
+                print('Power ', row['accel_power'], ' Speed ', row['accel_speed'])
 
             # ignore row if time is smaller than last recorded time
             #last_date = dt.datetime.strptime('2021-01-12 19:19:30', '%Y-%m-%d %H:%M:%S') #Now
@@ -217,8 +211,6 @@ class UnrollData(BaseTransformer):
             # columns with 5 elements
             try:
                 speed_ = ast.literal_eval(row['accel_speed'])
-                if once2 > 0:
-                    print ('Speed is ', speed_)
             except Exception as e4:
                 speed_ = None5
                 #print (' eval of ' + str(row['accel_speed']) + ' failed with ' + str(e4))
@@ -227,8 +219,6 @@ class UnrollData(BaseTransformer):
 
             try:
                 power_ = ast.literal_eval(row['accel_power'])
-                if once2 > 0:
-                    print ('Power is ', power_)
             except Exception as e5:
                 power_ = None5
                 #print (' eval of ' + str(row['accel_power']) + ' failed with ' + str(e5))
