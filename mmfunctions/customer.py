@@ -187,7 +187,7 @@ class UnrollData(BaseTransformer):
             try:
                 vibx_ = ast.literal_eval(row['rms_x'])
             except Exception as e1:
-                vibx_ = None15
+                vibx_ = None15.copy()
                 #print (' eval of ' + str(row['rms_x']) + ' failed with ' + str(e1))
                 continue
                 pass
@@ -195,7 +195,7 @@ class UnrollData(BaseTransformer):
             try:
                 viby_ = ast.literal_eval(row['rms_y'])
             except Exception as e2:
-                viby_ = None15
+                viby_ = None15.copy()
                 #print (' eval of ' + str(row['rms_y']) + ' failed with ' + str(e2))
                 continue
                 pass
@@ -203,7 +203,7 @@ class UnrollData(BaseTransformer):
             try:
                 vibz_ = ast.literal_eval(row['rms_z'])
             except Exception as e3:
-                vibz_ = None15
+                vibz_ = None15.copy()
                 #print (' eval of ' + str(row['rms_z']) + ' failed with ' + str(e3))
                 continue
                 pass
@@ -212,7 +212,7 @@ class UnrollData(BaseTransformer):
             try:
                 speed_ = ast.literal_eval(row['accel_speed'])
             except Exception as e4:
-                speed_ = None5
+                speed_ = None5.copy()
                 #print (' eval of ' + str(row['accel_speed']) + ' failed with ' + str(e4))
                 continue
                 pass
@@ -220,16 +220,20 @@ class UnrollData(BaseTransformer):
             try:
                 power_ = ast.literal_eval(row['accel_power'])
             except Exception as e5:
-                power_ = None5
+                power_ = None5.copy()
                 #print (' eval of ' + str(row['accel_power']) + ' failed with ' + str(e5))
                 continue
                 pass
 
-            vibx = None15
-            viby = None15
-            vibz = None15
-            power = None5
-            speed = None5
+            if once3 > 0:
+                once3 -= 1
+                print('Power ', power_, 'Speed ', speed_)
+
+            vibx = None15.copy()
+            viby = None15.copy()
+            vibz = None15.copy()
+            power = None5.copy()
+            speed = None5.copy()
             for i in range(15):
                 try:
                     vibx[i] = float(vibx_[i])
