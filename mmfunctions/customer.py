@@ -150,12 +150,17 @@ class UnrollData(BaseTransformer):
 
         # Count rows with old data
         old_data_rows = 0
+        once = True
 
         # assume single entity
         for ix, row in df.iterrows():
             # columns with 15 elements
             #device_id = ix[0].replace('Device','Shadow') - device id is identical !
             device_id = ix[0]
+
+            if once:
+                once = False
+                print('First row is ', row)
 
             # ignore row if time is smaller than last recorded time
             #last_date = dt.datetime.strptime('2021-01-12 19:19:30', '%Y-%m-%d %H:%M:%S') #Now
