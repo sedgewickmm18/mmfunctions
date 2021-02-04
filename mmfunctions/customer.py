@@ -139,12 +139,11 @@ class UnrollData(BaseTransformer):
         print(Now)
 
         # retrieve last recorded timestamps by entity
+        date_recorder = DateRecorder()
         db = self.get_db()
-        date_recorder = None
         try:
             date_recorder = db.model_store.retrieve_model('Armstark')
         except Exception:
-            date_recorder = DateRecorder()
             pass
 
         # Count rows with old data
@@ -239,6 +238,10 @@ class UnrollData(BaseTransformer):
                     power[i] = float(power_[i])
                 except Exception:
                     pass
+
+            if power[0] == speed[0]:
+                logger.error('BUG')
+                exit
 
             for i in range(15):
                 print (len(vibx), len(viby), len(vibz), len(speed), len(power))
