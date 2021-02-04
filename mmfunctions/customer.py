@@ -145,6 +145,9 @@ class UnrollData(BaseTransformer):
         except Exception:
             date_recorder = DateRecorder()
 
+        # Count rows with old data
+        old_data_rows = 0
+
         # assume single entity
         for ix, row in df.iterrows():
             # columns with 15 elements
@@ -158,7 +161,9 @@ class UnrollData(BaseTransformer):
             except Exception:
                 pass
             if ix[1] < last_date:
-                logger.debug('Unroller got old data')
+                #logger.debug('Unroller got old data')
+                date_recorder.last_date_per_entity[device_id] = last_date
+                old_data_rows += 1
                 continue
             else:
                 date_recorder.last_date_per_entity[device_id] = ix[1]
@@ -279,6 +284,7 @@ class UnrollData(BaseTransformer):
 
         # write back last recorded date
         try:
+            logger.debug('Ignored ' + str(old_data_rows) + ' old events')
             db.model_store.store_model('Armstark', date_recorder)
         except Exception:
             pass
