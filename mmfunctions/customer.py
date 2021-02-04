@@ -293,14 +293,6 @@ class UnrollData(BaseTransformer):
                                                         #client.publishEvent(typeId="MMDeviceTypeShadow", deviceId=device_id, eventId="MMEventOutputType",
                         #                    msgFormat="json", data=js, qos=0)  # , onPublish=eventPublishCallback)
 
-        # write back last recorded date
-        try:
-            logger.debug('Ignored ' + str(old_data_rows) + ' old events')
-            db.model_store.store_model('Armstark', date_recorder)
-        except Exception:
-            pass
-
-
         if USING_DB:
             print('writing ', len(list_of_ts))
             db = self.get_db()
@@ -316,6 +308,14 @@ class UnrollData(BaseTransformer):
 
             db.write_frame(df_new, 'IOT_SHADOW_PUMP_DE_GEN5')
             print('DONE')
+
+        # write back last recorded date
+        try:
+            logger.debug('Ignored ' + str(old_data_rows) + ' old events')
+            db.model_store.store_model('Armstark', date_recorder)
+        except Exception:
+            pass
+
 
         msg = 'UnrollData'
         self.trace_append(msg)
