@@ -303,6 +303,10 @@ class UnrollData(BaseTransformer):
                                            list_of_power, list_of_speed, list_of_devicetype, list_of_entity,
                                            list_of_log_id, list_of_eventtype, list_of_format, list_of_ts, list_of_ts)),
                                   columns=cols)
+
+            df_new = df_new.set_index(['deviceid', 'evt_timestamp'])
+            df_new = df_new[~df_new.index.duplicated(keep='first')]
+
             #['evt_timestamp', 'rms_x', 'rms_z', 'rms_y', 'POWER', 'spee
             #d', 'devicetype', 'deviceid', 'logicalinterface_id', 'eventtype', 'format', 'rcv_timestamp_utc', 'updated_utc']
 
