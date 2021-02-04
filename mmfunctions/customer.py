@@ -159,15 +159,16 @@ class UnrollData(BaseTransformer):
 
             # ignore row if time is smaller than last recorded time
             #last_date = dt.datetime.strptime('2021-01-12 19:19:30', '%Y-%m-%d %H:%M:%S') #Now
-            last_date = Now
+            last_date = None
             try:
                 last_date = date_recorder[device_id]
             except Exception:
+                last_date = None
                 pass
 
             logger.info('last date for ' + str(device_id) + ' is ' + str(last_date))
 
-            if ix[1] < last_date:
+            if last_date is None or ix[1] < last_date:
                 #logger.debug('Unroller got old data')
                 #date_recorder[device_id] = last_date
                 old_data_rows += 1
