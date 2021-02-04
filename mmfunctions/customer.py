@@ -134,7 +134,8 @@ class UnrollData(BaseTransformer):
             client.on_disconnect = on_disconnect # On Disconnect Callback.
             client.connect()
 
-        Now = dt.datetime.now(pytz.timezone("UTC"))
+        #Now = dt.datetime.now(pytz.timezone("UTC"))
+        Now = dt.datetime.now
         print(Now)
 
         # retrieve last recorded timestamps by entity
