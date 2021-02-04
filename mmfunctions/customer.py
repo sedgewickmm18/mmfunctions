@@ -151,6 +151,7 @@ class UnrollData(BaseTransformer):
         # Count rows with old data
         old_data_rows = 0
         once = True
+        once2 = 20
 
         # assume single entity
         for ix, row in df.iterrows():
@@ -250,6 +251,10 @@ class UnrollData(BaseTransformer):
                     power[i] = float(power_[i])
                 except Exception:
                     pass
+
+            if once2 > 0:
+                once2 -= 1
+                print('Power vs Speed ', power, speed)
 
             if power[0] == speed[0]:
                 logger.error('BUG')
