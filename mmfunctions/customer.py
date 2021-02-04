@@ -135,7 +135,7 @@ class UnrollData(BaseTransformer):
         print(Now)
 
         # retrieve last recorded timestamps by entity
-        date_recorder = collections.OrderedDict()
+        date_recorder = OrderedDict()
         db = self.get_db()
         try:
             date_recorder = db.model_store.retrieve_model('Armstark')
