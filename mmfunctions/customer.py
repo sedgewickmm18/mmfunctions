@@ -248,7 +248,6 @@ class UnrollData(BaseTransformer):
 
             if power[0] == speed[0]:
                 logger.error('BUG')
-                exit
 
             for i in range(15):
                 print (len(vibx), len(viby), len(vibz), len(speed), len(power))
