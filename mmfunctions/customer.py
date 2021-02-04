@@ -148,7 +148,7 @@ class UnrollData(BaseTransformer):
             date_recorder = OrderedDict()
             pass
 
-        new_date_recorder = date_recorder.deepcopy()
+        new_date_recorder = date_recorder.copy()
 
         # Count rows with old data
         old_data_rows = 0
