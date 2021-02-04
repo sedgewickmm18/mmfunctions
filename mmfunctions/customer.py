@@ -140,10 +140,12 @@ class UnrollData(BaseTransformer):
 
         # retrieve last recorded timestamps by entity
         db = self.get_db()
+        date_recorder = None
         try:
             date_recorder = db.model_store.retrieve_model('Armstark')
         except Exception:
             date_recorder = DateRecorder()
+            pass
 
         # Count rows with old data
         old_data_rows = 0
