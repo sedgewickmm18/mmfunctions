@@ -184,7 +184,9 @@ class UnrollData(BaseTransformer):
                 old_data_rows += 1
                 continue
             else:
-                new_date_recorder[device_id] = ix[1]
+                old_data_rows += 1
+                continue
+                #new_date_recorder[device_id] = ix[1]
 
             try:
                 vibx_ = ast.literal_eval(row['rms_x'])
