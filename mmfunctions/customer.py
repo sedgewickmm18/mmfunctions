@@ -179,15 +179,15 @@ class UnrollData(BaseTransformer):
                         ' compare with ' + str(ix[1]) + 'comparison results: ' + str(ix[1] < last_date) +
                         '/' + str(ix[1] > last_date))
 
-            if last_date is not None and ix[1] < last_date:
+            if last_date is None:
+                logger.debug('Okay')
+            elif ix[1] <= last_date:
                 logger.info('Ignore event from date ' + str(ix[1]))
                 #date_recorder[device_id] = last_date
                 old_data_rows += 1
                 continue
-            else:
-                old_data_rows += 1
-                continue
-                #new_date_recorder[device_id] = ix[1]
+
+            new_date_recorder[device_id] = ix[1]
 
             try:
                 vibx_ = ast.literal_eval(row['rms_x'])
