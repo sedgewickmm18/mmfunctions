@@ -323,7 +323,6 @@ class UnrollData(BaseTransformer):
                        'logicalinterface_id', 'eventtype', 'format', 'rcv_timestamp_utc', 'updated_utc']
 
             print('DataBase is ', db, ' columns are ', cols, ' ,writing to ', my_cols)
-            print('list of power ', list_of_power[0], ', list of speed ', list_of_speed[0])
 
             df_new = pd.DataFrame(list(zip(list_of_ts, list_of_vibx, list_of_viby, list_of_vibz,
                                            list_of_power, list_of_speed, list_of_devicetype, list_of_entity,
