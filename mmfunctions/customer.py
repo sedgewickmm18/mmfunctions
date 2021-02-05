@@ -175,9 +175,10 @@ class UnrollData(BaseTransformer):
                 last_date = None
                 pass
 
-            logger.info('last date for ' + str(device_id) + ' is ' + str(last_date) +
-                        ' compare with ' + str(ix[1]) + 'comparison results: ' + str(ix[1] < last_date) +
-                        '/' + str(ix[1] > last_date))
+            if last_date is not None:
+                logger.info('last date for ' + str(device_id) + ' is ' + str(last_date) +
+                            ' compare with ' + str(ix[1]) + 'comparison results: ' + str(ix[1] < last_date) +
+                            '/' + str(ix[1] > last_date))
 
             if last_date is None:
                 logger.debug('Okay')
