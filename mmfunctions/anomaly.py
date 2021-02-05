@@ -2562,7 +2562,7 @@ def kl_div(mu1, mu2, lg_sigma1, lg_sigma2):
     return 0.5 * (2 * lg_sigma2 - 2 * lg_sigma1 + (lg_sigma1.exp() ** 2 + (mu1 - mu2)**2)/lg_sigma2.exp()**2 - 1)
 
 class VI(nn.Module):
-    def __init__(self, scaler, prior_mu=0.0, prior_sigma=1.0, beta=1.0, version=None):
+    def __init__(self, scaler, prior_mu=0.0, prior_sigma=1.0, beta=1.0, adjust_mean=0.0, version=None):
         self.prior_mu = prior_mu
         self.prior_sigma = prior_sigma
         self.beta = beta
@@ -2571,6 +2571,7 @@ class VI(nn.Module):
         self.build_time = pd.Timestamp.now()
         self.scaler = scaler
         self.show_once = True
+        self.adjust_mean = adjust_mean
         super().__init__()
 
         self.q_mu = nn.Sequential(
@@ -2741,7 +2742,6 @@ class VIAnomalyScore(SupervisedLearningTransformer):
         self.prior_mu = 0.0
         self.prior_sigma = 1.0
         self.beta = 1.0
-        self.adjust_mean = 0.0
 
     # in super class
     #def get_model_name(self, prefix='model', suffix=None):
@@ -2801,9 +2801,13 @@ class VIAnomalyScore(SupervisedLearningTransformer):
 
             # deal with negative means - are the issues related to ReLU ?
             #  adjust targets to have mean == 0
+            adjust_mean = 0.0
             if vi_model is None:
-                self.adjust_mean = targets.mean()
-            targets -= self.adjust_mean
+                adjust_mean = targets.mean()
+            else:
+                adjust_mean = vi_model.adjust_mean
+            logger.info('Adjusting target mean with ' + str(adjust_mean))
+            targets -= adjust_mean
 
             xy = np.hstack([features, targets])
 
@@ -2827,8 +2831,8 @@ class VIAnomalyScore(SupervisedLearningTransformer):
                 #self.prior_sigma = 1.0
                 #self.prior_sigma = 1.0 + (targets.std() - 1.0)/2
 
-                vi_model = VI(scaler, prior_mu=self.prior_mu,
-                              prior_sigma=self.prior_sigma, beta=self.beta, version=version)
+                vi_model = VI(scaler, prior_mu=self.prior_mu, prior_sigma=self.prior_sigma,
+                              beta=self.beta, adjust_mean=adjust_mean, version=version)
 
                 logger.debug('Training VI model ' + str(vi_model.version) + ' for entity: ' + str(entity) +
                              'Prior mean: ' + str(self.prior_mu) + ', sigma: ' + str(self.prior_sigma))
@@ -2871,7 +2875,7 @@ class VIAnomalyScore(SupervisedLearningTransformer):
                     self.mu[entity] = mu
                     self.quantile095[entity] = q1
 
-                df_copy.loc[entity, self.predictions] = mu[ind_r] + self.adjust_mean
+                df_copy.loc[entity, self.predictions] = mu[ind_r] + vi_model.adjust_mean
                 df_copy.loc[entity, self.pred_stddev] = q1[ind_r]
             else:
                 logger.debug('No VI model for entity: ' + str(entity))
