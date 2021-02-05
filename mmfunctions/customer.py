@@ -180,7 +180,7 @@ class UnrollData(BaseTransformer):
                         '/' + str(ix[1] > last_date))
 
             if last_date is not None and ix[1] < last_date:
-                #logger.debug('Unroller got old data')
+                logger.info('Ignore event from date ' + str(ix[1]))
                 #date_recorder[device_id] = last_date
                 old_data_rows += 1
                 continue
