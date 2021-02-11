@@ -73,10 +73,6 @@ class UnrollData(BaseTransformer):
 
     def execute(self, df):
 
-        logger.info('BYPASSING UNROLLER')
-
-        return df
-
         list_of_entity = []
         list_of_ts = []
         list_of_vibx = []
