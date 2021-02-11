@@ -73,6 +73,7 @@ class UnrollData(BaseTransformer):
 
     def execute(self, df):
 
+        return df
         list_of_entity = []
         list_of_ts = []
         list_of_vibx = []
@@ -176,14 +177,14 @@ class UnrollData(BaseTransformer):
                 pass
 
             if last_date is not None:
-                logger.info('last date for ' + str(device_id) + ' is ' + str(last_date) +
-                            ' compare with ' + str(ix[1]) + 'comparison results: ' + str(ix[1] < last_date) +
-                            '/' + str(ix[1] > last_date))
+                logger.debug('last date for ' + str(device_id) + ' is ' + str(last_date) +
+                             ' compare with ' + str(ix[1]) + 'comparison results: ' + str(ix[1] < last_date) +
+                             '/' + str(ix[1] > last_date))
 
             if last_date is None:
                 logger.debug('Okay')
             elif ix[1] <= last_date:
-                logger.info('Ignore event from date ' + str(ix[1]))
+                logger.debug('Ignore event from date ' + str(ix[1]))
                 #date_recorder[device_id] = last_date
                 old_data_rows += 1
                 continue
@@ -269,7 +270,8 @@ class UnrollData(BaseTransformer):
                 print('Power vs Speed ', power, speed)
 
             if power[0] == speed[0]:
-                logger.error('BUG')
+                if power[0] is not None:
+                    logger.error('BUG')
 
             for i in range(15):
                 print (len(vibx), len(viby), len(vibz), len(speed), len(power))
