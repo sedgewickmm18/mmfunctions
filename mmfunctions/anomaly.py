@@ -32,7 +32,7 @@ from sklearn import metrics
 from sklearn.covariance import MinCovDet
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import (StandardScaler, RobustScaler, MinMaxScaler,
-                                   minmax_scale, PowerTransformer)
+                                   minmax_scale, PowerTransformer, PolynomialFeatures)
 from sklearn.utils import check_array
 # for Matrix Profile
 import iotfunctions
@@ -106,7 +106,9 @@ def custom_resampler(array_like):
 def min_delta(df):
     # minimal time delta for merging
 
-    if len(df.index.names) > 1:
+    if df is None:
+        return pd.Timedelta('5 seconds'), df
+    elif len(df.index.names) > 1:
         df2 = df.copy()
         df2.index = df2.index.droplevel(list(range(1, df.index.nlevels)))
     else:
@@ -1969,6 +1971,88 @@ class BayesRidgeRegressor(BaseEstimatorFunction):
         return (inputs, outputs)
 
 
+class BayesRidgeRegressorExt(BaseEstimatorFunction):
+    """
+    Linear regressor based on a probabilistic model as provided by sklearn
+    """
+    eval_metric = staticmethod(metrics.r2_score)
+
+    # class variables
+    train_if_no_model = True
+    num_rounds_per_estimator = 3
+
+    def BRidgePipelineDeg(self):
+        steps = [('scaler', StandardScaler()),
+                 ('poly', PolynomialFeatures(degree=self.degree)),
+                 ('bridge', linear_model.BayesianRidge(compute_score=True))]
+        return Pipeline(steps)
+
+    def set_estimators(self):
+        params = {}
+        self.estimators['bayesianridge'] = (self.BRidgePipelineDeg, params)
+        logger.info('Bayesian Ridge Regressor start searching for best polynomial model of degree ' + str(self.degree))
+
+    def __init__(self, features, targets, predictions=None, deviations=None, degree=3):
+        super().__init__(features=features, targets=targets, predictions=predictions, stddev=True)
+
+        if deviations is not None:
+            self.pred_stddev = deviations
+
+        self.experiments_per_execution = 1
+        self.auto_train = True
+        self.correlation_threshold = 0
+        self.stop_auto_improve_at = -2
+        self.degree = degree
+
+    def execute(self, df):
+
+        df_copy = df.copy()
+        entities = np.unique(df_copy.index.levels[0])
+
+        logger.debug(str(entities) + ' predicting ' + str(self.targets) + ' from ' + str(self.features) +\
+                     ' to appear in ' + str(self.predictions) + ' with confidence interval ' + str(self.pred_stddev))
+
+        missing_cols = [x for x in self.predictions + self.pred_stddev if x not in df_copy.columns]
+        for m in missing_cols:
+            df_copy[m] = None
+
+        for entity in entities:
+            try:
+                #check_array(df_copy.loc[[entity]][self.features].values, allow_nd=2)
+                logger.debug('check passed')
+                dfe = super()._execute(df_copy.loc[[entity]], entity)
+
+                logger.debug('BayesianRidge: Entity ' + str(entity) + ' Type of pred, stddev arrays ' + \
+                             str(type(dfe[self.predictions])) + str(type(dfe[self.pred_stddev].values)))
+
+                dfe.fillna(0, inplace=True)
+
+                df_copy.loc[entity, self.predictions] = dfe[self.predictions]
+                df_copy.loc[entity, self.pred_stddev] = dfe[self.pred_stddev]
+
+            except Exception as e:
+                logger.info('Bayesian Ridge regressor for entity ' + str(entity) + ' failed with: ' + str(e))
+                df_copy.loc[entity, self.predictions] = 0
+                df_copy.loc[entity, self.pred_stddev] = 0
+
+        return df_copy
+
+    @classmethod
+    def build_ui(cls):
+        # define arguments that behave as function inputs
+        inputs = []
+        inputs.append(UIMultiItem(name='features', datatype=float, required=True, output_item='deviations',
+                                  is_output_datatype_derived=True))
+        inputs.append(UIMultiItem(name='targets', datatype=float, required=True, output_item='predictions',
+                                  is_output_datatype_derived=True))
+        inputs.append(
+            UISingle(name='degree', datatype=int, required=False, description=('Degree of polynomial')))
+
+        # define arguments that behave as function outputs
+        outputs = []
+        return (inputs, outputs)
+
+
 class GBMRegressor(BaseEstimatorFunction):
     """
     Regressor based on gradient boosting method as provided by lightGBM
@@ -2274,8 +2358,22 @@ class GBMForecaster(BaseEstimatorFunction):
 
                 new_features.append(lagged_feature + '_' + str(lag))
 
-        # add day of week and month of year as two feature pairs
-        new_features = np.concatenate((new_features, ['_DayOfWeekCos_', '_DayOfWeekSin_', '_DayOfYearCos_', '_DayOfYearSin_']))
+        # find out proper timescale
+        mindelta, df_copy = min_delta(df)
+
+        # add day of week and month of year as two feature pairs for at least hourly timescales
+        include_day_of_week = False
+        include_hour_of_day = False
+        if mindelta >= pd.Timedelta('1h'):
+            new_features = np.concatenate((new_features, ['_DayOfWeekCos_', '_DayOfWeekSin_', '_DayOfYearCos_', '_DayOfYearSin_']))
+            logger.info('GBMForecaster adding day_of_week feature')
+            include_day_of_week = True
+        elif mindelta >= pd.Timedelta('1m'):
+            new_features = np.concatenate((new_features, ['_HourOfDayCos_', '_HourOfDaySin_']))
+            logger.info('GBMForecaster adding hour_of_day feature')
+            include_hour_of_day = True
+
+        # add day of week or hour of day if appropriate
 
         if df is not None:
             df_copy = df.copy()
@@ -2292,12 +2390,15 @@ class GBMForecaster(BaseEstimatorFunction):
 
             # add day of week and month of year as two feature pairs
             # operate on simple timestamp index
-            df_copy['_DayOfWeekCos_'] = np.cos(df_copy.index.get_level_values(1).dayofweek / 7)
-            df_copy['_DayOfWeekSin_'] = np.sin(df_copy.index.get_level_values(1).dayofweek / 7)
-            df_copy['_DayOfYearCos_'] = np.cos(df_copy.index.get_level_values(1).dayofyear / 365)
-            df_copy['_DayOfYearSin_'] = np.sin(df_copy.index.get_level_values(1).dayofyear / 365)
+            if include_day_of_week:
+                df_copy['_DayOfWeekCos_'] = np.cos(df_copy.index.get_level_values(1).dayofweek / 7)
+                df_copy['_DayOfWeekSin_'] = np.sin(df_copy.index.get_level_values(1).dayofweek / 7)
+                df_copy['_DayOfYearCos_'] = np.cos(df_copy.index.get_level_values(1).dayofyear / 365)
+                df_copy['_DayOfYearSin_'] = np.sin(df_copy.index.get_level_values(1).dayofyear / 365)
+            elif include_hour_of_day:
+                df_copy['_HourOfDayCos_'] = np.cos(df_copy.index.get_level_values(1).hour / 24)
+                df_copy['_HourOfDaySin_'] = np.sin(df_copy.index.get_level_values(1).hour / 24)
 
-            #df = df[df[df.columns.intersection(new_features)].notna()]   # drop NaNs
         else:
             df_copy = df
 

@@ -147,6 +147,7 @@ class UnrollData(BaseTransformer):
         except Exception:
             date_recorder = OrderedDict()
             pass
+        logger.info('Date recorder ' + str(date_recorder))
 
         new_date_recorder = date_recorder.copy()
 
@@ -162,9 +163,11 @@ class UnrollData(BaseTransformer):
             #device_id = ix[0].replace('Device','Shadow') - device id is identical !
             device_id = ix[0]
 
+            '''
             if once > 0:
                 once -= 1
                 print('Power ', row['accel_power'], ' Speed ', row['accel_speed'])
+            '''
 
             # ignore row if time is smaller than last recorded time
             #last_date = dt.datetime.strptime('2021-01-12 19:19:30', '%Y-%m-%d %H:%M:%S') #Now
@@ -175,15 +178,17 @@ class UnrollData(BaseTransformer):
                 last_date = None
                 pass
 
+            '''
             if last_date is not None:
                 logger.debug('last date for ' + str(device_id) + ' is ' + str(last_date) +
                              ' compare with ' + str(ix[1]) + 'comparison results: ' + str(ix[1] < last_date) +
                              '/' + str(ix[1] > last_date))
+            '''
 
             if last_date is None:
                 logger.debug('Okay')
             elif ix[1] <= last_date:
-                logger.debug('Ignore event from date ' + str(ix[1]))
+                #logger.debug('Ignore event from date ' + str(ix[1]))
                 #date_recorder[device_id] = last_date
                 old_data_rows += 1
                 continue
@@ -342,7 +347,7 @@ class UnrollData(BaseTransformer):
 
         # write back last recorded date
         try:
-            logger.debug('Ignored ' + str(old_data_rows) + ' old events')
+            logger.info('Ignored ' + str(old_data_rows) + ' old events')
             db.model_store.store_model('Armstark', new_date_recorder)
         except Exception:
             pass
