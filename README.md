@@ -1,4 +1,6 @@
-# mmfunctions
-iotfunctions playground
+## mmfunctions
 
-Please see the repo wiki for more information
+Playground for Maximo Asset Monitor
+
+Please see the [repo wiki](https://github.com/sedgewickmm18/mmfunctions/wiki) for more information.
+
