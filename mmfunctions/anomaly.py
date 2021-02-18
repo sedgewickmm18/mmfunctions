@@ -36,6 +36,7 @@ from sklearn.preprocessing import (StandardScaler, RobustScaler, MinMaxScaler,
 from sklearn.utils import check_array
 # for Matrix Profile
 import iotfunctions
+print ('iotfunctions version is ', iotfunctions.__version__)
 if iotfunctions.__version__ != '8.2.1':
     import stumpy
 
