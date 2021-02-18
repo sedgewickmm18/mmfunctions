@@ -36,7 +36,6 @@ from sklearn.preprocessing import (StandardScaler, RobustScaler, MinMaxScaler,
 from sklearn.utils import check_array
 # for Matrix Profile
 import iotfunctions
-print ('iotfunctions version is ', iotfunctions.__version__)
 if iotfunctions.__version__ != '8.2.1':
     import stumpy
 
@@ -58,6 +57,8 @@ import torch.nn.functional as torchfunc
 
 
 logger = logging.getLogger(__name__)
+logger.info('IOT functions version ' + iotfunctions.__version__)
+
 PACKAGE_URL = 'git+https://github.com/sedgewickmm18/mmfunctions.git'
 _IS_PREINSTALLED = False
 
