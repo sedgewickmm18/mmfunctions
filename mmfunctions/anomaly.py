@@ -2365,11 +2365,9 @@ class GBMForecaster(BaseEstimatorFunction):
         include_day_of_week = False
         include_hour_of_day = False
         if mindelta >= pd.Timedelta('1h'):
-            new_features = np.concatenate((new_features, ['_DayOfWeekCos_', '_DayOfWeekSin_', '_DayOfYearCos_', '_DayOfYearSin_']))
             logger.info('GBMForecaster adding day_of_week feature')
             include_day_of_week = True
         elif mindelta >= pd.Timedelta('1m'):
-            new_features = np.concatenate((new_features, ['_HourOfDayCos_', '_HourOfDaySin_']))
             logger.info('GBMForecaster adding hour_of_day feature')
             include_hour_of_day = True
 
@@ -2391,11 +2389,13 @@ class GBMForecaster(BaseEstimatorFunction):
             # add day of week and month of year as two feature pairs
             # operate on simple timestamp index
             if include_day_of_week:
+                new_features = np.concatenate((new_features, ['_DayOfWeekCos_', '_DayOfWeekSin_', '_DayOfYearCos_', '_DayOfYearSin_']))
                 df_copy['_DayOfWeekCos_'] = np.cos(df_copy.index.get_level_values(1).dayofweek / 7)
                 df_copy['_DayOfWeekSin_'] = np.sin(df_copy.index.get_level_values(1).dayofweek / 7)
                 df_copy['_DayOfYearCos_'] = np.cos(df_copy.index.get_level_values(1).dayofyear / 365)
                 df_copy['_DayOfYearSin_'] = np.sin(df_copy.index.get_level_values(1).dayofyear / 365)
             elif include_hour_of_day:
+                new_features = np.concatenate((new_features, ['_HourOfDayCos_', '_HourOfDaySin_']))
                 df_copy['_HourOfDayCos_'] = np.cos(df_copy.index.get_level_values(1).hour / 24)
                 df_copy['_HourOfDaySin_'] = np.sin(df_copy.index.get_level_values(1).hour / 24)
 
