@@ -69,4 +69,7 @@ class AggregateWithExpression(BaseSimpleAggregator):
     def aggregate(self, x):
         return eval(self.expression)
 
+    def execute(self, x):
+        print(x)
+        return eval(self.expression)
 
