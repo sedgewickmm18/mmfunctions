@@ -72,6 +72,7 @@ class AggregateWithExpression(BaseSimpleAggregator):
     def execute(self, x):
         logger.info('Execute AggregateWithExpression')
         print('Source ', self.source, 'Expression ', self.expression, 'Name ', self.name)
-        print(x)
-        return eval(self.expression)
+        y = eval(self.expression)
+        logger.info('AggregateWithExpression returns ' + str(y))
+        return y
 
