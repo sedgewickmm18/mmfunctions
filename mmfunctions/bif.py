@@ -46,12 +46,13 @@ class AggregateWithExpression(BaseSimpleAggregator):
 
     """
 
-    def __init__(self, source, expression=None, name=None):
+    def __init__(self, source=None, expression=None, name=None):
         super().__init__()
 
         self.source = source
         self.expression = expression
         self.name = name
+        print(dir(self))
 
     @classmethod
     def build_ui(cls):
