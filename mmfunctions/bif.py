@@ -48,6 +48,7 @@ class AggregateWithExpression(BaseSimpleAggregator):
 
     def __init__(self, source=None, expression=None, name=None):
         super().__init__()
+        logger.info('AggregateWithExpression _init')
 
         self.source = source
         self.expression = expression
@@ -57,9 +58,8 @@ class AggregateWithExpression(BaseSimpleAggregator):
     @classmethod
     def build_ui(cls):
         inputs = []
-        inputs.append(UIMultiItem(name='source', datatype=None, description=('Choose the data items'
-                                                                                  ' that you would like to'
-                                                                                  ' aggregate'),
+        inputs.append(UIMultiItem(name='source', datatype=None,
+                                  description=('Choose the data items that you would like to aggregate'),
                                   output_item='name', is_output_datatype_derived=True))
 
         inputs.append(UIExpression(name='expression', description='Paste in or type an AS expression'))
