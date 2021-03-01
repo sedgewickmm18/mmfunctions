@@ -90,29 +90,29 @@ class AggregateTimeInState(BaseSimpleAggregator):
 
     """
 
-    def __init__(self, source=None, state_name=None, name=None):
+    def __init__(self, source=None, name=None):
         super().__init__()
         logger.info('AggregateTimeInState _init')
 
         self.source = source
-        self.state_name = state_name
         self.name = name
         print(dir(self))
 
     @classmethod
     def build_ui(cls):
         inputs = []
-        inputs.append(UIMultiItem(name='source', datatype=None,
-                                  description=('Choose the data items that you would like to aggregate'),
-                                  output_item='name', is_output_datatype_derived=True))
+        inputs.append(UISingleItem(name='source', datatype=None,
+                                  description='Choose the data items that you would like to aggregate'))
 
-        inputs.append(UISingle(name='state_name', datatype=str,  description='Enter name of the state to measure time of'))
+        outputs = []
+        outputs.append(
+            UIFunctionOutSingle(name='name', datatype=float, description='Spectral anomaly score (z-score)'))
 
-        return (inputs, [])
+        return (inputs, outputs)
 
     def execute(self, group):
         logger.info('Execute AggregateTimeInState')
-        print('Source ', self.source, 'state_name ', self.state_name, 'Name ', self.name, ' Index ', group.index)
+        print('Source ', self.source,  'Name ', self.name, ' Index ', group.index)
 
         lg = group.size
         if lg == 0:
@@ -184,13 +184,15 @@ class StateTimePrep(BaseTransformer):
     @classmethod
     def build_ui(cls):
         inputs = []
-        inputs.append(UIMultiItem(name='source', datatype=None,
-                                  description=('Choose the data items that you would like to aggregate'),
-                                  output_item='name', is_output_datatype_derived=True))
-
+        inputs.append(UISingleItem(name='source', datatype=float,
+                                  description='Choose the data items that you would like to aggregate'))
         inputs.append(UISingle(name='state_name', datatype=str,  description='Enter name of the state to measure time of'))
 
-        return (inputs, [])
+        outputs = []
+        outputs.append(
+            UIFunctionOutSingle(name='name', datatype=str, description='Spectral anomaly score (z-score)'))
+
+        return (inputs, outputs)
 
     def _calc(self, df):
         logger.info('Execute StateTimePrep per entity')
