@@ -79,15 +79,11 @@ class AggregateWithExpression(BaseSimpleAggregator):
 
 class AggregateTimeInState(BaseSimpleAggregator):
     """
-    Create aggregation using expression. The calculation is evaluated for
-    each data_item selected. The data item will be made available as a
-    Pandas Series. Refer to the Pandas series using the local variable named
-    "x". The expression must return a scalar value.
-
-    Example:
-
-    x.max() - x.min()
-
+    Creates aggregation from the output of StateTimePreparation, a string
+    encoded pair of a state change variable (-1 for leaving the state,
+    0 for no change, 1 for entering the state) together with a unix epoch
+    timestamp.
+    It computes the overall number of seconds spent in a particular state.
     """
 
     def __init__(self, source=None, name=None):
@@ -102,17 +98,17 @@ class AggregateTimeInState(BaseSimpleAggregator):
     def build_ui(cls):
         inputs = []
         inputs.append(UISingleItem(name='source', datatype=None,
-                                  description='Choose the data items that you would like to aggregate'))
+                                  description='Output of StateTimePreparation to aggregate over'))
 
         outputs = []
         outputs.append(
-            UIFunctionOutSingle(name='name', datatype=float, description='Spectral anomaly score (z-score)'))
+            UIFunctionOutSingle(name='name', datatype=float, description='Overall amount of seconds spent in a particular state'))
 
         return (inputs, outputs)
 
     def execute(self, group):
         logger.info('Execute AggregateTimeInState')
-        print('Source ', self.source,  'Name ', self.name, ' Index ', group.index)
+        #print('Source ', self.source,  'Name ', self.name, ' Index ', group.index)
 
         lg = group.size
         if lg == 0:
@@ -122,9 +118,7 @@ class AggregateTimeInState(BaseSimpleAggregator):
         group_exp = group.str.split(pat=',', n=1, expand=True).astype(int)
         g0 = group_exp[0].values
         g1 = group_exp[1].values
-        print(g0, g1)
-        #np.savetxt('/tmp/numpy' + str(g1[0]), g0)
-        #group.to_csv('/tmp/testgroup' + str(g1[0]))
+        #print(g0, g1)
 
         # adjust for intervals cut in half by aggregation
         '''
@@ -156,29 +150,38 @@ class AggregateTimeInState(BaseSimpleAggregator):
             pass
 
         if nonzeroMin > 0:
-            print('YES1', nonzeroMin, g0[nonzeroMin])
+            #print('YES1', nonzeroMin, g0[nonzeroMin])
             if g0[nonzeroMin] < 0:
                 g0[0] = 1
         else:
-            print('NO 1', nonzeroMin, g0[nonzeroMin])
+            #print('NO 1', nonzeroMin, g0[nonzeroMin])
             if g0[0] < 0:
                 g0[0] = 0
 
         if nonzeroMax > 0:
-            print('YES2', nonzeroMax, g0[nonzeroMax], g0.size)
+            #print('YES2', nonzeroMax, g0[nonzeroMax], g0.size)
             if g0[nonzeroMax] > 0:
                 g0[-1] = -1
                 # if nonzeroMax is last, ignore
                 if g0[nonzeroMax] < 0:
                     g0[-1] = 0
 
-        y = (g0 * g1).sum()
+        y = abs((g0 * g1).sum())
         logger.info('AggregateTimeInState returns ' + str(y) + ' seconds, computed from ' + str(g0.size))
-        return abs(y)
+        return y
 
-class StateTimePrep(BaseTransformer):
+class StateTimePreparation(BaseTransformer):
     '''
-    For a selected metric calculates the amount of time in minutes it has been in that  state since the last change in state.
+    Together with AggregateTimeInState StateTimePreparation
+    calculates the amount of time a selected metric has been in a
+    particular state.
+    StateTimePreparation outputs an encoded pair of a state change
+    variable (-1 for leaving the state, 0 for no change,
+     1 for entering the state) together with a unix epoch
+    timestamp.
+    The condition for the state change is given as binary operator
+    together with the second argument, for example
+    ">= 37"  ( for fever) or "=='running'" (for process states)
     '''
     def __init__(self, source=None, state_name=None, name=None):
         super().__init__()
@@ -193,12 +196,12 @@ class StateTimePrep(BaseTransformer):
     def build_ui(cls):
         inputs = []
         inputs.append(UISingleItem(name='source', datatype=float,
-                                  description='Choose the data items that you would like to aggregate'))
-        inputs.append(UISingle(name='state_name', datatype=str,  description='Enter name of the state to measure time of'))
+                                  description='Data item to compute the state change array from'))
+        inputs.append(UISingle(name='state_name', datatype=str,  description='Condition for the state change array computation'))
 
         outputs = []
         outputs.append(
-            UIFunctionOutSingle(name='name', datatype=str, description='Spectral anomaly score (z-score)'))
+            UIFunctionOutSingle(name='name', datatype=str, description='State change array output'))
 
         return (inputs, outputs)
 
