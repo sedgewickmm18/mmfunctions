@@ -122,8 +122,8 @@ class AggregateTimeInState(BaseSimpleAggregator):
         group_exp = group.str.split(pat=',', n=1, expand=True).astype(int)
         g0 = group_exp[0].values
         g1 = group_exp[1].values
-        np.savetxt('/tmp/numpy' + str(g1[0]), g0)
-        group.to_csv('/tmp/testgroup' + str(g1[0]))
+        #np.savetxt('/tmp/numpy' + str(g1[0]), g0)
+        #group.to_csv('/tmp/testgroup' + str(g1[0]))
 
         # adjust for intervals cut in half by aggregation
         '''
@@ -144,8 +144,15 @@ class AggregateTimeInState(BaseSimpleAggregator):
         '''
 
         # first non zero index
-        nonzeroMin = np.min(np.nonzero(g0 != 0))
-        nonzeroMax = np.max(np.nonzero(g0 != 0))
+        nonzeroMin = 0
+        nonzeroMax = 0
+        try:
+            nonzeroMin = np.min(np.nonzero(g0 != 0))
+            nonzeroMax = np.max(np.nonzero(g0 != 0))
+        except Exception:
+            logger.info('AggregateTimeInState empty  - returns ' + str(0) + ' seconds, from ' + str(g0.size))
+            return 0
+            pass
 
         if nonzeroMin > 0:
             print('YES1', nonzeroMin, g0[nonzeroMin])
