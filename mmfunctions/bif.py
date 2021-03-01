@@ -122,6 +122,7 @@ class AggregateTimeInState(BaseSimpleAggregator):
         group_exp = group.str.split(pat=',', n=1, expand=True).astype(int)
         g0 = group_exp[0].values
         g1 = group_exp[1].values
+        print(g0, g1)
         #np.savetxt('/tmp/numpy' + str(g1[0]), g0)
         #group.to_csv('/tmp/testgroup' + str(g1[0]))
 
@@ -150,7 +151,7 @@ class AggregateTimeInState(BaseSimpleAggregator):
             nonzeroMin = np.min(np.nonzero(g0 != 0))
             nonzeroMax = np.max(np.nonzero(g0 != 0))
         except Exception:
-            logger.info('AggregateTimeInState empty  - returns ' + str(0) + ' seconds, from ' + str(g0.size))
+            logger.info('AggregateTimeInState all elements zero - returns ' + str(0) + ' seconds, from ' + str(g0.size))
             return 0
             pass
 
