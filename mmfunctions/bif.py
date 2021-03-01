@@ -203,7 +203,8 @@ class StateTimePrep(BaseTransformer):
         df_copy = df.reset_index()
 
         # pair of +- seconds and regular timestamp
-        v1 = (df_copy[self.source] > 50).astype(int).diff().values.astype(int)
+        v1 = eval("df_copy[self.source] " + self.state_name).astype(int).diff().values.astype(int)
+        #v1 = (df_copy[self.source] > 50).astype(int).diff().values.astype(int)
         # first element is NaN
         if v1.size > 0:
             v1[0] = 0
