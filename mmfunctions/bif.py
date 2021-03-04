@@ -23,7 +23,10 @@ import numpy as np
 import scipy as sp
 import pandas as pd
 from statsmodels.tsa.seasonal import seasonal_decompose, STL
-from sqlalchemy import String
+from sklearn.neighbors import KernelDensity
+from scipy.stats.mstats import mquantiles
+
+#from sqlalchemy import String
 
 from iotfunctions.base import (BaseTransformer, BaseEvent, BaseSCDLookup, BaseSCDLookupWithDefault, BaseMetadataProvider,
                                BasePreload, BaseDatabaseLookup, BaseDataSource, BaseDBActivityMerge, BaseSimpleAggregator)
@@ -312,4 +315,84 @@ class SeasonalDecompose(BaseTransformer):
 
         logger.info('Exit SeasonalDecompose')
         return df_copy
+
+class AggregateKDEDensity1d(BaseSimpleAggregator):
+    """
+    Create aggregation using expression. The calculation is evaluated for
+    each data_item selected. The data item will be made available as a
+    Pandas Series. Refer to the Pandas series using the local variable named
+    "x". The expression must return a scalar value.
+
+    Example:
+
+    x.max() - x.min()
+
+    """
+
+    def __init__(self, source=None, alpha=0.995, name=None):
+        super().__init__()
+        logger.info('AggregateKDEDensity1d _init')
+
+        self.source = source
+        self.alpha = alpha
+        self.name = name
+        print(dir(self))
+
+    @classmethod
+    def build_ui(cls):
+        inputs = []
+        inputs.append(UIMultiItem(name='source', datatype=None,
+                                  description=('Choose the data items that you would like to aggregate'),
+                                  output_item='name', is_output_datatype_derived=True))
+
+        inputs.append(UIExpression(name='alpha', description='Quantile level - default 0.995'))
+
+        return (inputs, [])
+
+    def execute(self, group):
+        logger.info('Execute AggregateKDEDensity1d')
+
+        if group.size == 0:
+            return 0
+
+        X = group.values.reshape(-1,1)
+
+        # set up kernel density
+        kde = KernelDensity(kernel='gaussian')
+        kde.fit(X)
+
+        # apply it and compute the log density for the observed data
+        kde_X = kde.score_samples(X)
+
+        # cut point
+        tau_kde = mquantiles(kde_X, 1. - self.alpha)
+
+        # locate inliers and outliers
+        outliers = np.nonzero(kde_X < tau_kde)
+        #outliers = outliers.flatten()
+        inliers = np.nonzero(kde_X >= tau_kde)
+        #inliers = inliers.flatten()
+
+        logger.info('AggregateKDEDensity1d: size: ' + str(len(X)) + ' inliers: ' + str(len(inliers)) + ' outliers: ' + str(len(outliers)))
+
+        # inliers provides a lower bound
+        lower_bound = 0
+        try:
+            lower_bound = np.max(X[inliers])
+        except Exception as e:
+            logger.info('Establishing lower bound failed with ' + str(e))
+
+        print(lower_bound)
+
+        raw_threshold = 0
+        try:
+            high_outliers = np.nonzero(X[outliers] > lower_bound)
+            raw_threshold = np.min(X[high_outliers])
+        except Exception as ee:
+            logger.info('Establishing threshold failed with ' + str(ee))
+
+        #print('Source ', self.source, 'Expression ', self.expression, 'Name ', self.name)
+        logger.info('AggregateKDEDensity1d returns ' + str(raw_threshold))
+
+        return raw_threshold
 
