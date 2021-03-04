@@ -20,7 +20,9 @@ import warnings
 from collections import OrderedDict
 
 import numpy as np
+import scipy as sp
 import pandas as pd
+from statsmodels.tsa.seasonal import seasonal_decompose, STL
 from sqlalchemy import String
 
 from iotfunctions.base import (BaseTransformer, BaseEvent, BaseSCDLookup, BaseSCDLookupWithDefault, BaseMetadataProvider,
@@ -221,18 +223,93 @@ class StateTimePreparation(BaseTransformer):
         # first element is NaN
         if v1.size > 0:
             v1[0] = 0
-            nonzero = np.min(np.nonzero(v1 != 0))
-            if v1[nonzero] > 0:
-                v1[0] = -1
-            else:
-                v1[0] = 1
+            try:
+                nonzero = np.min(np.nonzero(v1 != 0))
+                if v1[nonzero] > 0:
+                    v1[0] = -1
+                else:
+                    v1[0] = 1
+            except Exception:
+                # no non zero element
+                pass
 
         df_copy['__intermediate1__'] = v1
         np.savetxt('/tmp/test', df_copy['__intermediate1__'].values)
         df_copy['__intermediate2__'] = (df_copy[ts_name].astype(int)// 1000000000)
         df_copy[self.name] = df_copy['__intermediate1__'].map(str) + ',' + df_copy['__intermediate2__'].map(str)
-        df_copy.drop(columns=['__intermediate1__','__intermediate2__'])
+
+        df_copy.drop(columns=['__intermediate1__','__intermediate2__'], inplace=True)
         df_copy.to_csv('/tmp/testc')
 
         #df_copy[self.name] = change_arr
         return df_copy.set_index(index_names)
+
+
+# NaNs and STL are not on good terms so base this class on the Interpolator
+class SeasonalDecompose(BaseTransformer):
+    """
+    Create aggregation using expression. The calculation is evaluated for
+    each data_item selected. The data item will be made available as a
+    Pandas Series. Refer to the Pandas series using the local variable named
+    "x". The expression must return a scalar value.
+
+    Example:
+
+    x.max() - x.min()
+
+    """
+
+    def __init__(self, input_item, windowsize, missing, output_item):
+        super().__init__()
+        self.input_item = input_item
+        self.windowsize = windowsize
+        self.missing = missing
+        self.output_item = output_item
+        logger.info('SeasonalDecompose _init')
+
+    @classmethod
+    def build_ui(cls):
+
+        # define arguments that behave as function inputs
+        inputs = []
+        inputs.append(UISingleItem(name='input_item', datatype=float, description='Data item to interpolate'))
+        inputs.append(
+            UISingle(name='windowsize', datatype=int, description='Minimal size of the window for interpolating data.'))
+        inputs.append(UISingle(name='missing', datatype=int, description='Data to be interpreted as not-a-number.'))
+
+        # define arguments that behave as function outputs
+        outputs = []
+        outputs.append(UIFunctionOutSingle(name='output_item', datatype=float, description='Interpolated data'))
+        return (inputs, outputs)
+
+    def _calc(self, df):
+        logger.info('kexecute SeasonalDecompose')
+
+        print(df.index)
+        df.to_csv('/tmp/testtest')
+
+        index_names = df.index.names
+        ts_name = df.index.names[1]  # TODO: deal with non-standard dataframes (no timestamp)
+
+        df_copy = df.copy()
+        df_rst = df.reset_index().set_index(ts_name)
+
+        # deal with string timestamp indices
+        if not isinstance(df_rst.index, pd.core.indexes.datetimes.DatetimeIndex):
+            df_rst.index = pd.to_datetime(df_rst.index, format="%Y-%m-%d-%H.%M.%S.%f")
+            #print(df_copy.index)
+
+        # minimal frequency supported by STL
+        df_sample = df_rst[[self.input_item]].resample('H').mean().ffill()
+        res = STL(df_sample, robust=True).fit()
+
+        df_new = pd.DataFrame(index=df_rst.index)
+        df_new['power'] = np.interp(df_rst.index, res.trend.index, res.trend.values)
+        print('Power trend', df_new['power'][0:3])
+
+        df_copy[self.output_item] = df_new['power'].values
+        print('Power trend', df_copy[self.output_item][0:3])
+
+        logger.info('Exit SeasonalDecompose')
+        return df_copy
+
