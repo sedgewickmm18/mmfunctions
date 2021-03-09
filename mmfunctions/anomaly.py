@@ -41,6 +41,10 @@ if iotfunctions.__version__ != '8.2.1':
 
 #import statsmodels.api as sm
 from statsmodels.nonparametric.kernel_density import KDEMultivariate
+from statsmodels.tsa.seasonal import STL
+from statsmodels.tsa.forecasting.stl import STLForecast
+from statsmodels.tsa.arima.model import ARIMA
+from statsmodels.iolib.smpickle import save_pickle,load_pickle
 
 from iotfunctions.base import (BaseTransformer, BaseRegressor, BaseEstimatorFunction, BaseSimpleAggregator)
 from iotfunctions.bif import (AlertHighValue)
@@ -2519,6 +2523,141 @@ class GBMForecaster(BaseEstimatorFunction):
         # define arguments that behave as function outputs
         outputs = []
         return (inputs, outputs)
+
+
+#######################################################################################
+# ARIMA
+#######################################################################################
+# totally useless, work in progress (but without lots of progress)
+
+#self.model_class = STLForecast(np.arange(0,1), ARIMA, model_kwargs=dict(order=(1,1,1), trend="c"), period=7*24)
+class ARIMAForecaster(BaseTransformer):
+    """
+    Provides a forecast for 'n_forecast' data points for from endogenous data in input_item
+    Data is returned as input_item shifted by n_forecast positions with the forecast appended
+    """
+
+    def __init__(self, input_item, n_forecast, output_item):
+        super().__init__()
+
+        self.input_item = input_item
+        self.n_forecast = n_forecast
+        self.output_item = output_item
+
+        self.power = None    # used to store box cox lambda
+        self.models = {}
+
+        self.name = 'ARIMAForecaster'
+
+    def get_model_name(self, prefix='model', suffix=None):
+
+        name = []
+        if prefix is not None:
+            name.append(prefix)
+
+        name.extend([self._entity_type.name, self.name])
+        print(name)
+        name.extend([self.output_item])
+        print(name)
+        if suffix is not None:
+            name.append(suffix)
+        name = '.'.join(name)
+        print(name)
+        return name
+
+
+    def execute(self, df):
+
+        df_copy = df.copy()
+        db = self._entity_type.db
+
+        entities = np.unique(df.index.levels[0])
+        logger.debug(str(entities))
+
+        df_copy[self.output_item] = 0
+
+        # check data type
+        if df_copy[self.input_item].dtype != np.float64:
+            return (df_copy)
+
+        # remove NaNs from input
+        df_copy = df_copy.dropna(subset=[self.input_item])
+
+        # make sure to train a model
+        for entity in entities:
+            # check data okay
+            temperature = df_copy.loc[[entity]][self.input_item].values.reshape(-1,1)
+            try:
+                print (self.input_item)
+                check_array(temperature, allow_nd=True)
+            except Exception as e:
+                logger.error(
+                    'Found Nan or infinite value in feature columns for entity ' + str(entity) + ' error: ' + str(e))
+                continue
+
+            logger.debug('Module ARIMA Forecaster, Entity: ' + str(entity) + ', Input: ' + str(
+                self.input_item) + ', Forecasting: ' + str(self.n_forecast) + ', Output: ' + str(
+                self.output_item))
+
+            # per entity - copy for later inplace operations
+            model_name = self.get_model_name(suffix=entity)
+            arima_model = None
+            try:
+                arima_model = db.model_store.retrieve_model(model_name)
+                logger.info('load model %s' % str(arima_model))
+            except Exception as e:
+                logger.error('Model retrieval failed with ' + str(e))
+                pass
+
+            # train new model
+            if arima_model is None:
+
+                # all variables should be continuous
+                #temperature = df_copy.loc[[entity]][self.input_item].values.reshape(-1,1)
+                stlf = STLForecast(temperature, ARIMA, model_kwargs=dict(order=(1,0,1), trend="n"), period=7*24)
+                arima_model = stlf.fit()
+
+                logger.debug('Created STL + ARIMA' + str(arima_model))
+
+                try:
+                    db.model_store.store_model(model_name, arima_model)
+                except Exception as e:
+                    logger.error('Model store failed with ' + str(e))
+                    pass
+
+            self.models[entity] = arima_model
+
+            # remove n_forecast elements and append the forecast of length n_forecast
+            predictions_ = arima_model.forecast(self.n_forecast)
+            print(predictions_.shape, temperature.shape)
+            predictions = np.hstack([temperature[self.n_forecast:].reshape(-1,), predictions_])
+
+            logger.debug(arima_model.summary())
+
+            #predictions[predictions < SmallEnergy] = SmallEnergy
+            #predictions = self.threshold / predictions
+            df_copy.loc[entity, self.output_item] = predictions
+
+        msg = 'ARIMA'
+        self.trace_append(msg)
+
+        return (df_copy)
+
+    @classmethod
+    def build_ui(cls):
+
+        # define arguments that behave as function inputs
+        inputs = []
+        inputs.append(UISingleItem(name='input_item', datatype=float, description='Data item to interpolate'))
+
+        inputs.append(
+            UISingle(name='n_forecast', datatype=int, description='Forecasting n_forecast data points.'))
+
+        # define arguments that behave as function outputs
+        outputs = []
+        outputs.append(UIFunctionOutSingle(name='output_item', datatype=float, description='Interpolated data'))
+        return (inputs, outputs)
+
 
 #
 # following Jake Vanderplas Data Science Handbook
