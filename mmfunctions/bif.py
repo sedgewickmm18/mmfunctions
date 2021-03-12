@@ -120,7 +120,12 @@ class AggregateTimeInState(BaseSimpleAggregator):
             return 0
 
         # group_exp[0] = change array, group_exp[1] = timestamps
-        group_exp = group.str.split(pat=',', n=1, expand=True).astype(int)
+        try:
+            group_exp = group.str.split(pat=',', n=1, expand=True).astype(int)
+        except Exception as esplit:
+            logger.info('AggregateTimeInState returns 0 due to NaNs')
+            return 0
+
         g0 = group_exp[0].values
         g1 = group_exp[1].values
         #print(g0, g1)
