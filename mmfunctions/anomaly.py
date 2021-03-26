@@ -678,13 +678,21 @@ class SpectralAnomalyScore(BaseTransformer):
         if not pd.api.types.is_numeric_dtype(df[self.input_item].dtype):
             return (df)
 
-        self.execute_by = [df.index.levels[0].name]
-        #self.execute_by = [self.input_item]
+        #self.execute_by = [df.index.levels[0].name]
         df[self.output_item] = 0
+        if self.inv_zscore is not None:
+            df[self.inv_zscore] = 0
 
         # delegate to _calc
         logger.debug('Execute ' + self.whoami + ' enter per entity execution')
-        df_copy = super().execute(df)
+
+        # group over entities
+        group_base = [pd.Grouper(axis=0, level=0)]
+
+        df_copy = df.groupby(group_base).apply(self._calc)
+        #df_copy = df.groupby(group_base).transform(self._calc)
+
+        #df_copy = super().execute(df)
         logger.debug('Spectral done')
         return df_copy
 
@@ -692,9 +700,9 @@ class SpectralAnomalyScore(BaseTransformer):
     def _calc(self, df):
         #print (df.index, df.columns)
         #return df
-        dfe = df.dropna(how='all')
+        dfe = df.dropna(how='all').copy()
         dfe_orig = df.copy()
-        entity = df.index.levels[0].name
+        entity = df.index.levels[0][0]
 
         # get rid of entityid part of the index
         # do it inplace as we copied the data before
@@ -783,7 +791,7 @@ class SpectralAnomalyScore(BaseTransformer):
 
             df[self.output_item] = zScoreII
             if self.inv_zscore is not None:
-                df[self.output_item] = inv_zScoreII
+                df[self.inv_zscore] = inv_zScoreII
             logger.debug('--->')
 
             return df
