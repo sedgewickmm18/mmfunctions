@@ -369,7 +369,7 @@ class Interpolator(BaseTransformer):
                     temperatureII = merge_score(dfe, dfe_orig, self.output_item, temperature, mindelta)
 
                 except Exception as e:
-                    logger.error('Spectral failed with ' + str(e))
+                    logger.error('Interpolator failed with ' + str(e))
 
                 idx = pd.IndexSlice
                 df_copy.loc[idx[entity, :], self.output_item] = temperatureII
@@ -672,8 +672,10 @@ class SpectralAnomalyScore(BaseTransformer):
     def execute(self, df):
 
         logger.debug('Execute ' + self.whoami)
+
         # check data type
-        if df[self.input_item].dtype != np.float64:
+        #if df[self.input_item].dtype != np.float64:
+        if not pd.api.types.is_numeric_dtype(df[self.input_item].dtype):
             return (df)
 
         self.execute_by = [df.index.levels[0].name]
