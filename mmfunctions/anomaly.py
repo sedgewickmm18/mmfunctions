@@ -794,7 +794,7 @@ class SpectralAnomalyScore(BaseTransformer):
                 df[self.inv_zscore] = inv_zScoreII
             logger.debug('--->')
 
-            return df
+            return df.droplevel(0)
 
     @classmethod
     def build_ui(cls):
@@ -811,124 +811,6 @@ class SpectralAnomalyScore(BaseTransformer):
         outputs.append(
             UIFunctionOutSingle(name='output_item', datatype=float, description='Spectral anomaly score (z-score)'))
         return (inputs, outputs)
-
-'''
-    def execute(self, df):
-
-        df_copy = df.copy()
-        entities = np.unique(df.index.levels[0])
-        logger.debug(str(entities))
-
-        df_copy[self.output_item] = 0
-
-        # check data type
-        if df_copy[self.input_item].dtype != np.float64:
-            return (df_copy)
-
-        for entity in entities:
-            # per entity - copy for later inplace operations
-            dfe = df_copy.loc[[entity]].dropna(how='all')
-            dfe_orig = df_copy.loc[[entity]].copy()
-
-            # get rid of entityid part of the index
-            # do it inplace as we copied the data before
-            dfe.reset_index(level=[0], inplace=True)
-            dfe.sort_index(inplace=True)
-            dfe_orig.reset_index(level=[0], inplace=True)
-            dfe_orig.sort_index(inplace=True)
-
-            # minimal time delta for merging
-            mindelta, dfe_orig = min_delta(dfe_orig)
-
-            logger.debug('Timedelta:' + str(mindelta) + ' Index: ' + str(dfe_orig.index))
-
-            # one dimensional time series - named temperature for catchyness
-            temperature = dfe[[self.input_item]].fillna(0).to_numpy(dtype=np.float64).reshape(-1, )
-
-            # interpolate gaps - data imputation by default
-            #   for missing data detection we look at the timestamp gradient instead
-            dfe, temperature = self.prepare_data(dfe)
-
-            logger.debug(
-                'Module Spectral, Entity: ' + str(entity) + ', Input: ' + str(self.input_item) + ', Windowsize: ' + str(
-                    self.windowsize) + ', Output: ' + str(self.output_item) + ', Overlap: ' + str(
-                    self.windowoverlap) + ', Inputsize: ' + str(temperature.size))
-
-            if temperature.size <= self.windowsize:
-                logger.debug(str(temperature.size) + ' <= ' + str(self.windowsize))
-                dfe[self.output_item] = Error_SmallWindowsize
-            else:
-                logger.debug(str(temperature.size) + str(self.windowsize))
-
-                dfe[self.output_item] = Error_Generic
-                if self.inv_zscore is not None:
-                    dfe[self.inv_zscore] = Error_Generic
-
-                zScoreII = None
-                inv_zScoreII = None
-                try:
-                    # Fourier transform:
-                    #   frequency, time, spectral density
-                    frequency_temperature, time_series_temperature, spectral_density_temperature = signal.spectrogram(
-                        temperature, fs=self.frame_rate, window='hanning', nperseg=self.windowsize,
-                        noverlap=self.windowoverlap, detrend='l', scaling='spectrum')
-
-                    # cut off freqencies too low to fit into the window
-                    frequency_temperatureb = (frequency_temperature > 2 / self.windowsize).astype(int)
-                    frequency_temperature = frequency_temperature * frequency_temperatureb
-                    frequency_temperature[frequency_temperature == 0] = 1 / self.windowsize
-
-                    signal_energy = np.dot(spectral_density_temperature.T, frequency_temperature)
-
-                    signal_energy[signal_energy < SmallEnergy] = SmallEnergy
-                    inv_signal_energy = np.divide(np.ones(signal_energy.size), signal_energy)
-
-                    dfe[self.output_item] = 0.0005
-
-                    ets_zscore = abs(sp.stats.zscore(signal_energy)) * Spectral_normalizer
-                    inv_zscore = abs(sp.stats.zscore(inv_signal_energy))
-
-                    logger.debug(
-                        'Spectral z-score max: ' + str(ets_zscore.max()) + ',   Spectral inv z-score max: ' + str(
-                            inv_zscore.max()))
-
-                    # length of time_series_temperature, signal_energy and ets_zscore is smaller than half the original
-                    #   extend it to cover the full original length
-                    logger.debug('->')
-                    dfe[self.output_item] = 0.0006
-                    linear_interpolate = sp.interpolate.interp1d(time_series_temperature, ets_zscore, kind='linear',
-                                                                 fill_value='extrapolate')
-
-                    zScoreII = merge_score(dfe, dfe_orig, self.output_item,
-                                           abs(linear_interpolate(np.arange(0, temperature.size, 1))), mindelta)
-
-                    if self.inv_zscore is not None:
-                        linear_interpol_inv_zscore = sp.interpolate.interp1d(time_series_temperature, inv_zscore,
-                                                                             kind='linear', fill_value='extrapolate')
-
-                        inv_zScoreII = merge_score(dfe, dfe_orig, self.inv_zscore,
-                                                   abs(linear_interpol_inv_zscore(np.arange(0, temperature.size, 1))),
-                                                   mindelta)
-
-                except Exception as e:
-                    logger.error('Spectral failed with ' + str(e))
-
-                logger.debug('-->')
-                idx = pd.IndexSlice
-                df_copy.loc[idx[entity, :], self.output_item] = zScoreII
-
-                if self.inv_zscore is not None:
-                    df_copy.loc[idx[entity, :], self.inv_zscore] = inv_zScoreII
-                logger.debug('--->')
-
-        if self.inv_zscore is not None:
-            msg = 'SpectralAnomalyScoreExt'
-        else:
-            msg = 'SpectralAnomalyScore'
-        self.trace_append(msg)
-
-        return (df_copy)
-'''
 
 
 class SpectralAnomalyScoreExt(SpectralAnomalyScore):
