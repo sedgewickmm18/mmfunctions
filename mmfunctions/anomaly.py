@@ -30,10 +30,12 @@ from sklearn import ensemble
 from sklearn import linear_model
 from sklearn import metrics
 from sklearn.covariance import MinCovDet
-from sklearn.pipeline import Pipeline
+from sklearn.neighbors import LocalOutlierFactor
+from sklearn.pipeline import Pipeline, TransformerMixin
 from sklearn.preprocessing import (StandardScaler, RobustScaler, MinMaxScaler,
                                    minmax_scale, PowerTransformer, PolynomialFeatures)
 from sklearn.utils import check_array
+
 # for Matrix Profile
 import iotfunctions
 if iotfunctions.__version__ != '8.2.1':
@@ -1452,6 +1454,168 @@ SaliencybasedGeneralizedAnomalyScorev2 = SaliencybasedGeneralizedAnomalyScoreV2
 GeneralizedAnomalyScorev2 = GeneralizedAnomalyScoreV2
 
 #######################################################################################
+# Base class to handle models
+#######################################################################################
+
+class SupervisedLearningTransformer(BaseTransformer):
+
+    name = 'SupervisedLearningTransformer'
+
+    """
+    Base class for anomaly scorers that can be trained with historic data in a notebook
+    and automatically store a trained model in the tenant database
+    Inferencing is run in the pipeline
+    """
+    def __init__(self, features, targets):
+        super().__init__()
+
+        logging.debug("__init__" + self.name)
+
+        # do NOT automatically train if no model is found (subclasses)
+        self.auto_train = False
+        self.delete_model = False
+
+        self.features = features
+        self.targets = targets
+        parms = []
+        if features is not None:
+            parms.extend(features)
+        if targets is not None:
+            parms.extend(targets)
+        parms = '.'.join(parms)
+        logging.debug("__init__ done with parameters: " + parms)
+
+    '''
+    Generate unique model name from entity, optionally features and target for consistency checks
+    '''
+    def get_model_name(self, prefix='model', features=None, targets=None, suffix=None):
+
+        name = []
+        if prefix is not None:
+            name.append(prefix)
+
+        name.extend([self._entity_type.name, self.name])
+        if features is not None:
+            name.extend(features)
+        if targets is not None:
+            name.extend(targets)
+        if suffix is not None:
+            name.append(suffix)
+        name = '.'.join(name)
+        return name
+
+#######################################################################################
+# Outlier removal in pipeline
+#######################################################################################
+
+class RobustThreshold:
+    def __init__(self, threshold):
+        self.lof = LocalOutlierFactor() #**kwargs)
+        self.version = 1
+        self.threshold = threshold
+        self.MinMax = None
+
+    def getMinMax(self, X):
+        X_ = X[self.lof.negative_outlier_factor_ > self.threshold]
+        return [X_.min(), X_.max()]
+
+    def fit(self, X):
+        self.lof.fit(X.reshape(-1,1))
+        self.MinMax = self.getMinMax(X)
+
+class RobustTransform(SupervisedLearningTransformer):
+
+    def __init__(self, input_item, threshold, output_item):
+        super().__init__(features=[input_item], targets=[output_item])
+
+        self.input_item = input_item
+        self.threshold = threshold
+        self.output_item = output_item
+        self.auto_train = True
+
+        self.whoami = 'RobustTransform'
+
+        print(self.whoami, self.input_item, self.threshold, self.output_item)
+
+    def execute(self, df):
+        logger.debug('Execute ' + self.whoami)
+
+        # check data type
+        #if df[self.input_item].dtype != np.float64:
+        if not pd.api.types.is_numeric_dtype(df[self.input_item].dtype):
+            return (df)
+
+        # set output columns to zero
+        #for output_item in self.output_items:
+        df[self.output_item] = 0
+
+        # delegate to _calc
+        logger.debug('Execute ' + self.whoami + ' enter per entity execution')
+
+        # group over entities
+        group_base = [pd.Grouper(axis=0, level=0)]
+
+        df_copy = df.groupby(group_base).apply(self._calc)
+
+        logger.debug('Scoring done')
+        return df_copy
+
+
+    def _calc(self, df):
+        # per entity - copy for later inplace operations
+        db = self._entity_type.db
+        entity = df.index.levels[0][0]
+
+        model_name = self.get_model_name(targets=self.targets, suffix=entity)
+        robust_model = None
+        try:
+            robust_model = db.model_store.retrieve_model(model_name)
+            logger.info('load model %s' % str(robust_model))
+        except Exception as e:
+            logger.error('Model retrieval failed with ' + str(e))
+            pass
+
+        # ditch old model
+        version = 1
+        if self.delete_model:
+            if robust_model is not None:
+                version = robust_model.version + 1
+                logger.debug('Deleting robust model ' + str(robust_model.version) + ' for entity: ' + str(entity))
+                robust_model = None
+
+        feature = df[self.input_item].values
+
+        if robust_model is None and self.auto_train:
+            robust_model = RobustThreshold(self.threshold)
+            robust_model.fit(feature)
+            try:
+                db.model_store.store_model(model_name, robust_model)
+            except Exception as e:
+                logger.error('Model store failed with ' + str(e))
+                pass
+
+        df[self.output_item] = robust_model.lof.negative_outlier_factor_ < self.threshold
+        return df.droplevel(0)
+
+
+    @classmethod
+    def build_ui(cls):
+        # define arguments that behave as function inputs
+        inputs = []
+        inputs.append(UISingleItem(name="input_item", datatype=float, description="Data item to analyze"))
+
+        inputs.append(UISingle(name="threshold", datatype=int,
+                               description="Threshold to determine outliers. Typically set to -10.", ))
+
+        # define arguments that behave as function outputs
+        outputs = []
+        outputs.append(UIFunctionOutSingle(name="output_item", datatype=float,
+                                           description="Anomaly score (SaliencybasedGeneralizedAnomalyScore)", ))
+        return (inputs, outputs)
+
+
+
+#######################################################################################
 # Regressors
 #######################################################################################
 
@@ -2458,55 +2622,6 @@ class VI(nn.Module):
     # Minimizing negative ELBO
     def det_loss_old(self, y_pred, y, mu, log_var):
         return -elbo(y_pred, y, mu, log_var)
-
-class SupervisedLearningTransformer(BaseTransformer):
-
-    name = 'SupervisedLearningTransformer'
-
-    """
-    Base class for anomaly scorers that can be trained with historic data in a notebook
-    and automatically store a trained model in the tenant database
-    Inferencing is run in the pipeline
-    """
-    def __init__(self, features=None, targets=None):
-        super().__init__()
-
-        logging.debug("__init__" + self.name)
-
-        # do NOT automatically train if no model is found (subclasses)
-        self.auto_train = False
-        self.delete_model = False
-
-        self.features = features
-        self.targets = targets
-        parms = []
-        if features is not None:
-            parms.extend(features)
-        if targets is not None:
-            parms.extend(targets)
-        parms = '.'.join(parms)
-        logging.debug("__init__ done with parameters: " + parms)
-
-    '''
-    Generate unique model name from entity, optionally features and target for consistency checks
-    '''
-    def get_model_name(self, prefix='model', features=None, targets=None, suffix=None):
-
-        name = []
-        if prefix is not None:
-            name.append(prefix)
-
-        name.extend([self._entity_type.name, self.name])
-        if features is not None:
-            name.extend(features)
-        if targets is not None:
-            name.extend(targets)
-        if suffix is not None:
-            name.append(suffix)
-        name = '.'.join(name)
-        return name
-
-
 
 class VIAnomalyScore(SupervisedLearningTransformer):
     """
