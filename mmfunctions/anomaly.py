@@ -1646,12 +1646,12 @@ class RobustThreshold(SupervisedLearningTransformer):
         inputs.append(UISingleItem(name="input_item", datatype=float, description="Data item to analyze"))
 
         inputs.append(UISingle(name="threshold", datatype=int,
-                               description="Threshold to determine outliers. Typically set to -10.", ))
+                               description="Threshold to determine outliers by quantile. Typically set to 0.95", ))
 
         # define arguments that behave as function outputs
         outputs = []
-        outputs.append(UIFunctionOutSingle(name="output_item", datatype=float,
-                                           description="Anomaly score (SaliencybasedGeneralizedAnomalyScore)", ))
+        outputs.append(UIFunctionOutSingle(name="output_item", datatype=bool,
+                                           description="Boolean outlier condition"))
         return (inputs, outputs)
 
 
