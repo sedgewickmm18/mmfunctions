@@ -30,7 +30,7 @@ from sklearn import ensemble
 from sklearn import linear_model
 from sklearn import metrics
 from sklearn.covariance import MinCovDet
-from sklearn.neighbors import LocalOutlierFactor
+from sklearn.neighbors import (KernelDensity, LocalOutlierFactor)
 from sklearn.pipeline import Pipeline, TransformerMixin
 from sklearn.preprocessing import (StandardScaler, RobustScaler, MinMaxScaler,
                                    minmax_scale, PowerTransformer, PolynomialFeatures)
@@ -41,7 +41,7 @@ import iotfunctions
 if iotfunctions.__version__ != '8.2.1':
     import stumpy
 
-#import statsmodels.api as sm
+import statsmodels.api as sm
 from statsmodels.nonparametric.kernel_density import KDEMultivariate
 from statsmodels.tsa.seasonal import STL
 from statsmodels.tsa.forecasting.stl import STLForecast
@@ -1508,22 +1508,58 @@ class SupervisedLearningTransformer(BaseTransformer):
 # Outlier removal in pipeline
 #######################################################################################
 
-class RobustThreshold:
-    def __init__(self, threshold):
+class LocalOutlierFactor:
+    def __init__(self):
         self.lof = LocalOutlierFactor() #**kwargs)
         self.version = 1
-        self.threshold = threshold
-        self.MinMax = None
-
-    def getMinMax(self, X):
-        X_ = X[self.lof.negative_outlier_factor_ > self.threshold]
-        return [X_.min(), X_.max()]
 
     def fit(self, X):
         self.lof.fit(X.reshape(-1,1))
-        self.MinMax = self.getMinMax(X)
 
-class RobustTransform(SupervisedLearningTransformer):
+    def predict(self, X, threshold):
+        #return (X >= self.MinMax[0]) & (X <= self.MinMax[1])
+        return self.lof.negative_outlier_factor_ < threshold
+
+class KDEMaxMin:
+    def __init__(self):
+        self.version = 1
+        self.kde = KernelDensity(kernel='gaussian')
+        self.Min = None
+        self.Max = None
+
+    def fit(self, X, alpha):
+        self.kde.fit(X.reshape(-1,1))
+
+        kde_X = self.kde.score_samples(X.reshape(-1,1))
+
+        # find outliers of the kde score
+        tau_kde = sp.stats.mstats.mquantiles(kde_X, 1. - alpha)  # alpha = 0.995
+
+        # determine outliers
+        X_outliers = X[np.argwhere(kde_X < tau_kde).flatten()]
+        X_valid = X[np.argwhere(kde_X >= tau_kde).flatten()]
+
+        # determine max of all sample that are not outliers
+        self.Min = X_valid.min()
+        self.Max = X_valid.max()
+        if len(X_outliers) > 0:
+            X_min = X_outliers[X_outliers < self.Min]
+            X_max = X_outliers[X_outliers > self.Max]
+            if len(X_min) > 0:
+                self.Min = max(X_min.max(), self.Min)
+            if len(X_max) > 0:
+                self.Max = min(X_max.min(), self.Max)
+        #    self.Min = max(X_outliers[X_outliers < self.Min].max(), self.Min)
+        #    self.Max = min(X_outliers[X_outliers > self.Max].min(), self.Max)
+
+        logger.info('KDEMaxMin - Min: ' + str(self.Min) + ', ' + str(self.Max))
+
+        return kde_X
+
+    def predict(self, X, threshold=None):
+        return (X >= self.Min) & (X <= self.Max)
+
+class RobustThreshold(SupervisedLearningTransformer):
 
     def __init__(self, input_item, threshold, output_item):
         super().__init__(features=[input_item], targets=[output_item])
@@ -1532,6 +1568,8 @@ class RobustTransform(SupervisedLearningTransformer):
         self.threshold = threshold
         self.output_item = output_item
         self.auto_train = True
+        self.Min = dict()
+        self.Max = dict()
 
         self.whoami = 'RobustTransform'
 
@@ -1586,15 +1624,18 @@ class RobustTransform(SupervisedLearningTransformer):
         feature = df[self.input_item].values
 
         if robust_model is None and self.auto_train:
-            robust_model = RobustThreshold(self.threshold)
-            robust_model.fit(feature)
+            robust_model = KDEMaxMin() #self.threshold)
+            robust_model.fit(feature, self.threshold)
             try:
                 db.model_store.store_model(model_name, robust_model)
             except Exception as e:
                 logger.error('Model store failed with ' + str(e))
                 pass
 
-        df[self.output_item] = robust_model.lof.negative_outlier_factor_ < self.threshold
+        self.Min[entity] = robust_model.Min
+        self.Max[entity] = robust_model.Max
+
+        df[self.output_item] = robust_model.predict(feature, self.threshold)
         return df.droplevel(0)
 
 
