@@ -111,8 +111,7 @@ def min_delta(df):
     if df is None:
         return pd.Timedelta('5 seconds'), df
     elif len(df.index.names) > 1:
-        df2 = df.copy()
-        df2.index = df2.index.droplevel(list(range(1, df.index.nlevels)))
+        df2 = df.reset_index(level=df.index.names[1:], drop=True)
     else:
         df2 = df
 
@@ -291,7 +290,7 @@ class Interpolator(BaseTransformer):
         # operate on simple timestamp index
         if len(dfEntity.index.names) > 1:
             index_names = dfEntity.index.names
-            dfe = dfEntity.reset_index().set_index(index_names[0])
+            dfe = dfEntity.reset_index(index_names[1:])
         else:
             dfe = dfEntity
 
@@ -309,7 +308,7 @@ class Interpolator(BaseTransformer):
 
         # one dimensional time series - named temperature for catchyness
         # replace NaN with self.missing
-        temperature = dfe[[self.input_item]].fillna(0).to_numpy(dtype=np.float64).reshape(-1, )
+        temperature = dfe[self.input_item].fillna(0).to_numpy(dtype=np.float64)
 
         return dfe, temperature
 
@@ -428,7 +427,7 @@ class Standard_Scaler(BaseEstimatorFunction):
         # operate on simple timestamp index
         if len(dfEntity.index.names) > 1:
             index_names = dfEntity.index.names
-            dfe = dfEntity.reset_index().set_index(index_names[0])
+            dfe = dfEntity.reset_index(index_names[1:])
         else:
             dfe = dfEntity
 
@@ -439,7 +438,7 @@ class Standard_Scaler(BaseEstimatorFunction):
             logger.error('Prepare data error: ' + str(e))
 
         # one dimensional time series - named temperature for catchyness
-        temperature = dfe[[self.prediction]].fillna(0).to_numpy(dtype=np.float64).reshape(-1, )
+        temperature = dfe[self.prediction].fillna(0).to_numpy(dtype=np.float64)
 
         return dfe, temperature
 
@@ -467,7 +466,6 @@ class Standard_Scaler(BaseEstimatorFunction):
                 normalize_entity = False
                 logger.error(
                     'Found Nan or infinite value in feature columns for entity ' + str(entity) + ' error: ' + str(e))
-                pass
 
             # support for optional scaling in subclasses
             if normalize_entity:
@@ -647,7 +645,7 @@ class SpectralAnomalyScore(BaseTransformer):
         # operate on simple timestamp index
         if len(dfEntity.index.names) > 1:
             index_names = dfEntity.index.names
-            dfe = dfEntity.reset_index().set_index(index_names[0])
+            dfe = dfEntity.reset_index(index_names[1:])
         else:
             dfe = dfEntity
 
@@ -658,7 +656,7 @@ class SpectralAnomalyScore(BaseTransformer):
             logger.error('Prepare data error: ' + str(e))
 
         # one dimensional time series - named temperature for catchyness
-        temperature = dfe[[self.input_item]].fillna(0).to_numpy(dtype=np.float64).reshape(-1, )
+        temperature = dfe[self.input_item].fillna(0).to_numpy(dtype=np.float64)
 
         return dfe, temperature
 
@@ -687,16 +685,16 @@ class SpectralAnomalyScore(BaseTransformer):
 
     def _calc(self, df):
 
-        dfe = df.dropna(how='all').copy()
-        dfe_orig = df.copy()
         entity = df.index.levels[0][0]
 
-        # get rid of entity id part of the index
-        # do it inplace as we copied the data before
-        dfe.reset_index(level=[0], inplace=True)
-        dfe.sort_index(inplace=True)
-        dfe_orig.reset_index(level=[0], inplace=True)
-        dfe_orig.sort_index(inplace=True)
+        # get rid of entity id as part of the index
+        df = df.droplevel(0)
+
+        # Get new data frame with sorted index
+        dfe_orig = df.sort_index()
+
+        # remove all rows with only null entries
+        dfe = dfe_orig.dropna(how='all')
 
         # minimal time delta for merging
         mindelta, dfe_orig = min_delta(dfe_orig)
@@ -741,8 +739,6 @@ class SpectralAnomalyScore(BaseTransformer):
                 signal_energy[signal_energy < SmallEnergy] = SmallEnergy
                 inv_signal_energy = np.divide(np.ones(signal_energy.size), signal_energy)
 
-                dfe[self.output_item] = 0.0005
-
                 ets_zscore = abs(sp.stats.zscore(signal_energy)) * Spectral_normalizer
                 inv_zscore = abs(sp.stats.zscore(inv_signal_energy))
 
@@ -778,7 +774,7 @@ class SpectralAnomalyScore(BaseTransformer):
                 df[self.inv_zscore] = inv_zScoreII
             logger.debug('--->')
 
-            return df.droplevel(0)
+            return df
 
     @classmethod
     def build_ui(cls):
@@ -868,7 +864,7 @@ class KMeansAnomalyScore(BaseTransformer):
         # operate on simple timestamp index
         if len(dfEntity.index.names) > 1:
             index_names = dfEntity.index.names
-            dfe = dfEntity.reset_index().set_index(index_names[0])
+            dfe = dfEntity.reset_index(index_names[1:])
         else:
             dfe = dfEntity
 
@@ -879,7 +875,7 @@ class KMeansAnomalyScore(BaseTransformer):
             logger.error('Prepare data error: ' + str(e))
 
         # one dimensional time series - named temperature for catchyness
-        temperature = dfe[[self.input_item]].fillna(0).to_numpy(dtype=np.float64).reshape(-1, )
+        temperature = dfe[self.input_item].fillna(0).to_numpy(dtype=np.float64)
 
         return dfe, temperature
 
@@ -1020,7 +1016,7 @@ class GeneralizedAnomalyScore(BaseTransformer):
         # operate on simple timestamp index
         if len(dfEntity.index.names) > 1:
             index_names = dfEntity.index.names
-            dfe = dfEntity.reset_index().set_index(index_names[0])
+            dfe = dfEntity.reset_index(index_names[1:])
         else:
             dfe = dfEntity
 
@@ -1031,7 +1027,7 @@ class GeneralizedAnomalyScore(BaseTransformer):
             logger.error('Prepare data error: ' + str(e))
 
         # one dimensional time series - named temperature for catchyness
-        temperature = dfe[[self.input_item]].fillna(0).to_numpy(dtype=np.float64).reshape(-1, )
+        temperature = dfe[self.input_item].fillna(0).to_numpy(dtype=np.float64)
 
         return dfe, temperature
 
@@ -1177,7 +1173,7 @@ class NoDataAnomalyScore(GeneralizedAnomalyScore):
         # operate on simple timestamp index
         if len(dfEntity.index.names) > 1:
             index_names = dfEntity.index.names
-            dfe = dfEntity.reset_index().set_index(index_names[0])
+            dfe = dfEntity.reset_index(index_names[1:])
         else:
             dfe = dfEntity
 
@@ -1303,7 +1299,7 @@ if iotfunctions.__version__ != '8.2.1':
             # operate on simple timestamp index
             if len(df_entity.index.names) > 1:
                 index_names = df_entity.index.names
-                dfe = df_entity.reset_index().set_index(index_names[0])
+                dfe = df_entity.reset_index(index_names[1:])
             else:
                 dfe = df_entity
 
@@ -1314,7 +1310,7 @@ if iotfunctions.__version__ != '8.2.1':
                 logger.error('Prepare data error: ' + str(e))
 
             # one dimensional time series
-            analysis_input = dfe[[self.input_item]].fillna(0).to_numpy(dtype=np.float64).reshape(-1, )
+            analysis_input = dfe[self.input_item].fillna(0).to_numpy(dtype=np.float64)
 
             return dfe, analysis_input
 
@@ -2418,13 +2414,9 @@ class GBMForecaster(BaseEstimatorFunction):
         self.parameter_tuning_iterations = 1
         self.cv = 1
 
-        if n_estimators is not None or num_leaves is not None or learning_rate is not None:
-            self.params = {'gbm__n_estimators': [n_estimators], 'gbm__num_leaves': [num_leaves],
-                           'gbm__reg_lambda': [reg_lambda], 'gbm__feature_fraction': [feature_fraction],
-                           'gbm__learning_rate': [learning_rate], 'gbm__max_depth': [max_depth], 'gbm__verbosity': [2]}
-        else:
-            self.params = {'gbm__n_estimators': [500], 'gbm__num_leaves': [50], 'gbm__learning_rate': [0.001],
-                           'gbm__verbosity': [2]}
+        self.params = {'gbm__n_estimators': [n_estimators], 'gbm__num_leaves': [num_leaves],
+                       'gbm__reg_lambda': [reg_lambda], 'gbm__feature_fraction': [feature_fraction],
+                       'gbm__learning_rate': [learning_rate], 'gbm__max_depth': [max_depth], 'gbm__verbosity': [2]}
 
         self.stop_auto_improve_at = -2
 
@@ -2575,7 +2567,6 @@ class ARIMAForecaster(BaseTransformer):
                 logger.info('load model %s' % str(arima_model))
             except Exception as e:
                 logger.error('Model retrieval failed with ' + str(e))
-                pass
 
             # train new model
             if arima_model is None:
@@ -2590,7 +2581,6 @@ class ARIMAForecaster(BaseTransformer):
                     db.model_store.store_model(model_name, arima_model)
                 except Exception as e:
                     logger.error('Model store failed with ' + str(e))
-                    pass
 
             self.models[entity] = arima_model
 
@@ -2693,7 +2683,6 @@ class KDEAnomalyScore(BaseTransformer):
                 logger.info('load model %s' % str(kde_model))
             except Exception as e:
                 logger.error('Model retrieval failed with ' + str(e))
-                pass
 
             xy = np.hstack([df_copy.loc[[entity]][self.features].values, df_copy.loc[[entity]][self.targets].values])
 
@@ -2708,7 +2697,6 @@ class KDEAnomalyScore(BaseTransformer):
                     db.model_store.store_model(model_name, kde_model)
                 except Exception as e:
                     logger.error('Model store failed with ' + str(e))
-                    pass
 
             self.models[entity] = kde_model
 
@@ -2983,15 +2971,13 @@ class VIAnomalyScore(SupervisedLearningTransformer):
                 logger.info('load model %s' % str(vi_model))
             except Exception as e:
                 logger.error('Model retrieval failed with ' + str(e))
-                pass
 
             # ditch old model
             version = 1
-            if self.delete_model:
-                if vi_model is not None:
-                    version = vi_model.version + 1
-                    logger.debug('Deleting VI model ' + str(vi_model.version) + ' for entity: ' + str(entity))
-                    vi_model = None
+            if self.delete_model and vi_model is not None:
+                version = vi_model.version + 1
+                logger.debug('Deleting VI model ' + str(vi_model.version) + ' for entity: ' + str(entity))
+                vi_model = None
 
             # learn to scale features
             if vi_model is not None:
@@ -3052,7 +3038,6 @@ class VIAnomalyScore(SupervisedLearningTransformer):
                     db.model_store.store_model(model_name, vi_model)
                 except Exception as e:
                     logger.error('Model store failed with ' + str(e))
-                    pass
 
             # if training was not allowed or failed
             if vi_model is not None:
