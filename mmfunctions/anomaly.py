@@ -301,6 +301,7 @@ class Standard_Scaler(BaseEstimatorFunction):
         logger.debug(self.whoami + ': prepare Data for ' + self.prediction + ' column')
 
         # operate on simple timestamp index
+        #  needed for aggregated data with 3 or more indices
         if len(dfEntity.index.names) > 1:
             index_names = dfEntity.index.names
             dfe = dfEntity.reset_index().set_index(index_names[0])
@@ -2217,8 +2218,6 @@ class GBMForecaster(BaseEstimatorFunction):
         #df_copy = df.copy()
         _, df_copy = self.lag_features(df=df, Train=True)
 
-        print('Here 1', type(df_copy))
-
         entities = np.unique(df_copy.index.levels[0])
         logger.debug(str(entities))
 
@@ -2460,8 +2459,6 @@ class KDEAnomalyScore(BaseTransformer):
         df_copy = df.copy()
         db = self._entity_type.db
 
-        print('Here 1', type(df_copy))
-
         entities = np.unique(df_copy.index.levels[0])
         logger.debug(str(entities))
 
@@ -2597,7 +2594,7 @@ class VI(nn.Module):
     # draw from N(mu, sigma)
     def reparameterize(self, mu, log_var):
         # std can not be negative, thats why we use log variance
-        sigma = torch.exp(0.5 * log_var) + 1e-7
+        sigma = torch.add(torch.exp(0.5 * log_var), 1e-7)
         eps = torch.randn_like(sigma)
         return mu + sigma * eps
 
@@ -2612,10 +2609,10 @@ class VI(nn.Module):
         # likelihood of observing y given Variational mu and sigma - reconstruction error
         loglikelihood = ll_gaussian(y, mu, log_var)
 
-        # KL - prior probability of y_pred N(0,1)
+        # KL - prior probability of y_pred w.r.t. N(0,1)
         log_prior = ll_gaussian(y_pred, self.prior_mu, torch.log(torch.tensor(self.prior_sigma)))
 
-        # KL - variational probability of y_pred
+        # KL - probability of y_pred w.r.t the variational likelihood
         log_p_q = ll_gaussian(y_pred, mu, log_var)
 
         if self.show_once:
@@ -2629,22 +2626,8 @@ class VI(nn.Module):
     # simplified when everything is Gaussian
     #  KL(q, p) = \log \frac{\sigma_1}{\sigma_2} + \frac{\sigma_2^2 + (\mu_2 - \mu_1)^2}{2 \sigma_1^2} - \frac{1}{2}
     # unfortunately I don't get it to work properly
-    def elbo_gauss(self, y, y_pred, mu, log_var):
-        # likelihood of observing y given Variational mu and sigma - reconstruction error
-        loglikelihood = ll_gaussian(y, mu, log_var)
-
-        #kl_divergence = kl_div(mu, torch.tensor(self.prior_mu), log_var, torch.log(torch.tensor(self.prior_sigma)))
-        #  see 3 - https://arxiv.org/pdf/1312.6114.pdf
-        kl_divergence = (-0.5 * torch.sum(1 + log_var - mu**2 - log_var.exp()))
-
-        if self.show_once:
-            self.show_once = False
-            logger.info('Cardinalities: Mu: ' + str(mu.shape) + ' Sigma: ' + str(log_var.shape) +
-                        ' loglikelihood: ' + str(loglikelihood.shape) + ' KL: ' + str(kl_divergence.shape) +
-                        ' KL value: ' + str(kl_divergence))
-
-        return loglikelihood.mean() - kl_divergence
-
+    #def elbo_gauss(self, y, y_pred, mu, log_var):
+    # does not work
 
     # Unfinished - the stuff here is crap !
     def iwae(self, y_pred, y, mu, log_var):
@@ -2797,10 +2780,9 @@ class VIAnomalyScore(SupervisedLearningTransformer):
                     y_pred, mu, log_var = vi_model(X)
                     #loss = det_loss(y_pred, Y, mu, log_var)
                     loss = -vi_model.elbo(y_pred, Y, mu, log_var)
-                    lossg = -vi_model.elbo_gauss(y_pred, Y, mu, log_var)
                     if epoch % 10 == 0:
-                        logger.debug('Epoch: ' + str(epoch) + ', neg ELBO: ' + str(loss.item()) +
-                                     ' neg ELBO G: ' + str(lossg.item()))
+                        logger.debug('Epoch: ' + str(epoch) + ', neg ELBO: ' + str(loss.item()))
+
                     loss.backward()
                     grad_norm = 0
                     optim.step()
