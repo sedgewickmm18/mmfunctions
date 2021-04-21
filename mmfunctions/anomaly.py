@@ -32,7 +32,8 @@ from sklearn import ensemble
 from sklearn import linear_model
 from sklearn import metrics
 from sklearn.covariance import MinCovDet
-from sklearn.pipeline import Pipeline
+from sklearn.neighbors import (KernelDensity, LocalOutlierFactor)
+from sklearn.pipeline import Pipeline, TransformerMixin
 from sklearn.preprocessing import (StandardScaler, RobustScaler, MinMaxScaler,
                                    minmax_scale, PolynomialFeatures)
 from sklearn.utils import check_array
@@ -42,7 +43,7 @@ import iotfunctions
 if iotfunctions.__version__ != '8.2.1':
     import stumpy
 
-# import statsmodels.api as sm
+import statsmodels.api as sm
 from statsmodels.nonparametric.kernel_density import KDEMultivariate
 from statsmodels.tsa.forecasting.stl import STLForecast
 from statsmodels.tsa.arima.model import ARIMA
@@ -257,139 +258,6 @@ def merge_score(dfEntity, dfEntityOrig, column_name, score, mindelta):
     return merged_score
 
 
-#####
-#  experimental function to interpolate over larger gaps
-####
-class Interpolator(BaseTransformer):
-    """
-    Interpolates NaN and data to be interpreted as NaN (for example 0 as invalid sensor reading)
-    The window size is typically set large enough to allow for "bridging" gaps
-    Missing indicates sensor readings to be interpreted as invalid.
-    """
-
-    def __init__(self, input_item, windowsize, missing, output_item):
-        super().__init__()
-        logger.debug(input_item)
-        self.input_item = input_item
-
-        # use 12 by default
-        self.windowsize, self.windowoverlap = set_window_size_and_overlap(windowsize)
-
-        self.missing = missing
-
-        self.output_item = output_item
-
-        self.inv_zscore = None
-
-        self.whoami = 'Interpolator'
-
-    def prepare_data(self, dfEntity):
-
-        logger.debug(self.whoami + ': prepare Data')
-
-        # operate on simple timestamp index
-        if len(dfEntity.index.names) > 1:
-            index_names = dfEntity.index.names
-            dfe = dfEntity.reset_index(index_names[1:])
-        else:
-            dfe = dfEntity
-
-        # remove Nan
-        dfe = dfe[dfe[self.input_item].notna()]
-
-        # remove self.missing
-        dfe = dfe[dfe[self.input_item] != self.missing]
-
-        # interpolate gaps - data imputation
-        try:
-            dfe = dfe.interpolate(method="time")
-        except Exception as e:
-            logger.error('Prepare data error: ' + str(e))
-
-        # one dimensional time series - named temperature for catchyness
-        # replace NaN with self.missing
-        temperature = dfe[self.input_item].fillna(0).to_numpy(dtype=np.float64)
-
-        return dfe, temperature
-
-    def execute(self, df):
-
-        df_copy = df.copy()
-        entities = np.unique(df.index.levels[0])
-        logger.debug(str(entities))
-
-        df_copy[self.output_item] = 0
-
-        # check data type
-        if df_copy[self.input_item].dtype != np.float64:
-            return df_copy
-
-        for entity in entities:
-            # per entity - copy for later inplace operations
-            dfe = df_copy.loc[[entity]].dropna(how='all')
-            dfe_orig = df_copy.loc[[entity]].copy()
-
-            # get rid of entityid part of the index
-            # do it inplace as we copied the data before
-            dfe.reset_index(level=[0], inplace=True)
-            dfe.sort_index(inplace=True)
-            dfe_orig.reset_index(level=[0], inplace=True)
-            dfe_orig.sort_index(inplace=True)
-
-            # minimal time delta for merging
-            mindelta, dfe_orig = min_delta(dfe_orig)
-
-            logger.debug('Timedelta:' + str(mindelta) + ' Index: ' + str(dfe_orig.index))
-
-            # interpolate gaps - data imputation by default
-            #   for missing data detection we look at the timestamp gradient instead
-            dfe, temperature = self.prepare_data(dfe)
-
-            logger.debug('Module Interpolator, Entity: ' + str(entity) + ', Input: ' + str(
-                self.input_item) + ', Windowsize: ' + str(self.windowsize) + ', Output: ' + str(
-                self.output_item) + ', Inputsize: ' + str(temperature.size) + ', Fullsize: ' + str(
-                dfe_orig[self.input_item].values.shape))
-
-            if temperature.size <= self.windowsize:
-                logger.debug(str(temperature.size) + ' <= ' + str(self.windowsize))
-                dfe[self.output_item] = Error_SmallWindowsize
-            else:
-                logger.debug(str(temperature.size) + str(self.windowsize))
-                temperatureII = None
-
-                try:
-                    # length of time_series_temperature, signal_energy and ets_zscore is smaller than half the original
-                    #   extend it to cover the full original length
-                    temperatureII = merge_score(dfe, dfe_orig, self.output_item, temperature, mindelta)
-
-                except Exception as e:
-                    logger.error('Interpolator failed with ' + str(e))
-
-                idx = pd.IndexSlice
-                df_copy.loc[idx[entity, :], self.output_item] = temperatureII
-
-        msg = 'Interpolator'
-        self.trace_append(msg)
-
-        return df_copy
-
-    @classmethod
-    def build_ui(cls):
-
-        # define arguments that behave as function inputs
-        inputs = []
-        inputs.append(UISingleItem(name='input_item', datatype=float, description='Data item to interpolate'))
-
-        inputs.append(
-            UISingle(name='windowsize', datatype=int, description='Minimal size of the window for interpolating data.'))
-        inputs.append(UISingle(name='missing', datatype=int, description='Data to be interpreted as not-a-number.'))
-
-        # define arguments that behave as function outputs
-        outputs = []
-        outputs.append(UIFunctionOutSingle(name='output_item', datatype=float, description='Interpolated data'))
-        return inputs, outputs
-
-
 #######################################################################################
 # Scalers
 #######################################################################################
@@ -425,6 +293,7 @@ class Standard_Scaler(BaseEstimatorFunction):
         logger.debug(self.whoami + ': prepare Data for ' + self.prediction + ' column')
 
         # operate on simple timestamp index
+        #  needed for aggregated data with 3 or more indices
         if len(dfEntity.index.names) > 1:
             index_names = dfEntity.index.names
             dfe = dfEntity.reset_index(index_names[1:])
@@ -612,16 +481,11 @@ class MinMax_Scaler(BaseEstimatorFunction):
 # Anomaly Scorers
 #######################################################################################
 
-class SpectralAnomalyScore(BaseTransformer):
+class AnomalyScorer(BaseTransformer):
     """
-    An unsupervised anomaly detection function.
-     Applies a spectral analysis clustering techniqueto extract features from time series data and to create z scores.
-     Moves a sliding window across the data signal and applies the anomalymodelto each window.
-     The window size is typically set to 12 data points.
-     Try several anomaly detectors on your data and use the one that fits your data best.
+    Superclass of all unsupervised anomaly detection functions.
     """
-
-    def __init__(self, input_item, windowsize, output_item):
+    def __init__(self, input_item, windowsize, output_items):
         super().__init__()
         logger.debug(input_item)
         self.input_item = input_item
@@ -632,12 +496,32 @@ class SpectralAnomalyScore(BaseTransformer):
         # assume 1 per sec for now
         self.frame_rate = 1
 
-        self.output_item = output_item
+        # step
+        self.step = self.windowsize - self.windowoverlap
 
-        self.inv_zscore = None
+        self.output_items = output_items
 
-        self.whoami = 'Spectral'
+        self.normalize = False
 
+        self.whoami = 'Anomaly'
+
+
+    def get_model_name(self, prefix='model', suffix=None):
+
+        name = []
+        if prefix is not None:
+            name.append(prefix)
+
+        name.extend([self._entity_type.name, self.whoami])
+        name.append(self.output_items[0])
+        if suffix is not None:
+            name.append(suffix)
+        name = '.'.join(name)
+
+        return name
+
+
+    # make sure data is evenly spaced
     def prepare_data(self, dfEntity):
 
         logger.debug(self.whoami + ': prepare Data')
@@ -651,7 +535,7 @@ class SpectralAnomalyScore(BaseTransformer):
 
         # interpolate gaps - data imputation
         try:
-            dfe = dfe.interpolate(method="time")
+            dfe = dfe.dropna(subset=[self.input_item]).interpolate(method="time")
         except Exception as e:
             logger.error('Prepare data error: ' + str(e))
 
@@ -668,9 +552,9 @@ class SpectralAnomalyScore(BaseTransformer):
         if not pd.api.types.is_numeric_dtype(df[self.input_item].dtype):
             return df
 
-        df[self.output_item] = 0
-        if self.inv_zscore is not None:
-            df[self.inv_zscore] = 0
+        # set output columns to zero
+        for output_item in self.output_items:
+            df[output_item] = 0
 
         # delegate to _calc
         logger.debug('Execute ' + self.whoami + ' enter per entity execution')
@@ -680,11 +564,13 @@ class SpectralAnomalyScore(BaseTransformer):
 
         df_copy = df.groupby(group_base).apply(self._calc)
 
-        logger.debug('Spectral done')
+        logger.debug('Scoring done')
         return df_copy
 
     def _calc(self, df):
 
+        dfe = df.copy()
+        dfe_orig = df.copy()
         entity = df.index.levels[0][0]
 
         # get rid of entity id as part of the index
@@ -701,84 +587,239 @@ class SpectralAnomalyScore(BaseTransformer):
 
         logger.debug('Timedelta:' + str(mindelta) + ' Index: ' + str(dfe_orig.index))
 
+
+        # one dimensional time series - named temperature for catchyness
         # interpolate gaps - data imputation by default
         #   for missing data detection we look at the timestamp gradient instead
         dfe, temperature = self.prepare_data(dfe)
 
         logger.debug(
-                'Module Spectral, Entity: ' + str(entity) + ', Input: ' + str(self.input_item) + ', Windowsize: ' + str(
-                    self.windowsize) + ', Output: ' + str(self.output_item) + ', Overlap: ' + str(
+                self.whoami + ', Entity: ' + str(entity) + ', Input: ' + str(self.input_item) + ', Windowsize: ' + str(
+                    self.windowsize) + ', Output: ' + str(self.output_items) + ', Overlap: ' + str(
                     self.windowoverlap) + ', Inputsize: ' + str(temperature.size))
 
         if temperature.size <= self.windowsize:
             logger.debug(str(temperature.size) + ' <= ' + str(self.windowsize))
-            dfe[self.output_item] = Error_SmallWindowsize
+            for output_item in self.output_items:
+                dfe[output_item] = Error_SmallWindowsize
         else:
             logger.debug(str(temperature.size) + str(self.windowsize))
 
-            dfe[self.output_item] = Error_Generic
-            if self.inv_zscore is not None:
-                dfe[self.inv_zscore] = Error_Generic
+            for output_item in self.output_items:
+                dfe[output_item] = Error_Generic
 
-            zScoreII = None
-            inv_zScoreII = None
+            temperature = self.scale(temperature, entity)
+
+            scores = self.score(temperature)
+
+            # length of time_series_temperature, signal_energy and ets_zscore is smaller than half the original
+            #   extend it to cover the full original length
+            logger.debug('->')
             try:
-                # Fourier transform:
-                #   frequency, time, spectral density
-                frequency_temperature, time_series_temperature, spectral_density_temperature = signal.spectrogram(
-                    temperature, fs=self.frame_rate, window='hanning', nperseg=self.windowsize,
-                    noverlap=self.windowoverlap, detrend='l', scaling='spectrum')
+                for i,output_item in enumerate(self.output_items):
+                    # check for fast path, no interpolation required
+                    diff = temperature.size - scores[i].size
+                    # slow path - interpolate result score to stretch it to the size of the input data
+                    if diff > 0:
+                        dfe[output_item] = 0.0006
+                        time_series_temperature = np.linspace(self.windowsize // 2, temperature.size - self.windowsize // 2 + 1,
+                                                              temperature.size - diff)
+                        linear_interpolate = sp.interpolate.interp1d(time_series_temperature, scores[i], kind='linear',
+                                                                     fill_value='extrapolate')
 
-                # cut off frequencies too low to fit into the window
-                frequency_temperatureb = (frequency_temperature > 2 / self.windowsize).astype(int)
-                frequency_temperature = frequency_temperature * frequency_temperatureb
-                frequency_temperature[frequency_temperature == 0] = 1 / self.windowsize
+                        zScoreII = merge_score(dfe, dfe_orig, output_item,
+                                               abs(linear_interpolate(np.arange(0, temperature.size, 1))), mindelta)
+                    # fast path - either cut off or just copy
+                    elif diff < 0:
+                        zScoreII = scores[i][0:temperature.size]
+                    else:
+                        zScoreII = scores[i].size
 
-                signal_energy = np.dot(spectral_density_temperature.T, frequency_temperature)
-
-                signal_energy[signal_energy < SmallEnergy] = SmallEnergy
-                inv_signal_energy = np.divide(np.ones(signal_energy.size), signal_energy)
-
-                ets_zscore = abs(sp.stats.zscore(signal_energy)) * Spectral_normalizer
-                inv_zscore = abs(sp.stats.zscore(inv_signal_energy))
-
-                logger.debug(
-                    'Spectral z-score max: ' + str(ets_zscore.max()) + ',   Spectral inv z-score max: ' + str(
-                        inv_zscore.max()))
-
-                # length of time_series_temperature, signal_energy and ets_zscore is smaller than half the original
-                #   extend it to cover the full original length
-                logger.debug('->')
-                dfe[self.output_item] = 0.0006
-                linear_interpolate = sp.interpolate.interp1d(time_series_temperature, ets_zscore, kind='linear',
-                                                             fill_value='extrapolate')
-
-                zScoreII = merge_score(dfe, dfe_orig, self.output_item,
-                                       abs(linear_interpolate(np.arange(0, temperature.size, 1))), mindelta)
-
-                if self.inv_zscore is not None:
-                    linear_interpol_inv_zscore = sp.interpolate.interp1d(time_series_temperature, inv_zscore,
-                                                                         kind='linear', fill_value='extrapolate')
-
-                    inv_zScoreII = merge_score(dfe, dfe_orig, self.inv_zscore,
-                                               abs(linear_interpol_inv_zscore(np.arange(0, temperature.size, 1))),
-                                               mindelta)
+                    df[output_item] = zScoreII
 
             except Exception as e:
-                logger.error('Spectral failed with ' + str(e))
+                logger.error(self.whoami + ' score integration failed with ' + str(e))
 
-            logger.debug('-->')
-
-            df[self.output_item] = zScoreII
-            if self.inv_zscore is not None:
-                df[self.inv_zscore] = inv_zScoreII
             logger.debug('--->')
 
-            return df
+            return df.droplevel(0)
+
+
+    def score(self, temperature):
+
+        scores = []
+        for output_item in self.output_items:
+            scores.append(np.zeros(temperature.shape))
+        return scores
+
+
+    def scale(self, temperature, entity):
+
+        normalize_entity = self.normalize
+        if not normalize_entity:
+            return temperature
+
+        temp = temperature.reshape(-1, 1)
+        logger.info(self.whoami + ' scaling ' + str(temperature.shape))
+        try:
+            check_array(temp, allow_nd=True)
+        except Exception as e:
+            normalize_entity = False
+            logger.error(
+                    'Found Nan or infinite value in input data,  error: ' + str(e))
+            pass
+
+        db = self._entity_type.db
+
+        scaler_model = None
+        # per entity - copy for later inplace operations
+        model_name = self.get_model_name(suffix=entity)
+        try:
+            scaler_model = db.model_store.retrieve_model(model_name)
+            logger.info('load model %s' % str(scaler_model))
+        except Exception as e:
+            logger.error('Model retrieval failed with ' + str(e))
+            pass
+
+        # failed to load a model, so train it
+        if scaler_model is None:
+            # all variables should be continuous
+            scaler_model = StandardScaler().fit(temp)
+            logger.debug('Created Scaler ' + str(scaler_model))
+
+            try:
+                db.model_store.store_model(model_name, scaler_model)
+            except Exception as e:
+                logger.error('Model store failed with ' + str(e))
+                pass
+
+        if scaler_model is not None:
+            temp = scaler_model.transform(temp)
+
+        return temp.reshape(temperature.shape)
+
+#####
+#  experimental function to interpolate over larger gaps
+####
+class Interpolator(AnomalyScorer):
+    """
+    Interpolates NaN and data to be interpreted as NaN (for example 0 as invalid sensor reading)
+    The window size is typically set large enough to allow for "bridging" gaps
+    Missing indicates sensor readings to be interpreted as invalid.
+    """
+
+    def __init__(self, input_item, windowsize, missing, output_item):
+        super().__init__(input_item, windowsize, [output_item])
+        logger.debug(input_item)
+
+        self.missing = missing
+
+        self.whoami = 'Interpolator'
+
+    def prepare_data(self, dfEntity):
+
+        logger.debug(self.whoami + ': prepare Data')
+
+        # operate on simple timestamp index
+        if len(dfEntity.index.names) > 1:
+            index_names = dfEntity.index.names
+            dfe = dfEntity.reset_index().set_index(index_names[0])
+        else:
+            index_names = None
+            dfe = dfEntity
+
+        # remove Nan
+        dfe = dfe[dfe[self.input_item].notna()]
+
+        # remove self.missing
+        dfe = dfe[dfe[self.input_item] != self.missing]
+
+        # interpolate gaps - data imputation
+        try:
+            dfe = dfe.interpolate(method="time")
+        except Exception as e:
+            logger.error('Prepare data error: ' + str(e))
+
+        # one dimensional time series - named temperature for catchyness
+        # replace NaN with self.missing
+        temperature = dfe[[self.input_item]].fillna(0).to_numpy(dtype=np.float64).reshape(-1, )
+
+        return dfe, temperature
 
     @classmethod
     def build_ui(cls):
 
+        # define arguments that behave as function inputs
+        inputs = []
+        inputs.append(UISingleItem(name='input_item', datatype=float, description='Data item to interpolate'))
+
+        inputs.append(
+            UISingle(name='windowsize', datatype=int, description='Minimal size of the window for interpolating data.'))
+        inputs.append(UISingle(name='missing', datatype=int, description='Data to be interpreted as not-a-number.'))
+
+        # define arguments that behave as function outputs
+        outputs = []
+        outputs.append(UIFunctionOutSingle(name='output_item', datatype=float, description='Interpolated data'))
+        return (inputs, outputs)
+
+
+class SpectralAnomalyScore(AnomalyScorer):
+    '''
+    An unsupervised anomaly detection function.
+     Applies a spectral analysis clustering techniqueto extract features from time series data and to create z scores.
+     Moves a sliding window across the data signal and applies the anomalymodelto each window.
+     The window size is typically set to 12 data points.
+     Try several anomaly detectors on your data and use the one that fits your data best.
+    '''
+    def __init__(self, input_item, windowsize, output_item):
+        super().__init__(input_item, windowsize, [output_item])
+
+        logger.debug(input_item)
+
+        self.whoami = 'SpectralAnomalyScore'
+
+
+    def score(self, temperature):
+
+        scores = []
+        for output_item in self.output_items:
+            scores.append(np.zeros(temperature.shape))
+
+        try:
+            # Fourier transform:
+            #   frequency, time, spectral density
+            frequency_temperature, time_series_temperature, spectral_density_temperature = signal.spectrogram(
+                temperature, fs=self.frame_rate, window='hanning', nperseg=self.windowsize,
+                noverlap=self.windowoverlap, detrend='l', scaling='spectrum')
+
+            # cut off freqencies too low to fit into the window
+            frequency_temperatureb = (frequency_temperature > 2 / self.windowsize).astype(int)
+            frequency_temperature = frequency_temperature * frequency_temperatureb
+            frequency_temperature[frequency_temperature == 0] = 1 / self.windowsize
+
+            signal_energy = np.dot(spectral_density_temperature.T, frequency_temperature)
+
+            signal_energy[signal_energy < SmallEnergy] = SmallEnergy
+            inv_signal_energy = np.divide(np.ones(signal_energy.size), signal_energy)
+
+            ets_zscore = abs(sp.stats.zscore(signal_energy)) * Spectral_normalizer
+            inv_zscore = abs(sp.stats.zscore(inv_signal_energy))
+
+            scores[0] = ets_zscore
+            if len(self.output_items) > 1:
+                scores[1] = inv_zscore
+
+            logger.debug(
+                'Spectral z-score max: ' + str(ets_zscore.max()) + ',   Spectral inv z-score max: ' + str(
+                    inv_zscore.max()))
+
+        except Exception as e:
+            logger.error(self.whoami + ' failed with ' + str(e))
+
+        return scores
+
+    @classmethod
+    def build_ui(cls):
         # define arguments that behave as function inputs
         inputs = []
         inputs.append(UISingleItem(name='input_item', datatype=float, description='Data item to analyze'))
@@ -794,23 +835,19 @@ class SpectralAnomalyScore(BaseTransformer):
 
 
 class SpectralAnomalyScoreExt(SpectralAnomalyScore):
-    """
+    '''
     An unsupervised anomaly detection function.
      Applies a spectral analysis clustering techniqueto extract features from time series data and to create z scores.
      Moves a sliding window across the data signal and applies the anomalymodelto each window.
      The window size is typically set to 12 data points.
      Try several anomaly detectors on your data and use the one that fits your data best.
-    """
-
+    '''
     def __init__(self, input_item, windowsize, output_item, inv_zscore):
-        super().__init__(input_item, windowsize, output_item)
+        super().__init__(input_item, windowsize, [output_item, inv_zscore])
+
         logger.debug(input_item)
 
-        self.inv_zscore = inv_zscore
-
-    def execute(self, df):
-        df[self.output_item] = 0
-        return super().execute(df)
+        self.whoami = 'SpectralAnomalyScoreExt'
 
     @classmethod
     def build_ui(cls):
@@ -830,7 +867,7 @@ class SpectralAnomalyScoreExt(SpectralAnomalyScore):
         return inputs, outputs
 
 
-class KMeansAnomalyScore(BaseTransformer):
+class KMeansAnomalyScore(AnomalyScorer):
     """
     An unsupervised anomaly detection function.
      Applies a k-means analysis clustering technique to time series data.
@@ -840,127 +877,50 @@ class KMeansAnomalyScore(BaseTransformer):
     """
 
     def __init__(self, input_item, windowsize, output_item, expr=None):
-        super().__init__()
+        super().__init__(input_item, windowsize, [output_item])
+
         logger.debug(input_item)
-        self.input_item = input_item
-
-        # use 12 by default
-        self.windowsize, windowoverlap = set_window_size_and_overlap(windowsize)
-
-        # step
-        self.step = self.windowsize - windowoverlap
-
-        # assume 1 per sec for now
-        self.frame_rate = 1
-
-        self.output_item = output_item
 
         self.whoami = 'KMeans'
 
-    def prepare_data(self, dfEntity):
 
-        logger.debug(self.whoami + ': prepare Data')
+    def score(self, temperature):
 
-        # operate on simple timestamp index
-        if len(dfEntity.index.names) > 1:
-            index_names = dfEntity.index.names
-            dfe = dfEntity.reset_index(index_names[1:])
-        else:
-            dfe = dfEntity
+        scores = []
+        for output_item in self.output_items:
+            scores.append(np.zeros(temperature.shape))
 
-        # interpolate gaps - data imputation
         try:
-            dfe = dfe.interpolate(method="time")
+            # Chop into overlapping windows
+            slices = view_as_windows(temperature, self.windowsize, self.step)
+
+            if self.windowsize > 1:
+                n_cluster = 40
+            else:
+                n_cluster = 20
+
+            n_cluster = np.minimum(n_cluster, slices.shape[0] // 2)
+
+            logger.debug(self.whoami + 'params, Clusters: ' + str(n_cluster) + ', Slices: ' + str(slices.shape))
+
+            cblofwin = CBLOF(n_clusters=n_cluster, n_jobs=-1)
+            try:
+                cblofwin.fit(slices)
+            except Exception as e:
+                logger.info('KMeans failed with ' + str(e))
+                self.trace_append('KMeans failed with' + str(e))
+                return scores
+
+            pred_score = cblofwin.decision_scores_.copy() * KMeans_normalizer
+
+            scores[0] = pred_score
+
+            logger.debug('KMeans score max: ' + str(pred_score.max()))
+
         except Exception as e:
-            logger.error('Prepare data error: ' + str(e))
+            logger.error(self.whoami + ' failed with ' + str(e))
 
-        # one dimensional time series - named temperature for catchyness
-        temperature = dfe[self.input_item].fillna(0).to_numpy(dtype=np.float64)
-
-        return dfe, temperature
-
-    def execute(self, df):
-
-        df_copy = df.copy()
-        entities = np.unique(df_copy.index.levels[0])
-        logger.debug(str(entities))
-
-        df_copy[self.output_item] = 0
-
-        # check data type
-        if df_copy[self.input_item].dtype != np.float64:
-            return df_copy
-
-        for entity in entities:
-            # per entity - copy for later inplace operations
-            dfe = df_copy.loc[[entity]].dropna(how='all')
-            dfe_orig = df_copy.loc[[entity]].copy()
-
-            # get rid of entityid part of the index
-            # do it inplace as we copied the data before
-            dfe.reset_index(level=[0], inplace=True)
-            dfe.sort_index(inplace=True)
-            dfe_orig.reset_index(level=[0], inplace=True)
-            dfe_orig.sort_index(inplace=True)
-
-            # minimal time delta for merging
-            mindelta, dfe_orig = min_delta(dfe_orig)
-
-            logger.debug('Timedelta:' + str(mindelta))
-
-            # interpolate gaps - data imputation by default
-            #   for missing data detection we look at the timestamp gradient instead
-            dfe, temperature = self.prepare_data(dfe)
-
-            logger.debug(
-                'Module KMeans, Entity: ' + str(entity) + ', Input: ' + str(self.input_item) + ', Windowsize: ' + str(
-                    self.windowsize) + ', Output: ' + str(self.output_item) + ', Overlap: ' + str(
-                    self.step) + ', Inputsize: ' + str(temperature.size))
-
-            if temperature.size > self.windowsize:
-                logger.debug(str(temperature.size) + ',' + str(self.windowsize))
-
-                # Chop into overlapping windows
-                slices = view_as_windows(temperature, self.windowsize, self.step)
-
-                if self.windowsize > 1:
-                    n_cluster = 40
-                else:
-                    n_cluster = 20
-
-                n_cluster = np.minimum(n_cluster, slices.shape[0] // 2)
-
-                logger.debug('KMeans params, Clusters: ' + str(n_cluster) + ', Slices: ' + str(slices.shape))
-
-                cblofwin = CBLOF(n_clusters=n_cluster, n_jobs=-1)
-                try:
-                    cblofwin.fit(slices)
-                except Exception as e:
-                    logger.info('KMeans failed with ' + str(e))
-                    self.trace_append('KMeans failed with' + str(e))
-                    continue
-
-                pred_score = cblofwin.decision_scores_.copy() * KMeans_normalizer
-
-                # length of time_series_temperature, signal_energy and ets_zscore is smaller than half the original
-                #   extend it to cover the full original length
-                diff = temperature.size - pred_score.size
-
-                time_series_temperature = np.linspace(self.windowsize // 2, temperature.size - self.windowsize // 2 + 1,
-                                                      temperature.size - diff)
-
-                linear_interpolate_k = sp.interpolate.interp1d(time_series_temperature, pred_score, kind='linear',
-                                                               fill_value='extrapolate')
-
-                zScoreII = merge_score(dfe, dfe_orig, self.output_item,
-                                       linear_interpolate_k(np.arange(0, temperature.size, 1)), mindelta)
-
-                idx = pd.IndexSlice
-                df_copy.loc[idx[entity, :], self.output_item] = zScoreII
-
-        msg = 'KMeansAnomalyScore'
-        self.trace_append(msg)
-        return df_copy
+        return scores
 
     @classmethod
     def build_ui(cls):
@@ -977,7 +937,8 @@ class KMeansAnomalyScore(BaseTransformer):
         return inputs, outputs
 
 
-class GeneralizedAnomalyScore(BaseTransformer):
+
+class GeneralizedAnomalyScore(AnomalyScorer):
     """
     An unsupervised anomaly detection function.
      Applies the Minimum Covariance Determinant (FastMCD) technique to detect outliers.
@@ -987,49 +948,12 @@ class GeneralizedAnomalyScore(BaseTransformer):
     """
 
     def __init__(self, input_item, windowsize, output_item):
-        super().__init__()
+        super().__init__(input_item, windowsize, [output_item])
         logger.debug(input_item)
 
         self.whoami = 'GAM'
 
-        self.input_item = input_item
-
-        # use 12 by default
-        self.windowsize, windowoverlap = set_window_size_and_overlap(windowsize)
-
-        # step
-        self.step = self.windowsize - windowoverlap
-
-        # assume 1 per sec for now
-        self.frame_rate = 1
-
-        self.dampening = 1  # dampening - dampen anomaly score
-
-        self.output_item = output_item
-
         self.normalizer = Generalized_normalizer
-
-    def prepare_data(self, dfEntity):
-
-        logger.debug(self.whoami + ': prepare Data')
-
-        # operate on simple timestamp index
-        if len(dfEntity.index.names) > 1:
-            index_names = dfEntity.index.names
-            dfe = dfEntity.reset_index(index_names[1:])
-        else:
-            dfe = dfEntity
-
-        # interpolate gaps - data imputation
-        try:
-            dfe = dfe.interpolate(method="time")
-        except Exception as e:
-            logger.error('Prepare data error: ' + str(e))
-
-        # one dimensional time series - named temperature for catchyness
-        temperature = dfe[self.input_item].fillna(0).to_numpy(dtype=np.float64)
-
-        return dfe, temperature
 
     def feature_extract(self, temperature):
 
@@ -1037,102 +961,49 @@ class GeneralizedAnomalyScore(BaseTransformer):
 
         slices = view_as_windows(temperature, self.windowsize, self.step)
 
-        return slices
+    def score(self, temperature):
 
-    def execute(self, df):
+        scores = []
+        for output_item in self.output_items:
+            scores.append(np.zeros(temperature.shape))
 
-        df_copy = df.copy()
-        entities = np.unique(df_copy.index.levels[0])
-        logger.debug(str(entities))
+        logger.debug(str(temperature.size) + "," + str(self.windowsize))
 
-        df_copy[self.output_item] = 0
+        temperature -= np.mean(temperature, axis=0)
+        mcd = MinCovDet()
 
-        # check data type
-        if df_copy[self.input_item].dtype != np.float64:
-            return df_copy
+        # Chop into overlapping windows (default) or run through FFT first
+        slices = self.feature_extract(temperature)
 
-        for entity in entities:
-            # per entity - copy for later inplace operations
-            dfe = df_copy.loc[[entity]].dropna(how='all')
-            dfe_orig = df_copy.loc[[entity]].copy()
+        pred_score = None
 
-            # get rid of entityid part of the index
-            # do it inplace as we copied the data before
-            dfe.reset_index(level=[0], inplace=True)
-            dfe.sort_index(inplace=True)
-            dfe_orig.reset_index(level=[0], inplace=True)
-            dfe_orig.sort_index(inplace=True)
+        try:
+            mcd.fit(slices)
+            pred_score = mcd.mahalanobis(slices).copy() * self.normalizer
 
-            # minimal time delta for merging
-            mindelta, dfe_orig = min_delta(dfe_orig)
+        except ValueError as ve:
 
-            # interpolate gaps - data imputation by default
-            #   for missing data detection we look at the timestamp gradient instead
-            dfe, temperature = self.prepare_data(dfe)
+            pred_score = np.zeros(temperature.shape)
+            logger.info(self.whoami + ": Entity: " + str(entity) + ", Input: " + str(
+                    self.input_item) + ", WindowSize: " + str(self.windowsize) + ", Output: " + str(
+                    self.output_items[0]) + ", Step: " + str(self.step) + ", InputSize: " + str(
+                    slices.shape) + " failed in the fitting step with \"" + str(ve) + "\" - scoring zero")
+            pass
 
-            logger.debug('Module GeneralizedAnomaly, Entity: ' + str(entity) + ', Input: ' + str(
-                self.input_item) + ', Windowsize: ' + str(self.windowsize) + ', Output: ' + str(
-                self.output_item) + ', Overlap: ' + str(self.step) + ', Inputsize: ' + str(temperature.size))
+        except Exception as e:
 
-            if temperature.size > self.windowsize:
-                logger.debug(str(temperature.size) + "," + str(self.windowsize))
+            pred_score = np.zeros(temperature.shape)
+            logger.error(self.whoami + " GeneralizedAnomalyScore: Entity: " + str(entity) + ", Input: " + str(
+                    self.input_item) + ", WindowSize: " + str(self.windowsize) + ", Output: " + str(
+                    self.output_items[0]) + ", Step: " + str(self.step) + ", InputSize: " + str(
+                    slices.shape) + " failed in the fitting step with " + str(e))
+            pass
 
-                temperature -= np.mean(temperature, axis=0)
-                mcd = MinCovDet()
+        scores[0] = pred_score
 
-                # Chop into overlapping windows (default) or run through FFT first
-                slices = self.feature_extract(temperature)
+        logger.debug(self.whoami + ' score max: ' + str(pred_score.max()))
 
-                try:
-                    mcd.fit(slices)
-                    pred_score = mcd.mahalanobis(slices).copy() * self.normalizer
-
-                except ValueError as ve:
-
-                    logger.info(self.whoami + " GeneralizedAnomalyScore: Entity: " + str(entity) + ", Input: " + str(
-                        self.input_item) + ", WindowSize: " + str(self.windowsize) + ", Output: " + str(
-                        self.output_item) + ", Step: " + str(self.step) + ", InputSize: " + str(
-                        slices.shape) + " failed in the fitting step with \"" + str(ve) + "\" - scoring zero")
-
-                    dfe[self.output_item] = 0
-                    #  this fails in the interpolation step
-                    continue
-
-                except Exception as e:
-
-                    dfe[self.output_item] = 0
-                    logger.error(self.whoami + " GeneralizedAnomalyScore: Entity: " + str(entity) + ", Input: " + str(
-                        self.input_item) + ", WindowSize: " + str(self.windowsize) + ", Output: " + str(
-                        self.output_item) + ", Step: " + str(self.step) + ", InputSize: " + str(
-                        slices.shape) + " failed in the fitting step with " + str(e))
-                    continue
-
-                # will break if pred_score is None
-                # length of timesTS, ETS and ets_zscore is smaller than half the original
-                #   extend it to cover the full original length
-                diff = temperature.size - pred_score.size
-
-                time_series_temperature = np.linspace(self.windowsize // 2, temperature.size - self.windowsize // 2 + 1,
-                                                      temperature.size - diff)
-
-                logger.debug(self.whoami + '   Entity: ' + str(entity) + ', result shape: ' + str(
-                    time_series_temperature.shape) + ' score shape: ' + str(pred_score.shape))
-
-                linear_interpolate_k = sp.interpolate.interp1d(time_series_temperature, pred_score, kind="linear",
-                                                               fill_value="extrapolate")
-
-                gam_scoreI = linear_interpolate_k(np.arange(0, temperature.size, 1))
-
-                dampen_anomaly_score(gam_scoreI, self.dampening)
-
-                zScoreII = merge_score(dfe, dfe_orig, self.output_item, gam_scoreI, mindelta)
-
-                idx = pd.IndexSlice
-                df_copy.loc[idx[entity, :], self.output_item] = zScoreII
-
-        msg = "GeneralizedAnomalyScore"
-        self.trace_append(msg)
-        return df_copy
+        return scores
 
     @classmethod
     def build_ui(cls):
@@ -1196,13 +1067,6 @@ class NoDataAnomalyScore(GeneralizedAnomalyScore):
 
         return dfe, temperature
 
-    def execute(self, df):
-        df_copy = super().execute(df)
-
-        msg = "NoDataAnomalyScore"
-        self.trace_append(msg)
-        return df_copy
-
     @classmethod
     def build_ui(cls):
 
@@ -1247,13 +1111,6 @@ class FFTbasedGeneralizedAnomalyScore(GeneralizedAnomalyScore):
             slicelist.append(fftpack.rfft(slice))
 
         return np.stack(slicelist, axis=0)
-
-    def execute(self, df):
-        df_copy = super().execute(df)
-
-        msg = "FFTbasedGeneralizedAnomalyScore"
-        self.trace_append(msg)
-        return df_copy
 
     @classmethod
     def build_ui(cls):
@@ -1375,65 +1232,6 @@ if iotfunctions.__version__ != '8.2.1':
             return inputs, outputs
 
 
-#####
-#  experimental function with dampening factor
-####
-class FFTbasedGeneralizedAnomalyScore2(GeneralizedAnomalyScore):
-    """
-    An unsupervised and robust anomaly detection function.
-     Extracts temporal features from time series data using Fast Fourier Transforms.
-     Applies the GeneralizedAnomalyScore to the features to detect outliers.
-     Moves a sliding window across the data signal and applies the anomaly models to each window.
-     The window size is typically set to 12 data points.
-     Try several anomaly detectors on your data and use the one that fits your data best.
-    """
-
-    def __init__(self, input_item, windowsize, dampening, output_item):
-        super().__init__(input_item, windowsize, output_item)
-
-        self.whoami = 'FFT dampen'
-        self.dampening = dampening
-        self.normalizer = FFT_normalizer / dampening
-
-        logger.debug('FFT')
-
-    def feature_extract(self, temperature):
-        logger.debug(self.whoami + ': feature extract')
-
-        slices_ = view_as_windows(temperature, self.windowsize, self.step)
-
-        slicelist = []
-        for slice in slices_:
-            slicelist.append(fftpack.rfft(slice))
-
-        return np.stack(slicelist, axis=0)
-
-    def execute(self, df):
-        df_copy = super().execute(df)
-
-        msg = "FFTbasedGeneralizedAnomalyScore"
-        self.trace_append(msg)
-        return df_copy
-
-    @classmethod
-    def build_ui(cls):
-        # define arguments that behave as function inputs
-        inputs = []
-        inputs.append(UISingleItem(name="input_item", datatype=float, description="Data item to analyze", ))
-
-        inputs.append(UISingle(name="windowsize", datatype=int,
-                               description="Size of each sliding window in data points. Typically set to 12."))
-
-        inputs.append(UISingle(name="dampening", datatype=float,
-                               description="Moderate the anomaly score. Use a value <=1. Typically set to 1."))
-
-        # define arguments that behave as function outputs
-        outputs = []
-        outputs.append(UIFunctionOutSingle(name="output_item", datatype=float,
-                                           description="Anomaly score (FFTbasedGeneralizedAnomalyScore)", ))
-        return inputs, outputs
-
-
 class SaliencybasedGeneralizedAnomalyScore(GeneralizedAnomalyScore):
     """
     An unsupervised anomaly detection function.
@@ -1461,13 +1259,6 @@ class SaliencybasedGeneralizedAnomalyScore(GeneralizedAnomalyScore):
 
         return slices
 
-    def execute(self, df):
-        df_copy = super().execute(df)
-
-        msg = "SaliencybasedGeneralizedAnomalyScore"
-        self.trace_append(msg)
-        return df_copy
-
     @classmethod
     def build_ui(cls):
         # define arguments that behave as function inputs
@@ -1481,117 +1272,21 @@ class SaliencybasedGeneralizedAnomalyScore(GeneralizedAnomalyScore):
         outputs = []
         outputs.append(UIFunctionOutSingle(name="output_item", datatype=float,
                                            description="Anomaly score (SaliencybasedGeneralizedAnomalyScore)", ))
-        return inputs, outputs
+        return (inputs, outputs)
 
 
 #######################################################################################
 # Anomaly detectors with scaling
 #######################################################################################
-class KMeansAnomalyScoreV2(Standard_Scaler):
-    """
-    An unsupervised anomaly detection function.
-     Applies a k-means analysis clustering technique to time series data.
-     Moves a sliding window across the data signal and applies the anomaly model to each window.
-     The window size is typically set to 12 data points.
-     The normalize switch allows to learn and apply a standard scaler prior to computing the anomaly score.
-     Try several anomaly models on your data and use the one that fits your data best.
-    """
-    eval_metric = staticmethod(metrics.r2_score)
-
-    # class variables
-    train_if_no_model = True
+class KMeansAnomalyScoreV2(KMeansAnomalyScore):
 
     def __init__(self, input_item, windowsize, normalize, output_item, expr=None):
-        super().__init__(features=[input_item], targets=[output_item], predictions=None)
+        super().__init__(input_item, windowsize, output_item)
 
         logger.debug(input_item)
-        # do not run score and call transform instead of predict
-
-        self.input_item = input_item
-
-        # use 12 by default
-        self.windowsize, windowoverlap = set_window_size_and_overlap(windowsize)
-
-        # step
-        self.step = self.windowsize - windowoverlap
-
         self.normalize = normalize
 
-        # assume 1 per sec for now
-        self.frame_rate = 1
-
-        self.output_item = output_item
-
         self.whoami = 'KMeansV2'
-
-    def kexecute(self, entity, df_copy):
-
-        # per entity - copy for later inplace operations
-        dfe = df_copy.loc[[entity]].dropna(how='all')
-        dfe_orig = df_copy.loc[[entity]].copy()
-
-        # get rid of entityid part of the index
-        # do it inplace as we copied the data before
-        dfe.reset_index(level=[0], inplace=True)
-        dfe.sort_index(inplace=True)
-        dfe_orig.reset_index(level=[0], inplace=True)
-        dfe_orig.sort_index(inplace=True)
-
-        # minimal time delta for merging
-        mindelta, dfe_orig = min_delta(dfe_orig)
-
-        logger.debug('Timedelta:' + str(mindelta))
-
-        # interpolate gaps - data imputation by default
-        #   for missing data detection we look at the timestamp gradient instead
-        dfe, temperature = self.prepare_data(dfe)
-
-        logger.debug('Module ' + self.whoami + ', Entity: ' + str(entity) + ', Input: ' + str(
-            self.input_item) + ', Windowsize: ' + str(self.windowsize) + ', Output: ' + str(
-            self.output_item) + ', Overlap: ' + str(self.step) + ', Inputsize: ' + str(temperature.size))
-
-        if temperature.size > self.windowsize:
-            logger.debug(str(temperature.size) + ',' + str(self.windowsize))
-
-            # Chop into overlapping windows
-            slices = view_as_windows(temperature, self.windowsize, self.step)
-
-            if self.windowsize > 1:
-                n_cluster = 40
-            else:
-                n_cluster = 20
-
-            n_cluster = np.minimum(n_cluster, slices.shape[0] // 2)
-
-            logger.debug('KMeans parms, Clusters: ' + str(n_cluster) + ', Slices: ' + str(slices.shape))
-
-            cblofwin = CBLOF(n_clusters=n_cluster, n_jobs=-1)
-            try:
-                cblofwin.fit(slices)
-            except Exception as e:
-                logger.info('KMeans failed with ' + str(e))
-                self.trace_append('KMeans failed with' + str(e))
-                return df_copy
-
-            pred_score = cblofwin.decision_scores_.copy() * KMeans_normalizer
-
-            # length of time_series_temperature, signal_energy and ets_zscore is smaller than half the original
-            #   extend it to cover the full original length
-            diff = temperature.size - pred_score.size
-
-            time_series_temperature = np.linspace(self.windowsize // 2, temperature.size - self.windowsize // 2 + 1,
-                                                  temperature.size - diff)
-
-            linear_interpolate_k = sp.interpolate.interp1d(time_series_temperature, pred_score, kind='linear',
-                                                           fill_value='extrapolate')
-
-            z_score_ii = merge_score(dfe, dfe_orig, self.output_item,
-                                     linear_interpolate_k(np.arange(0, temperature.size, 1)), mindelta)
-
-            idx = pd.IndexSlice
-            df_copy.loc[idx[entity, :], self.output_item] = z_score_ii
-
-        return df_copy
 
     @classmethod
     def build_ui(cls):
@@ -1607,10 +1302,10 @@ class KMeansAnomalyScoreV2(Standard_Scaler):
         # define arguments that behave as function outputs
         outputs = []
         outputs.append(UIFunctionOutSingle(name='output_item', datatype=float, description='Anomaly score (kmeans)'))
-        return inputs, outputs
+        return (inputs, outputs)
 
 
-class GeneralizedAnomalyScoreV2(Standard_Scaler):
+class GeneralizedAnomalyScoreV2(GeneralizedAnomalyScore):
     """
     An unsupervised anomaly detection function.
      Applies the Minimum Covariance Determinant (FastMCD) technique to detect outliers.
@@ -1619,132 +1314,16 @@ class GeneralizedAnomalyScoreV2(Standard_Scaler):
      The normalize switch allows to learn and apply a standard scaler prior to computing the anomaly score.
      Try several anomaly detectors on your data and use the one that fits your data best.
     """
-    # class variables
-    eval_metric = staticmethod(metrics.r2_score)
-
-    train_if_no_model = True
 
     def __init__(self, input_item, windowsize, normalize, output_item, expr=None):
-        super().__init__(features=[input_item], targets=[output_item], predictions=None)
+        super().__init__(input_item, windowsize, output_item)
 
         logger.debug(input_item)
         # do not run score and call transform instead of predict
 
-        self.input_item = input_item
-
-        # use 12 by default
-        self.windowsize, windowoverlap = set_window_size_and_overlap(windowsize)
-
-        # step
-        self.step = self.windowsize - windowoverlap
-
         self.normalize = normalize
 
-        # assume 1 per sec for now
-        self.frame_rate = 1
-
-        self.dampening = 1  # dampening - dampen anomaly score
-
-        self.output_item = output_item
-
-        self.normalizer = Generalized_normalizer
-
         self.whoami = 'GAMV2'
-
-    def feature_extract(self, temperature):
-
-        logger.debug(self.whoami + ': feature extract')
-
-        slices = view_as_windows(temperature, self.windowsize, self.step)
-
-        return slices
-
-    def kexecute(self, entity, df_copy):
-
-        # per entity - copy for later inplace operations
-        dfe = df_copy.loc[[entity]].dropna(how='all')
-        dfe_orig = df_copy.loc[[entity]].copy()
-
-        # get rid of entityid part of the index
-        # do it inplace as we copied the data before
-        dfe.reset_index(level=[0], inplace=True)
-        dfe.sort_index(inplace=True)
-        dfe_orig.reset_index(level=[0], inplace=True)
-        dfe_orig.sort_index(inplace=True)
-
-        # minimal time delta for merging
-        mindelta, dfe_orig = min_delta(dfe_orig)
-
-        logger.debug('Timedelta:' + str(mindelta))
-
-        # interpolate gaps - data imputation by default
-        #   for missing data detection we look at the timestamp gradient instead
-        dfe, temperature = self.prepare_data(dfe)
-
-        logger.debug('Module ' + self.whoami + ', Entity: ' + str(entity) + ', Input: ' + str(
-            self.input_item) + ', Windowsize: ' + str(self.windowsize) + ', Output: ' + str(
-            self.output_item) + ', Overlap: ' + str(self.step) + ', Inputsize: ' + str(temperature.size))
-
-        if temperature.size > self.windowsize:
-            logger.debug(str(temperature.size) + "," + str(self.windowsize))
-
-            temperature -= np.mean(temperature, axis=0)
-            mcd = MinCovDet()
-
-            # Chop into overlapping windows (default) or run through FFT first
-            slices = self.feature_extract(temperature)
-
-            pred_score = None
-
-            try:
-                mcd.fit(slices)
-                pred_score = mcd.mahalanobis(slices).copy() * self.normalizer
-
-            except ValueError as ve:
-
-                logger.info(self.whoami + " GeneralizedAnomalyScore: Entity: " + str(entity) + ", Input: " + str(
-                    self.input_item) + ", WindowSize: " + str(self.windowsize) + ", Output: " + str(
-                    self.output_item) + ", Step: " + str(self.step) + ", InputSize: " + str(
-                    slices.shape) + " failed in the fitting step with \"" + str(ve) + "\" - scoring zero")
-
-                dfe[self.output_item] = 0
-                return df_copy
-
-            except Exception as e:
-
-                dfe[self.output_item] = 0
-                logger.error(self.whoami + " GeneralizedAnomalyScore: Entity: " + str(entity) + ", Input: " + str(
-                    self.input_item) + ", WindowSize: " + str(self.windowsize) + ", Output: " + str(
-                    self.output_item) + ", Step: " + str(self.step) + ", InputSize: " + str(
-                    slices.shape) + " failed in the fitting step with " + str(e))
-                return df_copy
-
-            # will break if pred_score is None
-            # length of timesTS, ETS and ets_zscore is smaller than half the original
-            #   extend it to cover the full original length
-            diff = temperature.size - pred_score.size
-
-            time_series_temperature = np.linspace(self.windowsize // 2, temperature.size - self.windowsize // 2 + 1,
-                                                  temperature.size - diff)
-
-            logger.debug(self.whoami + '   Entity: ' + str(entity) + ', result shape: ' + str(
-                time_series_temperature.shape) + ' score shape: ' + str(pred_score.shape))
-
-            linear_interpolate_k = sp.interpolate.interp1d(time_series_temperature, pred_score, kind="linear",
-                                                           fill_value="extrapolate")
-
-            gam_scoreI = linear_interpolate_k(np.arange(0, temperature.size, 1))
-
-            dampen_anomaly_score(gam_scoreI, self.dampening)
-
-            zScoreII = merge_score(dfe, dfe_orig, self.output_item, gam_scoreI, mindelta)
-
-            idx = pd.IndexSlice
-            df_copy.loc[idx[entity, :], self.output_item] = zScoreII
-
-        msg = "GeneralizedAnomalyScore"
-        self.trace_append(msg)
-        return df_copy
 
     @classmethod
     def build_ui(cls):
@@ -1777,6 +1356,8 @@ class FFTbasedGeneralizedAnomalyScoreV2(GeneralizedAnomalyScoreV2):
 
     def __init__(self, input_item, windowsize, normalize, output_item):
         super().__init__(input_item, windowsize, normalize, output_item)
+
+        self.normalize = normalize
 
         self.whoami = 'FFTV2'
         self.normalizer = FFT_normalizer
@@ -1812,7 +1393,7 @@ class FFTbasedGeneralizedAnomalyScoreV2(GeneralizedAnomalyScoreV2):
         return inputs, outputs
 
 
-class SaliencybasedGeneralizedAnomalyScoreV2(GeneralizedAnomalyScoreV2):
+class SaliencybasedGeneralizedAnomalyScoreV2(SaliencybasedGeneralizedAnomalyScore):
     """
     An unsupervised anomaly detection function.
      Based on salient region detection models,
@@ -1825,29 +1406,13 @@ class SaliencybasedGeneralizedAnomalyScoreV2(GeneralizedAnomalyScoreV2):
     """
 
     def __init__(self, input_item, windowsize, normalize, output_item):
-        super().__init__(input_item, windowsize, normalize, output_item)
+        super().__init__(input_item, windowsize, output_item)
 
         self.whoami = 'SaliencyV2'
-        if windowsize is None:
-            windowsize = 12
-        self.saliency = Saliency(windowsize, 0, 0)
-        self.normalizer = Saliency_normalizer
 
-        logger.debug('Saliency')
+        self.normalize = normalize
 
-    def feature_extract(self, temperature):
-        logger.debug(self.whoami + ': feature extract')
-
-        slices = view_as_windows(temperature, self.windowsize, self.step)
-
-        return slices
-
-    def execute(self, df):
-        df_copy = super().execute(df)
-
-        msg = "SaliencybasedGeneralizedAnomalyScore"
-        self.trace_append(msg)
-        return df_copy
+        logger.debug('SaliencyV2')
 
     @classmethod
     def build_ui(cls):
@@ -1871,6 +1436,209 @@ KMeansAnomalyScorev2 = KMeansAnomalyScoreV2
 FFTbasedGeneralizedAnomalyScorev2 = FFTbasedGeneralizedAnomalyScoreV2
 SaliencybasedGeneralizedAnomalyScorev2 = SaliencybasedGeneralizedAnomalyScoreV2
 GeneralizedAnomalyScorev2 = GeneralizedAnomalyScoreV2
+
+
+#######################################################################################
+# Base class to handle models
+#######################################################################################
+
+class SupervisedLearningTransformer(BaseTransformer):
+
+    name = 'SupervisedLearningTransformer'
+
+    """
+    Base class for anomaly scorers that can be trained with historic data in a notebook
+    and automatically store a trained model in the tenant database
+    Inferencing is run in the pipeline
+    """
+    def __init__(self, features, targets):
+        super().__init__()
+
+        logging.debug("__init__" + self.name)
+
+        # do NOT automatically train if no model is found (subclasses)
+        self.auto_train = False
+        self.delete_model = False
+
+        self.features = features
+        self.targets = targets
+        parms = []
+        if features is not None:
+            parms.extend(features)
+        if targets is not None:
+            parms.extend(targets)
+        parms = '.'.join(parms)
+        logging.debug("__init__ done with parameters: " + parms)
+
+    '''
+    Generate unique model name from entity, optionally features and target for consistency checks
+    '''
+    def get_model_name(self, prefix='model', features=None, targets=None, suffix=None):
+
+        name = []
+        if prefix is not None:
+            name.append(prefix)
+
+        name.extend([self._entity_type.name, self.name])
+        if features is not None:
+            name.extend(features)
+        if targets is not None:
+            name.extend(targets)
+        if suffix is not None:
+            name.append(suffix)
+        name = '.'.join(name)
+        return name
+
+#######################################################################################
+# Outlier removal in pipeline
+#######################################################################################
+
+class LocalOutlierFactor:
+    def __init__(self):
+        self.lof = LocalOutlierFactor() #**kwargs)
+        self.version = 1
+
+    def fit(self, X):
+        self.lof.fit(X.reshape(-1,1))
+
+    def predict(self, X, threshold):
+        #return (X >= self.MinMax[0]) & (X <= self.MinMax[1])
+        return self.lof.negative_outlier_factor_ < threshold
+
+class KDEMaxMin:
+    def __init__(self):
+        self.version = 1
+        self.kde = KernelDensity(kernel='gaussian')
+        self.Min = None
+        self.Max = None
+
+    def fit(self, X, alpha):
+        self.kde.fit(X.reshape(-1,1))
+
+        kde_X = self.kde.score_samples(X.reshape(-1,1))
+
+        # find outliers of the kde score
+        tau_kde = sp.stats.mstats.mquantiles(kde_X, 1. - alpha)  # alpha = 0.995
+
+        # determine outliers
+        X_outliers = X[np.argwhere(kde_X < tau_kde).flatten()]
+        X_valid = X[np.argwhere(kde_X >= tau_kde).flatten()]
+
+        # determine max of all sample that are not outliers
+        self.Min = X_valid.min()
+        self.Max = X_valid.max()
+        if len(X_outliers) > 0:
+            X_min = X_outliers[X_outliers < self.Min]
+            X_max = X_outliers[X_outliers > self.Max]
+            if len(X_min) > 0:
+                self.Min = max(X_min.max(), self.Min)
+            if len(X_max) > 0:
+                self.Max = min(X_max.min(), self.Max)
+        #    self.Min = max(X_outliers[X_outliers < self.Min].max(), self.Min)
+        #    self.Max = min(X_outliers[X_outliers > self.Max].min(), self.Max)
+
+        logger.info('KDEMaxMin - Min: ' + str(self.Min) + ', ' + str(self.Max))
+
+        return kde_X
+
+    def predict(self, X, threshold=None):
+        return (X >= self.Min) & (X <= self.Max)
+
+class RobustThreshold(SupervisedLearningTransformer):
+
+    def __init__(self, input_item, threshold, output_item):
+        super().__init__(features=[input_item], targets=[output_item])
+
+        self.input_item = input_item
+        self.threshold = threshold
+        self.output_item = output_item
+        self.auto_train = True
+        self.Min = dict()
+        self.Max = dict()
+
+        self.whoami = 'RobustTransform'
+
+        print(self.whoami, self.input_item, self.threshold, self.output_item)
+
+    def execute(self, df):
+        logger.debug('Execute ' + self.whoami)
+
+        # check data type
+        #if df[self.input_item].dtype != np.float64:
+        if not pd.api.types.is_numeric_dtype(df[self.input_item].dtype):
+            return (df)
+
+        # set output columns to zero
+        #for output_item in self.output_items:
+        df[self.output_item] = 0
+
+        # delegate to _calc
+        logger.debug('Execute ' + self.whoami + ' enter per entity execution')
+
+        # group over entities
+        group_base = [pd.Grouper(axis=0, level=0)]
+
+        df_copy = df.groupby(group_base).apply(self._calc)
+
+        logger.debug('Scoring done')
+        return df_copy
+
+
+    def _calc(self, df):
+        # per entity - copy for later inplace operations
+        db = self._entity_type.db
+        entity = df.index.levels[0][0]
+
+        model_name = self.get_model_name(targets=self.targets, suffix=entity)
+        robust_model = None
+        try:
+            robust_model = db.model_store.retrieve_model(model_name)
+            logger.info('load model %s' % str(robust_model))
+        except Exception as e:
+            logger.error('Model retrieval failed with ' + str(e))
+            pass
+
+        # ditch old model
+        version = 1
+        if self.delete_model:
+            if robust_model is not None:
+                version = robust_model.version + 1
+                logger.debug('Deleting robust model ' + str(robust_model.version) + ' for entity: ' + str(entity))
+                robust_model = None
+
+        feature = df[self.input_item].values
+
+        if robust_model is None and self.auto_train:
+            robust_model = KDEMaxMin() #self.threshold)
+            robust_model.fit(feature, self.threshold)
+            try:
+                db.model_store.store_model(model_name, robust_model)
+            except Exception as e:
+                logger.error('Model store failed with ' + str(e))
+                pass
+
+        self.Min[entity] = robust_model.Min
+        self.Max[entity] = robust_model.Max
+
+        df[self.output_item] = robust_model.predict(feature, self.threshold)
+        return df.droplevel(0)
+
+
+    @classmethod
+    def build_ui(cls):
+        # define arguments that behave as function inputs
+        inputs = []
+        inputs.append(UISingleItem(name="input_item", datatype=float, description="Data item to analyze"))
+
+        inputs.append(UISingle(name="threshold", datatype=int,
+                               description="Threshold to determine outliers by quantile. Typically set to 0.95", ))
+
+        # define arguments that behave as function outputs
+        outputs = []
+        outputs.append(UIFunctionOutSingle(name="output_item", datatype=bool,
+                                           description="Boolean outlier condition"))
+        return (inputs, outputs)
+
 
 
 #######################################################################################
@@ -2424,8 +2192,6 @@ class GBMForecaster(BaseEstimatorFunction):
 
         _, df_copy = self.lag_features(df=df, Train=True)
 
-        print('Here 1', type(df_copy))
-
         entities = np.unique(df_copy.index.levels[0])
         logger.debug(str(entities))
 
@@ -2517,7 +2283,6 @@ class ARIMAForecaster(BaseTransformer):
             name.append(prefix)
 
         name.extend([self._entity_type.name, self.name])
-        logger.debug(name)
         name.extend([self.output_item])
         logger.debug(name)
         if suffix is not None:
@@ -2655,8 +2420,6 @@ class KDEAnomalyScore(BaseTransformer):
         df_copy = df.copy()
         db = self._entity_type.db
 
-        logger.debug('Here 1', type(df_copy))
-
         entities = np.unique(df_copy.index.levels[0])
         logger.debug(str(entities))
 
@@ -2792,7 +2555,7 @@ class VI(nn.Module):
     # draw from N(mu, sigma)
     def reparameterize(self, mu, log_var):
         # std can not be negative, thats why we use log variance
-        sigma = torch.exp(0.5 * log_var) + 1e-7
+        sigma = torch.add(torch.exp(0.5 * log_var), 1e-7)
         eps = torch.randn_like(sigma)
         return mu + sigma * eps
 
@@ -2807,10 +2570,10 @@ class VI(nn.Module):
         # likelihood of observing y given Variational mu and sigma - reconstruction error
         loglikelihood = ll_gaussian(y, mu, log_var)
 
-        # KL - prior probability of y_pred N(0,1)
+        # KL - prior probability of y_pred w.r.t. N(0,1)
         log_prior = ll_gaussian(y_pred, self.prior_mu, torch.log(torch.tensor(self.prior_sigma)))
 
-        # KL - variational probability of y_pred
+        # KL - probability of y_pred w.r.t the variational likelihood
         log_p_q = ll_gaussian(y_pred, mu, log_var)
 
         if self.show_once:
@@ -2824,20 +2587,8 @@ class VI(nn.Module):
     # simplified when everything is Gaussian
     #  KL(q, p) = \log \frac{\sigma_1}{\sigma_2} + \frac{\sigma_2^2 + (\mu_2 - \mu_1)^2}{2 \sigma_1^2} - \frac{1}{2}
     # unfortunately I don't get it to work properly
-    def elbo_gauss(self, y, y_pred, mu, log_var):
-        # likelihood of observing y given Variational mu and sigma - reconstruction error
-        loglikelihood = ll_gaussian(y, mu, log_var)
-
-        #  see 3 - https://arxiv.org/pdf/1312.6114.pdf
-        kl_divergence = (-0.5 * torch.sum(1 + log_var - mu**2 - log_var.exp()))
-
-        if self.show_once:
-            self.show_once = False
-            logger.info('Cardinalities: Mu: ' + str(mu.shape) + ' Sigma: ' + str(log_var.shape) +
-                        ' loglikelihood: ' + str(loglikelihood.shape) + ' KL: ' + str(kl_divergence.shape) +
-                        ' KL value: ' + str(kl_divergence))
-
-        return loglikelihood.mean() - kl_divergence
+    #def elbo_gauss(self, y, y_pred, mu, log_var):
+    # does not work
 
     # Unfinished - the stuff here is crap !
     def iwae(self, y_pred, y, mu, log_var):
@@ -2856,54 +2607,6 @@ class VI(nn.Module):
     # Minimizing negative ELBO
     def det_loss_old(self, y_pred, y, mu, log_var):
         return -self.elbo(y_pred, y, mu, log_var)
-
-
-class SupervisedLearningTransformer(BaseTransformer):
-
-    name = 'SupervisedLearningTransformer'
-
-    """
-    Base class for anomaly scorers that can be trained with historic data in a notebook
-    and automatically store a trained model in the tenant database
-    Inferencing is run in the pipeline
-    """
-    def __init__(self, features=None, targets=None):
-        super().__init__()
-
-        logging.debug("__init__" + self.name)
-
-        # do NOT automatically train if no model is found (subclasses)
-        self.auto_train = False
-        self.delete_model = False
-
-        self.features = features
-        self.targets = targets
-        parms = []
-        if features is not None:
-            parms.extend(features)
-        if targets is not None:
-            parms.extend(targets)
-        parms = '.'.join(parms)
-        logging.debug("__init__ done with parameters: " + parms)
-
-    '''
-    Generate unique model name from entity, optionally features and target for consistency checks
-    '''
-    def get_model_name(self, prefix='model', features=None, targets=None, suffix=None):
-
-        name = []
-        if prefix is not None:
-            name.append(prefix)
-
-        name.extend([self._entity_type.name, self.name])
-        if features is not None:
-            name.extend(features)
-        if targets is not None:
-            name.extend(targets)
-        if suffix is not None:
-            name.append(suffix)
-        name = '.'.join(name)
-        return name
 
 
 class VIAnomalyScore(SupervisedLearningTransformer):
@@ -3025,10 +2728,9 @@ class VIAnomalyScore(SupervisedLearningTransformer):
                     optim.zero_grad()
                     y_pred, mu, log_var = vi_model(X)
                     loss = -vi_model.elbo(y_pred, Y, mu, log_var)
-                    lossg = -vi_model.elbo_gauss(y_pred, Y, mu, log_var)
                     if epoch % 10 == 0:
-                        logger.debug('Epoch: ' + str(epoch) + ', neg ELBO: ' + str(loss.item()) +
-                                     ' neg ELBO G: ' + str(lossg.item()))
+                        logger.debug('Epoch: ' + str(epoch) + ', neg ELBO: ' + str(loss.item()))
+
                     loss.backward()
                     optim.step()
 
