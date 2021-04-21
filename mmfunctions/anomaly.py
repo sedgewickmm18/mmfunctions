@@ -642,7 +642,8 @@ class AnomalyScorer(BaseTransformer):
 
             logger.debug('--->')
 
-            return df.droplevel(0)
+            #return df.droplevel(0)
+            return df
 
 
     def score(self, temperature):
@@ -772,7 +773,10 @@ class SpectralAnomalyScore(AnomalyScorer):
      Try several anomaly detectors on your data and use the one that fits your data best.
     '''
     def __init__(self, input_item, windowsize, output_item):
-        super().__init__(input_item, windowsize, [output_item])
+        if isinstance(output_item, list):
+            super().__init__(input_item, windowsize, output_item)
+        else:
+            super().__init__(input_item, windowsize, [output_item])
 
         logger.debug(input_item)
 
