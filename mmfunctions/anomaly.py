@@ -2710,8 +2710,8 @@ class VIAnomalyScore(SupervisedLearningTransformer):
                 self.mu[entity] = mu
                 self.quantile095[entity] = q1
 
-            df[self.predictions] = mu[ind_r] + vi_model.adjust_mean
-            df[self.pred_stddev] = q1[ind_r]
+            df[self.predictions] = (mu[ind_r] + vi_model.adjust_mean).reshape(-1,1)
+            df[self.pred_stddev] = (q1[ind_r]).reshape(-1,1)
         else:
             logger.debug('No VI model for entity: ' + str(entity))
 
