@@ -506,7 +506,6 @@ class AnomalyScorer(BaseTransformer):
 
         self.whoami = 'Anomaly'
 
-
     def get_model_name(self, prefix='model', suffix=None):
 
         name = []
@@ -520,7 +519,6 @@ class AnomalyScorer(BaseTransformer):
         name = '.'.join(name)
 
         return name
-
 
     # make sure data is evenly spaced
     def prepare_data(self, dfEntity):
@@ -572,8 +570,6 @@ class AnomalyScorer(BaseTransformer):
 
     def _calc(self, df):
 
-        dfe = df.copy()
-        dfe_orig = df.copy()
         entity = df.index.levels[0][0]
 
         # get rid of entity id as part of the index
@@ -589,7 +585,6 @@ class AnomalyScorer(BaseTransformer):
         mindelta, dfe_orig = min_delta(dfe_orig)
 
         logger.debug('Timedelta:' + str(mindelta) + ' Index: ' + str(dfe_orig.index))
-
 
         # one dimensional time series - named temperature for catchyness
         # interpolate gaps - data imputation by default
@@ -645,9 +640,7 @@ class AnomalyScorer(BaseTransformer):
 
             logger.debug('--->')
 
-            #return df.droplevel(0)
             return df
-
 
     def score(self, temperature):
 
@@ -655,7 +648,6 @@ class AnomalyScorer(BaseTransformer):
         for output_item in self.output_items:
             scores.append(np.zeros(temperature.shape))
         return scores
-
 
     def scale(self, temperature, entity):
 
@@ -668,10 +660,8 @@ class AnomalyScorer(BaseTransformer):
         try:
             check_array(temp, allow_nd=True)
         except Exception as e:
-            normalize_entity = False
-            logger.error(
-                    'Found Nan or infinite value in input data,  error: ' + str(e))
-            pass
+            logger.error('Found Nan or infinite value in input data,  error: ' + str(e))
+            return temperature
 
         db = self._entity_type.db
 
@@ -683,7 +673,6 @@ class AnomalyScorer(BaseTransformer):
             logger.info('load model %s' % str(scaler_model))
         except Exception as e:
             logger.error('Model retrieval failed with ' + str(e))
-            pass
 
         # failed to load a model, so train it
         if scaler_model is None:
@@ -695,12 +684,13 @@ class AnomalyScorer(BaseTransformer):
                 db.model_store.store_model(model_name, scaler_model)
             except Exception as e:
                 logger.error('Model store failed with ' + str(e))
-                pass
 
         if scaler_model is not None:
             temp = scaler_model.transform(temp)
+            return temp.reshape(temperature.shape)
 
-        return temp.reshape(temperature.shape)
+        return temperature
+
 
 #####
 #  experimental function to interpolate over larger gaps
@@ -727,9 +717,8 @@ class Interpolator(AnomalyScorer):
         # operate on simple timestamp index
         if len(dfEntity.index.names) > 1:
             index_names = dfEntity.index.names
-            dfe = dfEntity.reset_index().set_index(index_names[0])
+            dfe = dfEntity.reset_index(index_names[1:])
         else:
-            index_names = None
             dfe = dfEntity
 
         # remove Nan
@@ -746,7 +735,7 @@ class Interpolator(AnomalyScorer):
 
         # one dimensional time series - named temperature for catchyness
         # replace NaN with self.missing
-        temperature = dfe[[self.input_item]].fillna(0).to_numpy(dtype=np.float64).reshape(-1, )
+        temperature = dfe[self.input_item].fillna(0).to_numpy(dtype=np.float64)
 
         return dfe, temperature
 
@@ -784,7 +773,6 @@ class SpectralAnomalyScore(AnomalyScorer):
         logger.debug(input_item)
 
         self.whoami = 'SpectralAnomalyScore'
-
 
     def score(self, temperature):
 
@@ -944,7 +932,6 @@ class KMeansAnomalyScore(AnomalyScorer):
         return inputs, outputs
 
 
-
 class GeneralizedAnomalyScore(AnomalyScorer):
     """
     An unsupervised anomaly detection function.
@@ -968,6 +955,8 @@ class GeneralizedAnomalyScore(AnomalyScorer):
 
         slices = view_as_windows(temperature, self.windowsize, self.step)
 
+        return slices
+
     def score(self, temperature):
 
         scores = []
@@ -982,8 +971,6 @@ class GeneralizedAnomalyScore(AnomalyScorer):
         # Chop into overlapping windows (default) or run through FFT first
         slices = self.feature_extract(temperature)
 
-        pred_score = None
-
         try:
             mcd.fit(slices)
             pred_score = mcd.mahalanobis(slices).copy() * self.normalizer
@@ -995,7 +982,6 @@ class GeneralizedAnomalyScore(AnomalyScorer):
                     self.input_item) + ", WindowSize: " + str(self.windowsize) + ", Output: " + str(
                     self.output_items[0]) + ", Step: " + str(self.step) + ", InputSize: " + str(
                     slices.shape) + " failed in the fitting step with \"" + str(ve) + "\" - scoring zero")
-            pass
 
         except Exception as e:
 
@@ -1004,7 +990,6 @@ class GeneralizedAnomalyScore(AnomalyScorer):
                     self.input_item) + ", WindowSize: " + str(self.windowsize) + ", Output: " + str(
                     self.output_items[0]) + ", Step: " + str(self.step) + ", InputSize: " + str(
                     slices.shape) + " failed in the fitting step with " + str(e))
-            pass
 
         scores[0] = pred_score
 
@@ -1582,13 +1567,12 @@ class RobustThreshold(SupervisedLearningTransformer):
         feature = df[self.input_item].values
 
         if robust_model is None and self.auto_train:
-            robust_model = KDEMaxMin(version=version) #self.threshold)
+            robust_model = KDEMaxMin(version=version)
             robust_model.fit(feature, self.threshold)
             try:
                 db.model_store.store_model(model_name, robust_model)
             except Exception as e:
                 logger.error('Model store failed with ' + str(e))
-                pass
 
         self.Min[entity] = robust_model.Min
         self.Max[entity] = robust_model.Max
