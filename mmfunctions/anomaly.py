@@ -991,7 +991,7 @@ class GeneralizedAnomalyScore(AnomalyScorer):
         except ValueError as ve:
 
             pred_score = np.zeros(temperature.shape)
-            logger.info(self.whoami + ": Entity: " + str(entity) + ", Input: " + str(
+            logger.info(self.whoami + ", Input: " + str(
                     self.input_item) + ", WindowSize: " + str(self.windowsize) + ", Output: " + str(
                     self.output_items[0]) + ", Step: " + str(self.step) + ", InputSize: " + str(
                     slices.shape) + " failed in the fitting step with \"" + str(ve) + "\" - scoring zero")
@@ -1000,7 +1000,7 @@ class GeneralizedAnomalyScore(AnomalyScorer):
         except Exception as e:
 
             pred_score = np.zeros(temperature.shape)
-            logger.error(self.whoami + " GeneralizedAnomalyScore: Entity: " + str(entity) + ", Input: " + str(
+            logger.error(self.whoami + ", Input: " + str(
                     self.input_item) + ", WindowSize: " + str(self.windowsize) + ", Output: " + str(
                     self.output_items[0]) + ", Step: " + str(self.step) + ", InputSize: " + str(
                     slices.shape) + " failed in the fitting step with " + str(e))
