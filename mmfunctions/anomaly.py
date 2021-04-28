@@ -776,9 +776,7 @@ class SpectralAnomalyScore(AnomalyScorer):
 
     def score(self, temperature):
 
-        scores = []
-        for output_item in self.output_items:
-            scores.append(np.zeros(temperature.shape))
+        scores = np.zeros((len(self.output_items), ) + temperature.shape)
 
         try:
             # Fourier transform:
@@ -881,9 +879,7 @@ class KMeansAnomalyScore(AnomalyScorer):
 
     def score(self, temperature):
 
-        scores = []
-        for output_item in self.output_items:
-            scores.append(np.zeros(temperature.shape))
+        scores = np.zeros((len(self.output_items), ) + temperature.shape)
 
         try:
             # Chop into overlapping windows
@@ -959,9 +955,7 @@ class GeneralizedAnomalyScore(AnomalyScorer):
 
     def score(self, temperature):
 
-        scores = []
-        for output_item in self.output_items:
-            scores.append(np.zeros(temperature.shape))
+        scores = np.zeros((len(self.output_items), ) + temperature.shape)
 
         logger.debug(str(temperature.size) + "," + str(self.windowsize))
 
@@ -1142,10 +1136,7 @@ if iotfunctions.__version__ != '8.2.1':
 
         def score(self, temperature):
 
-            scores = []
-
-            for output_item in self.output_items:
-                scores.append(np.zeros(temperature.shape))
+            scores = np.zeros((len(self.output_items), ) + temperature.shape)
 
             try:  # calculate scores
                 matrix_profile = stumpy.aamp(temperature, m=self.windowsize)[:, 0]
