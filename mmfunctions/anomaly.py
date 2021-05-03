@@ -34,6 +34,7 @@ from sklearn import metrics
 from sklearn.covariance import MinCovDet
 from sklearn.neighbors import (KernelDensity, LocalOutlierFactor)
 from sklearn.pipeline import Pipeline, TransformerMixin
+from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import (StandardScaler, RobustScaler, MinMaxScaler,
                                    minmax_scale, PolynomialFeatures)
 from sklearn.utils import check_array
@@ -545,14 +546,16 @@ class AnomalyScorer(BaseTransformer):
     def execute(self, df):
 
         logger.debug('Execute ' + self.whoami)
+        df_copy = df # no copy
 
         # check data type
-        if not pd.api.types.is_numeric_dtype(df[self.input_item].dtype):
-            return df
+        if not pd.api.types.is_numeric_dtype(df_copy[self.input_item].dtype):
+            logger.error('Anomaly scoring on non-numeric feature:' + str(self.input_item))
+            return df_copy
 
         # set output columns to zero
         for output_item in self.output_items:
-            df[output_item] = 0
+            df_copy[output_item] = 0
 
         # delegate to _calc
         logger.debug('Execute ' + self.whoami + ' enter per entity execution')
@@ -560,7 +563,7 @@ class AnomalyScorer(BaseTransformer):
         # group over entities
         group_base = [pd.Grouper(axis=0, level=0)]
 
-        df_copy = df.groupby(group_base).apply(self._calc)
+        df_copy = df_copy.groupby(group_base).apply(self._calc)
 
         logger.debug('Scoring done')
         return df_copy
@@ -641,9 +644,7 @@ class AnomalyScorer(BaseTransformer):
 
     def score(self, temperature):
 
-        scores = []
-        for output_item in self.output_items:
-            scores.append(np.zeros(temperature.shape))
+        scores = np.zeros((len(self.output_items), ) + temperature.shape)
         return scores
 
     def scale(self, temperature, entity):
@@ -658,6 +659,7 @@ class AnomalyScorer(BaseTransformer):
             check_array(temp, allow_nd=True)
         except Exception as e:
             logger.error('Found Nan or infinite value in input data,  error: ' + str(e))
+            return temperature
 
         db = self._entity_type.db
 
@@ -683,8 +685,9 @@ class AnomalyScorer(BaseTransformer):
 
         if scaler_model is not None:
             temp = scaler_model.transform(temp)
+            return temp.reshape(temperature.shape)
 
-        return temp.reshape(temperature.shape)
+        return temperature
 
 
 #####
@@ -948,7 +951,9 @@ class GeneralizedAnomalyScore(AnomalyScorer):
 
         logger.debug(self.whoami + ': feature extract')
 
-        view_as_windows(temperature, self.windowsize, self.step)
+        slices = view_as_windows(temperature, self.windowsize, self.step)
+
+        return slices
 
     def score(self, temperature):
 
@@ -971,7 +976,7 @@ class GeneralizedAnomalyScore(AnomalyScorer):
         except ValueError as ve:
 
             pred_score = np.zeros(temperature.shape)
-            logger.info(self.whoami + ": Entity: " + str(entity) + ", Input: " + str(
+            logger.info(self.whoami + ", Input: " + str(
                     self.input_item) + ", WindowSize: " + str(self.windowsize) + ", Output: " + str(
                     self.output_items[0]) + ", Step: " + str(self.step) + ", InputSize: " + str(
                     slices.shape) + " failed in the fitting step with \"" + str(ve) + "\" - scoring zero")
@@ -979,7 +984,7 @@ class GeneralizedAnomalyScore(AnomalyScorer):
         except Exception as e:
 
             pred_score = np.zeros(temperature.shape)
-            logger.error(self.whoami + " GeneralizedAnomalyScore: Entity: " + str(entity) + ", Input: " + str(
+            logger.error(self.whoami + ", Input: " + str(
                     self.input_item) + ", WindowSize: " + str(self.windowsize) + ", Output: " + str(
                     self.output_items[0]) + ", Step: " + str(self.step) + ", InputSize: " + str(
                     slices.shape) + " failed in the fitting step with " + str(e))
@@ -1114,7 +1119,7 @@ class FFTbasedGeneralizedAnomalyScore(GeneralizedAnomalyScore):
 
 
 if iotfunctions.__version__ != '8.2.1':
-    class MatrixProfileAnomalyScore(BaseTransformer):
+    class MatrixProfileAnomalyScore(AnomalyScorer):
         """
         An unsupervised anomaly detection function.
          Applies matrix profile analysis on time series data.
@@ -1127,78 +1132,32 @@ if iotfunctions.__version__ != '8.2.1':
         ERROR_SCORES = 1e-16
 
         def __init__(self, input_item, window_size, output_item):
-            super().__init__()
+            super().__init__(input_item, window_size, [output_item])
             logger.debug(f'Input item: {input_item}')
-            self.input_item = input_item
-            self.window_size = window_size
-            self.output_item = output_item
+
             self.whoami = 'MatrixProfile'
 
-        def prepare_data(self, df_entity):
 
-            logger.debug(self.whoami + ': prepare Data')
+        def score(self, temperature):
 
-            # operate on simple timestamp index
-            if len(df_entity.index.names) > 1:
-                index_names = df_entity.index.names
-                dfe = df_entity.reset_index(index_names[1:])
-            else:
-                dfe = df_entity
+            scores = []
+            for output_item in self.output_items:
+                scores.append(np.zeros(temperature.shape))
 
-            # interpolate gaps - data imputation
-            try:
-                dfe = dfe.interpolate(method="time")
-            except Exception as e:
-                logger.error('Prepare data error: ' + str(e))
+            try:  # calculate scores
+                matrix_profile = stumpy.aamp(temperature, m=self.windowsize)[:, 0]
+                # fill in a small value for newer data points outside the last possible window
+                fillers = np.array([self.DATAPOINTS_AFTER_LAST_WINDOW] * (self.windowsize - 1))
+                matrix_profile = np.append(matrix_profile, fillers)
+            except Exception as er:
+                logger.warning(f' Error in calculating Matrix Profile Scores. {er}')
+                matrix_profile = np.array([self.ERROR_SCORES] * temperature.shape[0])
 
-            # one dimensional time series
-            analysis_input = dfe[self.input_item].fillna(0).to_numpy(dtype=np.float64)
+            scores[0] = matrix_profile
 
-            return dfe, analysis_input
+            logger.debug('Matrix Profile score max: ' + str(matrix_profile.max()))
 
-        def execute(self, df):
-            df_copy = df.copy()
-            entities = np.unique(df_copy.index.levels[0])
-            logger.debug(f'Entities: {str(entities)}')
-            df_copy[self.output_item] = self.INIT_SCORES
-
-            # check data type
-            if df_copy[self.input_item].dtype != np.float64:
-                return df_copy
-
-            for entity in entities:
-
-                # get rid of entity_id in index
-                dfe_orig = df_copy.loc[[entity]].reset_index(level=[0])
-                dfe_orig.sort_index(inplace=True)
-                dfe = dfe_orig.dropna(how='all')
-
-                logger.debug(f' Original df shape: {df_copy.shape} Entity df shape: {dfe.shape}')
-
-                # minimal time delta for merging
-                mindelta, dfe_orig = min_delta(dfe_orig)
-
-                if dfe.size >= self.window_size:
-                    # interpolate gaps - data imputation by default
-                    dfe, matrix_profile_input = self.prepare_data(dfe)
-                    try:  # calculate scores
-                        matrix_profile = stumpy.aamp(matrix_profile_input, m=self.window_size)[:, 0]
-                        # fill in a small value for newer data points outside the last possible window
-                        fillers = np.array([self.DATAPOINTS_AFTER_LAST_WINDOW] * (self.window_size - 1))
-                        matrix_profile = np.append(matrix_profile, fillers)
-                    except Exception as er:
-                        logger.warning(f' Error in calculating Matrix Profile Scores. {er}')
-                        matrix_profile = np.array([self.ERROR_SCORES] * dfe.shape[0])
-                else:
-                    logger.warning(f' Not enough data to calculate Matrix Profile for entity. {entity}')
-                    matrix_profile = np.array([self.ERROR_SCORES] * dfe.shape[0])
-
-                anomaly_score = merge_score(dfe, dfe_orig, self.output_item, matrix_profile, mindelta)
-
-                idx = pd.IndexSlice
-                df_copy.loc[idx[entity, :], self.output_item] = anomaly_score
-
-            return df_copy
+            return scores
 
         @classmethod
         def build_ui(cls):
@@ -1470,6 +1429,52 @@ class SupervisedLearningTransformer(BaseTransformer):
         name = '.'.join(name)
         return name
 
+
+    def load_model(self, suffix=None):
+        model_name = self.get_model_name(targets=self.targets, suffix=suffix)
+        my_model = None
+        try:
+            my_model = self._entity_type.db.model_store.retrieve_model(model_name)
+            logger.info('load model %s' % str(my_model))
+        except Exception as e:
+            logger.error('Model retrieval failed with ' + str(e))
+            pass
+
+        # ditch old model
+        version = 1
+        if self.delete_model:
+            if my_model is not None:
+                if hasattr(my_model, 'version'):
+                    version = my_model.version + 1
+                logger.debug('Deleting robust model ' + str(version-1) + ' for entity: ' + str(suffix))
+                my_model = None
+
+        return model_name, my_model, version
+
+
+    def execute(self, df):
+        logger.debug('Execute ' + self.whoami)
+        df_copy = df # no copy
+
+        # check data type
+        #if df[self.input_item].dtype != np.float64:
+        for feature in self.features:
+            if not pd.api.types.is_numeric_dtype(df_copy[feature].dtype):
+                logger.error('Regression on non-numeric feature:' + str(feature))
+                return (df_copy)
+
+        # delegate to _calc
+        logger.debug('Execute ' + self.whoami + ' enter per entity execution')
+
+        # group over entities
+        group_base = [pd.Grouper(axis=0, level=0)]
+
+        df_copy = df_copy.groupby(group_base).apply(self._calc)
+
+        logger.debug('Scoring done')
+        return df_copy
+
+
 #######################################################################################
 # Outlier removal in pipeline
 #######################################################################################
@@ -1487,8 +1492,8 @@ class LocalOutlierFactor:
         return self.lof.negative_outlier_factor_ < threshold
 
 class KDEMaxMin:
-    def __init__(self):
-        self.version = 1
+    def __init__(self, version=1):
+        self.version = version
         self.kde = KernelDensity(kernel='gaussian')
         self.Min = None
         self.Max = None
@@ -1537,32 +1542,16 @@ class RobustThreshold(SupervisedLearningTransformer):
         self.Min = dict()
         self.Max = dict()
 
-        self.whoami = 'RobustTransform'
+        self.whoami = 'RobustThreshold'
 
-        print(self.whoami, self.input_item, self.threshold, self.output_item)
+        logger.info(self.whoami + ' from ' + self.input_item + ' quantile threshold ' +  self.threshold +
+                    ' exceeding boolean ' + self.output_item)
+
 
     def execute(self, df):
-        logger.debug('Execute ' + self.whoami)
-
-        # check data type
-        #if df[self.input_item].dtype != np.float64:
-        if not pd.api.types.is_numeric_dtype(df[self.input_item].dtype):
-            return (df)
-
         # set output columns to zero
-        #for output_item in self.output_items:
         df[self.output_item] = 0
-
-        # delegate to _calc
-        logger.debug('Execute ' + self.whoami + ' enter per entity execution')
-
-        # group over entities
-        group_base = [pd.Grouper(axis=0, level=0)]
-
-        df_copy = df.groupby(group_base).apply(self._calc)
-
-        logger.debug('Scoring done')
-        return df_copy
+        return super().execute(df)
 
 
     def _calc(self, df):
@@ -1570,25 +1559,12 @@ class RobustThreshold(SupervisedLearningTransformer):
         db = self._entity_type.db
         entity = df.index.levels[0][0]
 
-        model_name = self.get_model_name(targets=self.targets, suffix=entity)
-        robust_model = None
-        try:
-            robust_model = db.model_store.retrieve_model(model_name)
-            logger.info('load model %s' % str(robust_model))
-        except Exception as e:
-            logger.error('Model retrieval failed with ' + str(e))
-
-        # ditch old model
-        version = 1
-        if self.delete_model and robust_model is not None:
-                version = robust_model.version + 1
-                logger.debug('Deleting robust model ' + str(robust_model.version) + ' for entity: ' + str(entity))
-                robust_model = None
+        model_name, robust_model, version = self.load_model(suffix=entity)
 
         feature = df[self.input_item].values
 
         if robust_model is None and self.auto_train:
-            robust_model = KDEMaxMin()
+            robust_model = KDEMaxMin(version=version)
             robust_model.fit(feature, self.threshold)
             try:
                 db.model_store.store_model(model_name, robust_model)
@@ -1644,7 +1620,7 @@ class BayesRidgeRegressor(BaseEstimatorFunction):
         logger.info('Bayesian Ridge Regressor start searching for best model')
 
     def __init__(self, features, targets, predictions=None, deviations=None):
-        super().__init__(features=features, targets=targets, predictions=predictions, stddev=True)
+        super().__init__(features=features, targets=targets, predictions=predictions, stddev=True, keep_current_models=True)
 
         if deviations is not None:
             self.pred_stddev = deviations
@@ -1654,37 +1630,64 @@ class BayesRidgeRegressor(BaseEstimatorFunction):
         self.correlation_threshold = 0
         self.stop_auto_improve_at = -2
 
+        self.whoami = 'BayesianRidgeRegressor'
+
+
     def execute(self, df):
 
+        logger.debug('Execute ' + self.whoami)
+
         df_copy = df.copy()
-        entities = np.unique(df_copy.index.levels[0])
-
-        logger.debug(str(entities) + ' predicting ' + str(self.targets) + ' from ' + str(self.features) +
-                     ' to appear in ' + str(self.predictions) + ' with confidence interval ' + str(self.pred_stddev))
-
+        # Create missing columns before doing group-apply
         missing_cols = [x for x in self.predictions + self.pred_stddev if x not in df_copy.columns]
         for m in missing_cols:
             df_copy[m] = None
 
-        for entity in entities:
-            try:
-                logger.debug('check passed')
-                dfe = super()._execute(df_copy.loc[[entity]], entity)
+        # check data type
+        #if df[self.input_item].dtype != np.float64:
+        for feature in self.features:
+            if not pd.api.types.is_numeric_dtype(df_copy[feature].dtype):
+                logger.error('Regression on non-numeric feature:' + str(feature))
+                return (df_copy)
 
-                logger.debug('BayesianRidge: Entity ' + str(entity) + ' Type of pred, stddev arrays ' +
-                             str(type(dfe[self.predictions])) + str(type(dfe[self.pred_stddev].values)))
+        # delegate to _calc
+        logger.debug('Execute ' + self.whoami + ' enter per entity execution')
 
-                dfe.fillna(0, inplace=True)
+        # group over entities
+        group_base = [pd.Grouper(axis=0, level=0)]
 
-                df_copy.loc[entity, self.predictions] = dfe[self.predictions]
-                df_copy.loc[entity, self.pred_stddev] = dfe[self.pred_stddev]
+        df_copy = df_copy.groupby(group_base).apply(self._calc)
 
-            except Exception as e:
-                logger.info('Bayesian Ridge regressor for entity ' + str(entity) + ' failed with: ' + str(e))
-                df_copy.loc[entity, self.predictions] = 0
-                df_copy.loc[entity, self.pred_stddev] = 0
-
+        logger.debug('Scoring done')
         return df_copy
+
+
+    def _calc(self, df):
+
+        db = self._entity_type.db
+        entity = df.index.levels[0][0]
+
+        logger.debug('BayesRidgeRegressor execute: ' + str(type(df)) + ' for entity ' + str(entity) +
+                     ' predicting ' + str(self.targets) + ' from ' + str(self.features) +
+                     ' to appear in ' + str(self.predictions) + ' with confidence interval ' + str(self.pred_stddev))
+
+        try:
+            dfe = super()._execute(df, entity)
+
+            logger.debug('BayesianRidge: Entity ' + str(entity) + ' Type of pred, stddev arrays ' +
+                         str(type(dfe[self.predictions])) + str(type(dfe[self.pred_stddev].values)))
+
+            dfe.fillna(0, inplace=True)
+
+            df[self.predictions] = dfe[self.predictions]
+            df[self.pred_stddev] = dfe[self.pred_stddev]
+
+        except Exception as e:
+            logger.info('Bayesian Ridge regressor for entity ' + str(entity) + ' failed with: ' + str(e))
+            df[self.predictions] = 0
+            df[self.pred_stddev] = 0
+
+        return df
 
     @classmethod
     def build_ui(cls):
@@ -1719,10 +1722,11 @@ class BayesRidgeRegressorExt(BaseEstimatorFunction):
     def set_estimators(self):
         params = {}
         self.estimators['bayesianridge'] = (self.BRidgePipelineDeg, params)
+
         logger.info('Bayesian Ridge Regressor start searching for best polynomial model of degree ' + str(self.degree))
 
     def __init__(self, features, targets, predictions=None, deviations=None, degree=3):
-        super().__init__(features=features, targets=targets, predictions=predictions, stddev=True)
+        super().__init__(features=features, targets=targets, predictions=predictions, stddev=True, keep_current_models=True)
 
         if deviations is not None:
             self.pred_stddev = deviations
@@ -1733,37 +1737,66 @@ class BayesRidgeRegressorExt(BaseEstimatorFunction):
         self.stop_auto_improve_at = -2
         self.degree = degree
 
+        self.whoami = 'BayesianRidgeRegressorExt'
+
+
     def execute(self, df):
 
+        logger.debug('Execute ' + self.whoami)
+
         df_copy = df.copy()
-        entities = np.unique(df_copy.index.levels[0])
-
-        logger.debug(str(entities) + ' predicting ' + str(self.targets) + ' from ' + str(self.features) +
-                     ' to appear in ' + str(self.predictions) + ' with confidence interval ' + str(self.pred_stddev))
-
+        # Create missing columns before doing group-apply
         missing_cols = [x for x in self.predictions + self.pred_stddev if x not in df_copy.columns]
         for m in missing_cols:
             df_copy[m] = None
 
-        for entity in entities:
-            try:
-                logger.debug('check passed')
-                dfe = super()._execute(df_copy.loc[[entity]], entity)
+        # check data type
+        #if df[self.input_item].dtype != np.float64:
+        for feature in self.features:
+            if not pd.api.types.is_numeric_dtype(df_copy[feature].dtype):
+                logger.error('Regression on non-numeric feature:' + str(feature))
+                return (df_copy)
 
-                logger.debug('BayesianRidge: Entity ' + str(entity) + ' Type of pred, stddev arrays ' +
-                             str(type(dfe[self.predictions])) + str(type(dfe[self.pred_stddev].values)))
+        # delegate to _calc
+        logger.debug('Execute ' + self.whoami + ' enter per entity execution')
 
-                dfe.fillna(0, inplace=True)
+        # group over entities
+        group_base = [pd.Grouper(axis=0, level=0)]
 
-                df_copy.loc[entity, self.predictions] = dfe[self.predictions]
-                df_copy.loc[entity, self.pred_stddev] = dfe[self.pred_stddev]
+        df_copy = df_copy.groupby(group_base).apply(self._calc)
 
-            except Exception as e:
-                logger.info('Bayesian Ridge regressor for entity ' + str(entity) + ' failed with: ' + str(e))
-                df_copy.loc[entity, self.predictions] = 0
-                df_copy.loc[entity, self.pred_stddev] = 0
-
+        logger.debug('Scoring done')
         return df_copy
+
+
+    def _calc(self, df):
+
+        db = self._entity_type.db
+        entity = df.index.levels[0][0]
+
+        logger.debug('BayesRidgeRegressor execute: ' + str(type(df)) + ' for entity ' + str(entity) +
+                     ' predicting ' + str(self.targets) + ' from ' + str(self.features) +
+                     ' to appear in ' + str(self.predictions) + ' with confidence interval ' + str(self.pred_stddev))
+
+        try:
+            logger.debug('check passed')
+
+            dfe = super()._execute(df, entity)
+
+            logger.debug('BayesianRidge: Entity ' + str(entity) + ' Type of pred, stddev arrays ' +
+                         str(type(dfe[self.predictions])) + str(type(dfe[self.pred_stddev].values)))
+
+            dfe.fillna(0, inplace=True)
+
+            df[self.predictions] = dfe[self.predictions]
+            df[self.pred_stddev] = dfe[self.pred_stddev]
+
+        except Exception as e:
+            logger.info('Bayesian Ridge regressor for entity ' + str(entity) + ' failed with: ' + str(e))
+            df[self.predictions] = 0
+            df[self.pred_stddev] = 0
+
+        return df
 
     @classmethod
     def build_ui(cls):
@@ -1800,8 +1833,29 @@ class GBMRegressor(BaseEstimatorFunction):
         logger.info('GBMRegressor start searching for best model')
 
     def __init__(self, features, targets, predictions=None, n_estimators=None, num_leaves=None, learning_rate=None,
-                 max_depth=None):
-        super().__init__(features=features, targets=targets, predictions=predictions, keep_current_models=True)
+                 max_depth=None, lags=None):
+        #
+        # from https://github.com/ashitole/Time-Series-Project/blob/main/Auto-Arima%20and%20LGBM.ipynb
+        #   as taken from https://www.kaggle.com/rohanrao/ashrae-half-and-half
+        #
+        n_estimators = 500
+        num_leaves = 40
+        learning_rate = 0.2   # default 0.001
+        feature_fraction = 0.85  # default 1.0
+        reg_lambda = 2  # default 0
+        max_depth = -1
+        self.lagged_features = features
+        self.lags = lags
+
+        self.forecast = None
+        if lags is not None:
+            self.forecast = min(lags)  # forecast = number to shift features back is the negative minimum lag
+            newfeatures, _ = self.lag_features()
+
+            super().__init__(features=newfeatures, targets=targets, predictions=predictions, keep_current_models=True)
+        else:
+            super().__init__(features=features, targets=targets, predictions=predictions, keep_current_models=True)
+
         self.experiments_per_execution = 1
         self.correlation_threshold = 0
         self.auto_train = True
@@ -1810,38 +1864,158 @@ class GBMRegressor(BaseEstimatorFunction):
         self.parameter_tuning_iterations = 1
         self.cv = 1
 
-        if n_estimators is not None or num_leaves is not None or learning_rate is not None:
-            self.params = {'gbm__n_estimators': [n_estimators], 'gbm__num_leaves': [num_leaves],
-                           'gbm__learning_rate': [learning_rate], 'gbm__max_depth': [max_depth], 'gbm__verbosity': [2]}
-        else:
-            self.params = {'gbm__n_estimators': [500], 'gbm__num_leaves': [50], 'gbm__learning_rate': [0.001],
-                           'gbm__verbosity': [2]}
+        self.params = {'gbm__n_estimators': [n_estimators], 'gbm__num_leaves': [num_leaves],
+                       'gbm__learning_rate': [learning_rate], 'gbm__max_depth': [max_depth], 'gbm__verbosity': [2]}
 
         self.stop_auto_improve_at = -2
+        self.whoami = 'GBMRegressor'
+
+    #
+    # forecasting support
+    #   return list of new columns for the lagged features and dataframe extended with these new columns
+    #
+    def lag_features(self, df=None, Train=True):
+        logger.debug('lags ' + str(self.lags) + '  lagged_features ' + str(self.lagged_features) + ' Train mode: '
+                     + str(Train))
+        create_feature_triplets = []
+        new_features = []
+
+        if self.lags is None or self.lagged_features is None:
+            return new_features, None
+
+        for lagged_feature in self.lagged_features:
+            for lag in self.lags:
+                # collect triple of new column, original column and lag
+                if Train:
+                    create_feature_triplets.append((lagged_feature + '_' + str(lag), lagged_feature, lag))
+                else:
+                    create_feature_triplets.append((lagged_feature + '_' + str(lag), lagged_feature, lag - self.forecast))
+
+                new_features.append(lagged_feature + '_' + str(lag))
+
+        # find out proper timescale
+        mindelta, df_copy = min_delta(df)
+
+        # add day of week and month of year as two feature pairs for at least hourly timescales
+        include_day_of_week = False
+        include_hour_of_day = False
+        if mindelta >= pd.Timedelta('1h'):
+            logger.info(self.whoami + ' adding day_of_week feature')
+            include_day_of_week = True
+        elif mindelta >= pd.Timedelta('1m'):
+            logger.info(self.whoami + ' adding hour_of_day feature')
+            include_hour_of_day = True
+
+        # add day of week or hour of day if appropriate
+
+        if df is not None:
+            df_copy = df.copy()
+            missing_cols = [x[0] for x in create_feature_triplets if x not in df_copy.columns]
+            for m in missing_cols:
+                df_copy[m] = None
+
+            # I hope I can do that for all entities in one fell swoop
+            for new_feature in create_feature_triplets:
+                df_copy[new_feature[0]] = df[new_feature[1]].shift(new_feature[2])
+
+            # get rid of NaN as result of shifting columns
+            df_copy.dropna(inplace=True)
+
+            # add day of week and month of year as two feature pairs
+            # operate on simple timestamp index
+            if include_day_of_week:
+                new_features = np.concatenate((new_features, ['_DayOfWeekCos_', '_DayOfWeekSin_', '_DayOfYearCos_', '_DayOfYearSin_']))
+                df_copy['_DayOfWeekCos_'] = np.cos(df_copy.index.get_level_values(1).dayofweek / 7)
+                df_copy['_DayOfWeekSin_'] = np.sin(df_copy.index.get_level_values(1).dayofweek / 7)
+                df_copy['_DayOfYearCos_'] = np.cos(df_copy.index.get_level_values(1).dayofyear / 365)
+                df_copy['_DayOfYearSin_'] = np.sin(df_copy.index.get_level_values(1).dayofyear / 365)
+            elif include_hour_of_day:
+                new_features = np.concatenate((new_features, ['_HourOfDayCos_', '_HourOfDaySin_']))
+                df_copy['_HourOfDayCos_'] = np.cos(df_copy.index.get_level_values(1).hour / 24)
+                df_copy['_HourOfDaySin_'] = np.sin(df_copy.index.get_level_values(1).hour / 24)
+
+        else:
+            df_copy = df
+
+        return new_features, df_copy
 
     def execute(self, df):
 
-        df_copy = df.copy()
-        entities = np.unique(df_copy.index.levels[0])
-        logger.debug(str(entities))
+        logger.debug('Execute ' + self.whoami)
 
+        # forecasting support
+        if self.lags is not None:
+            _, df_copy = self.lag_features(df=df, Train=True)
+        else:
+            df_copy = df.copy()
+
+        # Create missing columns before doing group-apply
         missing_cols = [x for x in self.predictions if x not in df_copy.columns]
         for m in missing_cols:
             df_copy[m] = None
 
-        for entity in entities:
-            # per entity - copy for later inplace operations
-            try:
-                check_array(df_copy.loc[[entity]][self.features].values, allow_nd=True)
-            except Exception as e:
-                logger.error(
-                    'Found Nan or infinite value in feature columns for entity ' + str(entity) + ' error: ' + str(e))
-                continue
+        # check data type
+        #if df[self.input_item].dtype != np.float64:
+        for feature in self.features:
+            if not pd.api.types.is_numeric_dtype(df_copy[feature].dtype):
+                logger.error('Regression on non-numeric feature:' + str(feature))
+                return (df_copy)
 
-            dfe = super()._execute(df_copy.loc[[entity]], entity)
-            df_copy.loc[entity, self.predictions] = dfe[self.predictions]
+        # delegate to _calc
+        logger.debug('Execute ' + self.whoami + ' enter per entity execution')
 
+        # group over entities
+        group_base = [pd.Grouper(axis=0, level=0)]
+
+        # first round - training
+        df_copy = df_copy.groupby(group_base).apply(self._calc)
+
+
+        # strip off lagged features
+        if self.lags is not None:
+            strip_features, df_copy = self.lag_features(df=df, Train=False)
+
+            # second round - inferencing
+            df_copy = df_copy.groupby(group_base).apply(self._calc)
+
+            logger.debug('Drop artificial features ' + str(strip_features))
+            df_copy.drop(columns = strip_features, inplace=True)
+
+        logger.debug('Scoring done')
         return df_copy
+
+
+    def _calc(self, df):
+
+        db = self._entity_type.db
+        entity = df.index.levels[0][0]
+
+        logger.debug('GBMRegressor execute: ' + str(type(df)) + ' for entity ' + str(entity) +
+                     ' predicting ' + str(self.targets) + ' from ' + str(self.features) +
+                     ' to appear in ' + str(self.predictions))
+
+        try:
+            check_array(df[self.features].values, allow_nd=True)
+        except Exception as e:
+            logger.error(
+                'Found Nan or infinite value in feature columns for entity ' + str(entity) + ' error: ' + str(e))
+            return df
+
+        try:
+            dfe = super()._execute(df, entity)
+
+            logger.debug('GBMRegressor: Entity ' + str(entity) + ' Type of pred ' +
+                         str(type(dfe[self.predictions])))
+
+            dfe.fillna(0, inplace=True)
+
+            df[self.predictions] = dfe[self.predictions]
+
+        except Exception as e:
+            logger.info('GBMRegressor for entity ' + str(entity) + ' failed with: ' + str(e))
+            df[self.predictions] = 0
+
+        return df
 
     @classmethod
     def build_ui(cls):
@@ -2046,175 +2220,17 @@ class FeatureBuilder(BaseTransformer):
         return inputs, outputs
 
 
-class GBMForecaster(BaseEstimatorFunction):
+class GBMForecaster(GBMRegressor):
     """
     Forecasting regressor based on gradient boosting method as provided by lightGBM
     """
-    eval_metric = staticmethod(metrics.r2_score)
-
-    # class variables
-    train_if_no_model = True
-
-    def GBMPipeline(self):
-        steps = [('scaler', StandardScaler()), ('gbm', lightgbm.LGBMRegressor())]
-        return Pipeline(steps=steps)
-
-    def set_estimators(self):
-        # gradient_boosted
-        self.estimators['light_gradient_boosted_regressor'] = (self.GBMPipeline, self.params)
-        logger.info('GBMRegressor start searching for best model')
-
-    #
-    # return list of new columns for the lagged features and dataframe extended with these new columns
-    #
-    def lag_features(self, df=None, Train=True):
-        logger.debug('lags ' + str(self.lags) + '  lagged_features ' + str(self.lagged_features) + ' Train mode: '
-                     + str(Train))
-        create_feature_triplets = []
-        new_features = []
-
-        if self.lags is None or self.lagged_features is None:
-            return new_features, None
-
-        for lagged_feature in self.lagged_features:
-            for lag in self.lags:
-                # collect triple of new column, original column and lag
-                if Train:
-                    create_feature_triplets.append((lagged_feature + '_' + str(lag), lagged_feature, lag))
-                else:
-                    create_feature_triplets.append((lagged_feature + '_' + str(lag), lagged_feature, lag - self.forecast))
-
-                new_features.append(lagged_feature + '_' + str(lag))
-
-        # find out proper timescale
-        mindelta, df_copy = min_delta(df)
-
-        # add day of week and month of year as two feature pairs for at least hourly timescales
-        include_day_of_week = False
-        include_hour_of_day = False
-        if mindelta >= pd.Timedelta('1h'):
-            logger.info('GBMForecaster adding day_of_week feature')
-            include_day_of_week = True
-        elif mindelta >= pd.Timedelta('1m'):
-            logger.info('GBMForecaster adding hour_of_day feature')
-            include_hour_of_day = True
-
-        # add day of week or hour of day if appropriate
-
-        if df is not None:
-            df_copy = df.copy()
-            missing_cols = [x[0] for x in create_feature_triplets if x not in df_copy.columns]
-            for m in missing_cols:
-                df_copy[m] = None
-
-            # I hope I can do that for all entities in one fell swoop
-            for new_feature in create_feature_triplets:
-                df_copy[new_feature[0]] = df[new_feature[1]].shift(new_feature[2])
-
-            # get rid of NaN as result of shifting columns
-            df_copy.dropna(inplace=True)
-
-            # add day of week and month of year as two feature pairs
-            # operate on simple timestamp index
-            if include_day_of_week:
-                new_features = np.concatenate((new_features, ['_DayOfWeekCos_', '_DayOfWeekSin_', '_DayOfYearCos_', '_DayOfYearSin_']))
-                df_copy['_DayOfWeekCos_'] = np.cos(df_copy.index.get_level_values(1).dayofweek / 7)
-                df_copy['_DayOfWeekSin_'] = np.sin(df_copy.index.get_level_values(1).dayofweek / 7)
-                df_copy['_DayOfYearCos_'] = np.cos(df_copy.index.get_level_values(1).dayofyear / 365)
-                df_copy['_DayOfYearSin_'] = np.sin(df_copy.index.get_level_values(1).dayofyear / 365)
-            elif include_hour_of_day:
-                new_features = np.concatenate((new_features, ['_HourOfDayCos_', '_HourOfDaySin_']))
-                df_copy['_HourOfDayCos_'] = np.cos(df_copy.index.get_level_values(1).hour / 24)
-                df_copy['_HourOfDaySin_'] = np.sin(df_copy.index.get_level_values(1).hour / 24)
-
-        else:
-            df_copy = df
-
-        return new_features, df_copy
-
     def __init__(self, features, targets, predictions=None, lags=None):
         #
         # from https://github.com/ashitole/Time-Series-Project/blob/main/Auto-Arima%20and%20LGBM.ipynb
         #   as taken from https://www.kaggle.com/rohanrao/ashrae-half-and-half
         #
-        n_estimators = 500
-        num_leaves = 40
-        learning_rate = 0.2   # default 0.001
-        feature_fraction = 0.85  # default 1.0
-        reg_lambda = 2  # default 0
-        max_depth = -1
-        self.lagged_features = features
-        self.lags = lags
-
-        self.forecast = min(lags)  # forecast = number to shift features back is the negative minimum lag
-
-        newfeatures, _ = self.lag_features()
-
-        super().__init__(features=newfeatures, targets=targets, predictions=predictions, keep_current_models=True)
-
-        self.experiments_per_execution = 1
-        self.correlation_threshold = 0
-        self.auto_train = True
-
-        self.num_rounds_per_estimator = 1
-        self.parameter_tuning_iterations = 1
-        self.cv = 1
-
-        self.params = {'gbm__n_estimators': [n_estimators], 'gbm__num_leaves': [num_leaves],
-                       'gbm__reg_lambda': [reg_lambda], 'gbm__feature_fraction': [feature_fraction],
-                       'gbm__learning_rate': [learning_rate], 'gbm__max_depth': [max_depth], 'gbm__verbosity': [2]}
-
-        self.stop_auto_improve_at = -2
-
-    def execute(self, df):
-
-        _, df_copy = self.lag_features(df=df, Train=True)
-
-        entities = np.unique(df_copy.index.levels[0])
-        logger.debug(str(entities))
-
-        missing_cols = [x for x in self.predictions if x not in df_copy.columns]
-        for m in missing_cols:
-            df_copy[m] = None
-
-        # make sure to train a model
-        for entity in entities:
-            # per entity - copy for later inplace operations
-            try:
-                logger.debug(self.features)
-                check_array(df_copy.loc[[entity]][self.features].values, allow_nd=True)
-            except Exception as e:
-                logger.error(
-                    'Found Nan or infinite value in feature columns for entity ' + str(entity) + ' error: ' + str(e))
-                continue
-
-            dfe = super()._execute(df_copy.loc[[entity]], entity)
-            df_copy.loc[entity, self.predictions] = dfe[self.predictions]
-
-        # use the model for inferencing - with less lag
-        strip_features, df_copy = self.lag_features(df=df, Train=False)
-
-        missing_cols = [x for x in self.predictions if x not in df_copy.columns]
-        for m in missing_cols:
-            df_copy[m] = None
-
-        for entity in entities:
-            # per entity - copy for later inplace operations
-            try:
-                logger.debug(self.features)
-                check_array(df_copy.loc[[entity]][self.features].values, allow_nd=True)
-            except Exception as e:
-                logger.error(
-                    'Found Nan or infinite value in feature columns for entity ' + str(entity) + ' error: ' + str(e))
-                continue
-
-            dfe = super()._execute(df_copy.loc[[entity]], entity)
-            df_copy.loc[entity, self.predictions] = dfe[self.predictions]
-
-        logger.debug('Drop artificial features ' + str(strip_features))
-        df_copy.drop(columns = strip_features, inplace=True)
-
-        return df_copy
+        super().__init__(features=features, targets=targets, predictions=predictions, n_estimators=500,
+                        num_leaves=40, learning_rate=0.2, max_depth=-1, lags=lags)
 
     @classmethod
     def build_ui(cls):
@@ -2233,113 +2249,81 @@ class GBMForecaster(BaseEstimatorFunction):
 #######################################################################################
 # ARIMA
 #######################################################################################
-# totally useless, work in progress (but without lots of progress)
 
 # self.model_class = STLForecast(np.arange(0,1), ARIMA, model_kwargs=dict(order=(1,1,1), trend="c"), period=7*24)
-class ARIMAForecaster(BaseTransformer):
+class ARIMAForecaster(SupervisedLearningTransformer):
     """
     Provides a forecast for 'n_forecast' data points for from endogenous data in input_item
     Data is returned as input_item shifted by n_forecast positions with the forecast appended
     """
 
     def __init__(self, input_item, n_forecast, output_item):
-        super().__init__()
+        super().__init__(features=[input_item], targets=[output_item])
 
         self.input_item = input_item
         self.n_forecast = n_forecast
         self.output_item = output_item
 
         self.power = None    # used to store box cox lambda
-        self.models = {}
+        self.active_models = dict()
 
         self.name = 'ARIMAForecaster'
 
-    def get_model_name(self, prefix='model', suffix=None):
-
-        name = []
-        if prefix is not None:
-            name.append(prefix)
-
-        name.extend([self._entity_type.name, self.name])
-        name.extend([self.output_item])
-        logger.debug(name)
-        if suffix is not None:
-            name.append(suffix)
-        name = '.'.join(name)
-        logger.debug(name)
-        return name
 
     def execute(self, df):
-
-        df_copy = df.copy()
-        db = self._entity_type.db
-
-        entities = np.unique(df.index.levels[0])
-        logger.debug(str(entities))
-
-        df_copy[self.output_item] = 0
+        # set output columns to zero
+        df[self.output_item] = 0
 
         # check data type
-        if df_copy[self.input_item].dtype != np.float64:
-            return df_copy
+        if df[self.input_item].dtype != np.float64:
+            logger.error('ARIMA forecasting on non-numeric feature:' + str(self.input_item))
+            return df
 
-        # remove NaNs from input
-        df_copy = df_copy.dropna(subset=[self.input_item])
+        return super().execute(df)
 
-        # make sure to train a model
-        for entity in entities:
-            # check data okay
-            temperature = df_copy.loc[[entity]][self.input_item].values.reshape(-1, 1)
+
+    def _calc(self, df):
+        # per entity - copy for later inplace operations
+        db = self._entity_type.db
+        entity = df.index.levels[0][0]
+
+        df = df.droplevel(0)
+
+        model_name, arima_model, version = self.load_model(suffix=entity)
+
+        logger.debug('Module ARIMA Forecaster, Entity: ' + str(entity) + ', Input: ' + str(
+                     self.input_item) + ', Forecasting: ' + str(self.n_forecast) + ', Output: ' + str(
+                     self.output_item))
+
+        feature = df[self.input_item].values
+
+        if arima_model is None and self.auto_train:
+
+            # all variables should be continuous
+            stlf = STLForecast(temperature, ARIMA, model_kwargs=dict(order=(1, 0, 1), trend="n"), period=7*24)
+
+            arima_model = stlf.fit()
+
+            logger.debug('Created STL + ARIMA' + str(arima_model))
+
             try:
-                logger.debug(self.input_item)
-                check_array(temperature, allow_nd=True)
+                db.model_store.store_model(model_name, arima_model)
             except Exception as e:
-                logger.error(
-                    'Found Nan or infinite value in feature columns for entity ' + str(entity) + ' error: ' + str(e))
-                continue
+                logger.error('Model store failed with ' + str(e))
+                pass
 
-            logger.debug('Module ARIMA Forecaster, Entity: ' + str(entity) + ', Input: ' + str(
-                self.input_item) + ', Forecasting: ' + str(self.n_forecast) + ', Output: ' + str(
-                self.output_item))
+        # remove n_forecast elements and append the forecast of length n_forecast
+        predictions_ = arima_model.forecast(self.n_forecast)
+        logger.debug(predictions_.shape, temperature.shape)
+        predictions = np.hstack([temperature[self.n_forecast:].reshape(-1,), predictions_])
 
-            # per entity - copy for later inplace operations
-            model_name = self.get_model_name(suffix=entity)
-            arima_model = None
-            try:
-                arima_model = db.model_store.retrieve_model(model_name)
-                logger.info('load model %s' % str(arima_model))
-            except Exception as e:
-                logger.error('Model retrieval failed with ' + str(e))
+        self.active_models[entity] = arima_model
 
-            # train new model
-            if arima_model is None:
+        logger.debug(arima_model.summary())
 
-                # all variables should be continuous
-                stlf = STLForecast(temperature, ARIMA, model_kwargs=dict(order=(1, 0, 1), trend="n"), period=7*24)
-                arima_model = stlf.fit()
+        df[self.output_item] = predictions
 
-                logger.debug('Created STL + ARIMA' + str(arima_model))
-
-                try:
-                    db.model_store.store_model(model_name, arima_model)
-                except Exception as e:
-                    logger.error('Model store failed with ' + str(e))
-
-            self.models[entity] = arima_model
-
-            # remove n_forecast elements and append the forecast of length n_forecast
-            predictions_ = arima_model.forecast(self.n_forecast)
-            logger.debug(predictions_.shape, temperature.shape)
-            predictions = np.hstack([temperature[self.n_forecast:].reshape(-1,), predictions_])
-
-            logger.debug(arima_model.summary())
-
-            df_copy.loc[entity, self.output_item] = predictions
-
-        msg = 'ARIMA'
-        self.trace_append(msg)
-
-        return df_copy
+        return df
 
     @classmethod
     def build_ui(cls):
@@ -2362,89 +2346,74 @@ class ARIMAForecaster(BaseTransformer):
 #   https://jakevdp.github.io/PythonDataScienceHandbook/05.13-kernel-density-estimation.html
 #
 
-class KDEAnomalyScore(BaseTransformer):
+class KDEAnomalyScore(SupervisedLearningTransformer):
     """
     A supervised anomaly detection function.
      Uses kernel density estimate to assign an anomaly score
     """
     def __init__(self, threshold, features, targets, predictions=None):
         logger.debug("init KDE Estimator")
-        super().__init__()
+        self.name = 'KDEAnomalyScore'
+        self.whoami= 'KDEAnomalyScore'
+        super().__init__(features, targets)
 
         self.threshold = threshold
-        self.features = features
-        self.targets = targets
-        self.name = "KDEAnomalyScore"
-        self.models = {}
+        self.active_models = dict()
         if predictions is None:
             predictions = ['predicted_%s' % x for x in self.targets]
         self.predictions = predictions
 
-    def get_model_name(self, prefix='model', suffix=None):
-
-        name = []
-        if prefix is not None:
-            name.append(prefix)
-
-        name.extend([self._entity_type.name, self.name])
-        name.extend(self.targets)
-        if suffix is not None:
-            name.append(suffix)
-        name = '.'.join(name)
-        return name
-
     def execute(self, df):
 
-        df_copy = df.copy()
-        db = self._entity_type.db
-
-        entities = np.unique(df_copy.index.levels[0])
-        logger.debug(str(entities))
-
-        missing_cols = [x for x in self.predictions if x not in df_copy.columns]
+        # Create missing columns before doing group-apply
+        df = df.copy()
+        missing_cols = [x for x in self.predictions if x not in df.columns]
         for m in missing_cols:
-            df_copy[m] = None
+            df[m] = None
 
-        # make sure to train a model
-        for entity in entities:
-            # check data okay
+        return super().execute(df)
+
+
+    def _calc(self, df):
+
+        db = self._entity_type.db
+        entity = df.index.levels[0][0]
+
+        logger.debug('KDEAnomalyScore execute: ' + str(type(df)) + ' for entity ' + str(entity))
+
+        # check data okay
+        try:
+            logger.debug(self.features)
+            check_array(df[self.features].values, allow_nd=True)
+        except Exception as e:
+            logger.error(
+                'Found Nan or infinite value in feature columns for entity ' + str(entity) + ' error: ' + str(e))
+
+        # per entity - copy for later inplace operations
+        model_name, kde_model, version = self.load_model(suffix=entity)
+
+        xy = np.hstack([df[self.features].values, df[self.targets].values])
+
+        # train new model
+        if kde_model is None:
+
+            logger.debug('Running KDE with ' + str(xy.shape))
+            # all variables should be continuous
+            kde_model = KDEMultivariate(xy, var_type="c" * (len(self.features) + len(self.targets)))
+            logger.debug('Created KDE ' + str(kde_model))
+
             try:
-                logger.debug(self.features)
-                check_array(df_copy.loc[[entity]][self.features].values, allow_nd=True)
+                db.model_store.store_model(model_name, kde_model)
             except Exception as e:
-                logger.error(
-                    'Found Nan or infinite value in feature columns for entity ' + str(entity) + ' error: ' + str(e))
-                continue
+                logger.error('Model store failed with ' + str(e))
 
-            # per entity - copy for later inplace operations
-            model_name = self.get_model_name(suffix=entity)
-            kde_model = None
-            try:
-                kde_model = db.model_store.retrieve_model(model_name)
-                logger.info('load model %s' % str(kde_model))
-            except Exception as e:
-                logger.error('Model retrieval failed with ' + str(e))
+            self.active_models[entity] = kde_model
 
-            xy = np.hstack([df_copy.loc[[entity]][self.features].values, df_copy.loc[[entity]][self.targets].values])
+        predictions = kde_model.pdf(xy).reshape(-1,1)
+        print(predictions.shape, df[self.predictions].values.shape)
+        df[self.predictions] = predictions
 
-            # train new model
-            if kde_model is None:
-
-                # all variables should be continuous
-                kde_model = KDEMultivariate(xy, var_type="c" * (len(self.features) + len(self.targets)))
-                logger.debug('Created KDE ' + str(kde_model))
-
-                try:
-                    db.model_store.store_model(model_name, kde_model)
-                except Exception as e:
-                    logger.error('Model store failed with ' + str(e))
-
-            self.models[entity] = kde_model
-
-            predictions = kde_model.pdf(xy)
-            df_copy.loc[entity, self.predictions] = predictions
-
-        return df_copy
+        return df
 
     @classmethod
     def build_ui(cls):
@@ -2555,6 +2524,7 @@ class VI(nn.Module):
         log_p_q = ll_gaussian(y_pred, mu, log_var)
 
         if self.show_once:
+            self.show_once = False
             logger.info('Cardinalities: Mu: ' + str(mu.shape) + ' Sigma: ' + str(log_var.shape) +
                         ' loglikelihood: ' + str(loglikelihood.shape) + ' KL value: ' +
                         str((log_prior - log_p_q).mean()))
@@ -2596,12 +2566,13 @@ class VIAnomalyScore(SupervisedLearningTransformer):
     def __init__(self, features, targets, predictions=None, pred_stddev=None):
 
         self.name = "VIAnomalyScore"
+        self.whoami = "VIAnomalyScore"
         super().__init__(features, targets)
 
         self.epochs = 1500
         self.learning_rate = 0.005
 
-        self.models = {}
+        self.active_models = dict()
         self.Input = {}
         self.Output = {}
         self.mu = {}
@@ -2621,123 +2592,111 @@ class VIAnomalyScore(SupervisedLearningTransformer):
 
     def execute(self, df):
 
-        df_copy = df.copy()
-        db = self._entity_type.db
-
-        logger.debug('VIAnomalyScore execute: ' + str(type(df_copy)))
-
-        entities = np.unique(df_copy.index.levels[0])
-        logger.debug(str(entities))
-
-        missing_cols = [x for x in (self.predictions + self.pred_stddev) if x not in df_copy.columns]
+        # Create missing columns before doing group-apply
+        df = df.copy()
+        missing_cols = [x for x in (self.predictions + self.pred_stddev) if x not in df.columns]
         for m in missing_cols:
-            df_copy[m] = None
+            df[m] = None
 
-        # make sure to train a model
-        for entity in entities:
-            # check data okay
+        return super().execute(df)
+
+
+    def _calc(self, df):
+
+        db = self._entity_type.db
+        entity = df.index.levels[0][0]
+
+        logger.debug('VIAnomalyScore execute: ' + str(type(df)) + ' for entity ' + str(entity))
+
+        # check data okay
+        try:
+            logger.debug(self.features)
+            check_array(df[self.features].values, allow_nd=True)
+        except Exception as e:
+            logger.error(
+                'Found Nan or infinite value in feature columns for entity ' + str(entity) + ' error: ' + str(e))
+
+        # per entity - copy for later inplace operations
+        model_name, vi_model, version = self.load_model(suffix=entity)
+
+        # learn to scale features
+        if vi_model is not None:
+            scaler = vi_model.scaler
+        else:
+            scaler = StandardScaler().fit(df[self.features].values)
+
+        features = scaler.transform(df[self.features].values)
+        targets = df[self.targets].values
+
+        # deal with negative means - are the issues related to ReLU ?
+        #  adjust targets to have mean == 0
+        if vi_model is None:
+            adjust_mean = targets.mean()
+        else:
+            adjust_mean = vi_model.adjust_mean
+        logger.info('Adjusting target mean with ' + str(adjust_mean))
+        targets -= adjust_mean
+
+        xy = np.hstack([features, targets])
+
+        # TODO: assumption is cardinality of One for features and targets !!!
+        ind = np.lexsort((xy[:, 1], xy[:, 0]))
+        ind_r = np.argsort(ind)
+
+        self.Input[entity] = xy[ind][:, 0]
+
+        X = torch.tensor(xy[ind][:, 0].reshape(-1, 1), dtype=torch.float)
+        Y = torch.tensor(xy[ind][:, 1].reshape(-1, 1), dtype=torch.float)
+
+        # train new model if there is none and autotrain is set
+        if vi_model is None and self.auto_train:
+
+            self.prior_sigma = targets.std()
+
+            vi_model = VI(scaler, prior_mu=self.prior_mu, prior_sigma=self.prior_sigma,
+                          beta=self.beta, adjust_mean=adjust_mean, version=version)
+
+            logger.debug('Training VI model ' + str(vi_model.version) + ' for entity: ' + str(entity) +
+                         'Prior mean: ' + str(self.prior_mu) + ', sigma: ' + str(self.prior_sigma))
+
+            optim = torch.optim.Adam(vi_model.parameters(), lr=self.learning_rate)
+
+            for epoch in range(self.epochs):
+                optim.zero_grad()
+                y_pred, mu, log_var = vi_model(X)
+                loss = -vi_model.elbo(y_pred, Y, mu, log_var)
+                if epoch % 10 == 0:
+                    logger.debug('Epoch: ' + str(epoch) + ', neg ELBO: ' + str(loss.item()))
+
+                loss.backward()
+                optim.step()
+
+            logger.debug('Created VAE ' + str(vi_model))
+
             try:
-                logger.debug(self.features)
-                check_array(df_copy.loc[[entity]][self.features].values, allow_nd=True)
+                db.model_store.store_model(model_name, vi_model)
             except Exception as e:
-                logger.error(
-                    'Found Nan or infinite value in feature columns for entity ' + str(entity) + ' error: ' + str(e))
-                continue
+                logger.error('Model store failed with ' + str(e))
 
-            # per entity - copy for later inplace operations
-            model_name = self.get_model_name(targets=self.targets, suffix=entity)
-            vi_model = None
-            try:
-                vi_model = db.model_store.retrieve_model(model_name)
-                logger.info('load model %s' % str(vi_model))
-            except Exception as e:
-                logger.error('Model retrieval failed with ' + str(e))
+        # if training was not allowed or failed
+        if vi_model is not None:
+            self.active_models[entity] = vi_model
 
-            # ditch old model
-            version = 1
-            if self.delete_model and vi_model is not None:
-                version = vi_model.version + 1
-                logger.debug('Deleting VI model ' + str(vi_model.version) + ' for entity: ' + str(entity))
-                vi_model = None
+            with torch.no_grad():
+                mu_and_log_sigma = vi_model(X)
+                mue = mu_and_log_sigma[1]
+                sigma = torch.exp(0.5 * mu_and_log_sigma[2]) + 1e-5
+                mu = sp.stats.norm.ppf(0.5, loc=mue, scale=sigma).reshape(-1,)
+                q1 = sp.stats.norm.ppf(0.95, loc=mue, scale=sigma).reshape(-1,)
+                self.mu[entity] = mu
+                self.quantile095[entity] = q1
 
-            # learn to scale features
-            if vi_model is not None:
-                scaler = vi_model.scaler
-            else:
-                scaler = StandardScaler().fit(df_copy.loc[[entity]][self.features].values)
+            df[self.predictions] = (mu[ind_r] + vi_model.adjust_mean).reshape(-1,1)
+            df[self.pred_stddev] = (q1[ind_r]).reshape(-1,1)
+        else:
+            logger.debug('No VI model for entity: ' + str(entity))
 
-            features = scaler.transform(df_copy.loc[[entity]][self.features].values)
-            targets = df_copy.loc[[entity]][self.targets].values
-
-            # deal with negative means - are the issues related to ReLU ?
-            #  adjust targets to have mean == 0
-            if vi_model is None:
-                adjust_mean = targets.mean()
-            else:
-                adjust_mean = vi_model.adjust_mean
-            logger.info('Adjusting target mean with ' + str(adjust_mean))
-            targets -= adjust_mean
-
-            xy = np.hstack([features, targets])
-
-            # TODO: assumption is cardinality of One for features and targets !!!
-            ind = np.lexsort((xy[:, 1], xy[:, 0]))
-            ind_r = np.argsort(ind)
-
-            self.Input[entity] = xy[ind][:, 0]
-
-            X = torch.tensor(xy[ind][:, 0].reshape(-1, 1), dtype=torch.float)
-            Y = torch.tensor(xy[ind][:, 1].reshape(-1, 1), dtype=torch.float)
-
-            # train new model if there is none and autotrain is set
-            if vi_model is None and self.auto_train:
-
-                self.prior_sigma = targets.std()
-
-                vi_model = VI(scaler, prior_mu=self.prior_mu, prior_sigma=self.prior_sigma,
-                              beta=self.beta, adjust_mean=adjust_mean, version=version)
-
-                logger.debug('Training VI model ' + str(vi_model.version) + ' for entity: ' + str(entity) +
-                             'Prior mean: ' + str(self.prior_mu) + ', sigma: ' + str(self.prior_sigma))
-
-                optim = torch.optim.Adam(vi_model.parameters(), lr=self.learning_rate)
-
-                for epoch in range(self.epochs):
-                    optim.zero_grad()
-                    y_pred, mu, log_var = vi_model(X)
-                    loss = -vi_model.elbo(y_pred, Y, mu, log_var)
-                    if epoch % 10 == 0:
-                        logger.debug('Epoch: ' + str(epoch) + ', neg ELBO: ' + str(loss.item()))
-
-                    loss.backward()
-                    optim.step()
-
-                logger.debug('Created VAE ' + str(vi_model))
-
-                try:
-                    db.model_store.store_model(model_name, vi_model)
-                except Exception as e:
-                    logger.error('Model store failed with ' + str(e))
-
-            # if training was not allowed or failed
-            if vi_model is not None:
-                self.models[entity] = vi_model
-
-                with torch.no_grad():
-                    mu_and_log_sigma = vi_model(X)
-                    mue = mu_and_log_sigma[1]
-                    sigma = torch.exp(0.5 * mu_and_log_sigma[2]) + 1e-5
-                    mu = sp.stats.norm.ppf(0.5, loc=mue, scale=sigma).reshape(-1,)
-                    q1 = sp.stats.norm.ppf(0.95, loc=mue, scale=sigma).reshape(-1,)
-                    self.mu[entity] = mu
-                    self.quantile095[entity] = q1
-
-                df_copy.loc[entity, self.predictions] = mu[ind_r] + vi_model.adjust_mean
-                df_copy.loc[entity, self.pred_stddev] = q1[ind_r]
-            else:
-                logger.debug('No VI model for entity: ' + str(entity))
-
-        return df_copy
+        return df
 
     @classmethod
     def build_ui(cls):
