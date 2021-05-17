@@ -2513,24 +2513,28 @@ class VI(nn.Module):
         return self.reparameterize(mu, log_var), mu, log_var
 
     # see 2.3 in https://arxiv.org/pdf/1312.6114.pdf
+    #
     def elbo(self, y_pred, y, mu, log_var):
         # likelihood of observing y given Variational mu and sigma - reconstruction error
         loglikelihood = ll_gaussian(y, mu, log_var)
+        # Sample from p(x|z) by sampling from q(z|x), passing through decoder (y_pred)
+        # likelihood of observing y given Variational decoder mu and sigma - reconstruction error
+        log_qzCx = ll_gaussian(y, mu, log_var)
 
-        # KL - prior probability of y_pred w.r.t. N(0,1)
-        log_prior = ll_gaussian(y_pred, self.prior_mu, torch.log(torch.tensor(self.prior_sigma)))
+        # KL - prior probability of sample y_pred w.r.t. N(0,1)
+        log_pz = ll_gaussian(y_pred, self.prior_mu, torch.log(torch.tensor(self.prior_sigma)))
 
         # KL - probability of y_pred w.r.t the variational likelihood
-        log_p_q = ll_gaussian(y_pred, mu, log_var)
+        log_pxCz = ll_gaussian(y_pred, mu, log_var)
 
         if self.show_once:
             self.show_once = False
             logger.info('Cardinalities: Mu: ' + str(mu.shape) + ' Sigma: ' + str(log_var.shape) +
-                        ' loglikelihood: ' + str(loglikelihood.shape) + ' KL value: ' +
-                        str((log_prior - log_p_q).mean()))
+                        ' loglikelihood: ' + str(log_qzCx.shape) + ' KL value: ' +
+                        str((log_pz - log_pxCz).mean()))
 
         # by taking the mean we approximate the expectation according to the law of large numbers
-        return (loglikelihood + self.beta * (log_prior - log_p_q)).mean()
+        return (log_qzCx + self.beta * (log_pz - log_pxCz)).mean()
 
     # simplified when everything is Gaussian
     #  KL(q, p) = \log \frac{\sigma_1}{\sigma_2} + \frac{\sigma_2^2 + (\mu_2 - \mu_1)^2}{2 \sigma_1^2} - \frac{1}{2}
@@ -2538,23 +2542,56 @@ class VI(nn.Module):
     #def elbo_gauss(self, y, y_pred, mu, log_var):
     # does not work
 
-    # Unfinished - the stuff here is crap !
-    def iwae(self, y_pred, y, mu, log_var):
-        # likelihood of observing y given Variational mu and sigma
-        likelihood = l_gaussian(y, mu, log_var)
+    # from https://github.com/JohanYe/IWAE-pytorch
+    def iwae(self, x, y, k_samples):
+        """
+        Simple to understand and lazy algorithm, but slow
+        Not made compatible with remainin script
+        Useful as it is likely easy to implement into existing models
+        """
+        from torch.distributions.kl import kl_divergence as KL
 
-        # prior probability of y_pred N(0,1)
-        log_prior = ll_gaussian(y_pred, self.prior_mu, torch.log(torch.tensor(self.prior_sigma)))
+        log_iw = None
+        for _ in range(k_samples):
 
-        # variational probability of y_pred
-        log_p_q = ll_gaussian(y_pred, mu, log_var)
 
-        # by taking the mean we approximate the expectation according to the law of large numbers
-        return (likelihood + self.beta * (log_prior - log_p_q)).mean()
+            # Encode - sample from the encoder
+            #  Latent variables mean,variance: mu_enc, log_var_enc
+            # y_pred: Sample from q(z|x) by passing data through encoder and reparameterizing
+            y_pred, mu_enc, log_var_enc = self.forward(x)
 
-    # Minimizing negative ELBO
-    def det_loss_old(self, y_pred, y, mu, log_var):
-        return -self.elbo(y_pred, y, mu, log_var)
+            # there is not much of a decoder - hence we use the identity as decoder 'stub'
+            dec_mu = mu_enc
+            dec_log_var = log_var_enc
+
+            # Sample from p(x|z) by sampling from q(z|x), passing through decoder (y_pred)
+            # likelihood of observing y given Variational decoder mu and sigma - reconstruction error
+            log_qzCx = ll_gaussian(y, dec_mu, dec_log_var)
+
+            # KL (well, not true for IWAE) - prior probability of y_pred w.r.t. N(0,1)
+            log_pz = ll_gaussian(y_pred, self.prior_mu, torch.log(torch.tensor(self.prior_sigma)))
+
+            # KL (well, not true for IWAE) - probability of y_pred w.r.t the decoded variational likelihood
+            log_pxCz = ll_gaussian(y_pred, dec_mu, dec_log_var)
+
+            #iw_log_sum = log_pxCz + log_pz - log_qz
+
+            #return (log_qzCx + self.beta * (log_pz - log_pxCz)).mean()
+            i_sum = log_qzCx + log_pz - log_pxCz
+            if log_iw is None:
+                log_iw = i_sum
+            else:
+                log_iw = torch.cat([log_iw, i_sum], 1)
+
+        #print(log_iw.shape)
+        # loss calculation
+        log_iw = log_iw.reshape(-1, k_samples)
+        #print(log_iw.shape)
+        iwelbo = torch.logsumexp(log_iw, dim=1) - np.log(k_samples)
+        #print(iwelbo.shape)
+
+
+        return iwelbo.mean()
 
 
 class VIAnomalyScore(SupervisedLearningTransformer):
@@ -2665,10 +2702,12 @@ class VIAnomalyScore(SupervisedLearningTransformer):
                 optim.zero_grad()
                 y_pred, mu, log_var = vi_model(X)
                 loss = -vi_model.elbo(y_pred, Y, mu, log_var)
+                iwae = -vi_model.iwae(X, Y, 10)
                 if epoch % 10 == 0:
-                    logger.debug('Epoch: ' + str(epoch) + ', neg ELBO: ' + str(loss.item()))
+                    logger.debug('Epoch: ' + str(epoch) + ', neg ELBO: ' + str(loss.item()) + ', IWAE ELBO: ' + str(iwae.item()))
 
-                loss.backward()
+                #loss.backward()
+                iwae.backward()
                 optim.step()
 
             logger.debug('Created VAE ' + str(vi_model))
