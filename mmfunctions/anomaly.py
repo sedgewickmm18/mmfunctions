@@ -2798,7 +2798,7 @@ class InvokeWMLModel(BaseTransformer):
         print(self.client)
 
         # check deployment
-        deployment_details = self.client.get_details(self.deployment_id, 1)
+        deployment_details = self.client.deployments.get_details(self.deployment_id, 1)
         # ToDo - test return and error msg
         print(deployment_details)
 
