@@ -2769,6 +2769,11 @@ class InvokeWMLModel(BaseTransformer):
         self.deployment_id = deployment_id
         self.apikey = apikey             # deprecated
 
+        # override
+        self.deployment_id = '901aa001-5cc6-4cce-99c9-6d04a3dda1f9'
+        self.apikey = 'NrJN6HE48DSIehKDpV-w-7ektZvusgDGhTzq1VsizqvS'
+        self.wml_auth = 'https://us-south.ml.cloud.ibm.com'
+
         self.scoring_endpoint = None
 
     def login(self):
@@ -2793,12 +2798,12 @@ class InvokeWMLModel(BaseTransformer):
         print(self.client)
 
         # check deployment
-        deployment_details = self.client.get_details(deployment_id, 1)
+        deployment_details = self.client.get_details(self.deployment_id, 1)
         # ToDo - test return and error msg
         print(deployment_details)
 
         # find scoring endpoint
-        self.scoring_endpoint = self.client.deployments.get_scoring_href(deployment_id)
+        self.scoring_endpoint = self.client.deployments.get_scoring_href(self.deployment_id)
         print(self.scoring_endpoint)
 
     def execute(self, df):
