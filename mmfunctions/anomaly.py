@@ -2793,6 +2793,7 @@ class InvokeWMLModel(BaseTransformer):
         except Exception as ae:
             wml_credentials = {'apikey': self.apikey , 'url': self.wml_auth, 'space_id': self.space_id}
             logger.error('WML Credentials constant ' + self.wml_auth + ' not present. Error ' + str(ae))
+            pass
 
         # get client and check credentials
         self.client = APIClient(wml_credentials)
