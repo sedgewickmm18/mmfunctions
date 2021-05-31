@@ -58,6 +58,9 @@ import torch
 import torch.autograd
 import torch.nn as nn
 
+# WML
+from ibm_watson_machine_learning import APIClient
+
 logger = logging.getLogger(__name__)
 logger.info('IOT functions version ' + iotfunctions.__version__)
 
@@ -2282,6 +2285,8 @@ class ARIMAForecaster(SupervisedLearningTransformer):
         return super().execute(df)
 
 
+    # EXCLUDED until we upgrade to statsmodels 0.12
+    '''
     def _calc(self, df):
         # per entity - copy for later inplace operations
         db = self._entity_type.db
@@ -2324,6 +2329,7 @@ class ARIMAForecaster(SupervisedLearningTransformer):
         df[self.output_item] = predictions
 
         return df
+    '''
 
     @classmethod
     def build_ui(cls):
@@ -2536,20 +2542,10 @@ class VI(nn.Module):
         # by taking the mean we approximate the expectation according to the law of large numbers
         return (log_qzCx + self.beta * (log_pz - log_pxCz)).mean()
 
-    # simplified when everything is Gaussian
-    #  KL(q, p) = \log \frac{\sigma_1}{\sigma_2} + \frac{\sigma_2^2 + (\mu_2 - \mu_1)^2}{2 \sigma_1^2} - \frac{1}{2}
-    # unfortunately I don't get it to work properly
-    #def elbo_gauss(self, y, y_pred, mu, log_var):
-    # does not work
 
-    # from https://github.com/JohanYe/IWAE-pytorch
+    # from https://arxiv.org/pdf/1509.00519.pdf
+    #  and https://justin-tan.github.io/blog/2020/06/20/Intuitive-Importance-Weighted-ELBO-Bounds
     def iwae(self, x, y, k_samples):
-        """
-        Simple to understand and lazy algorithm, but slow
-        Not made compatible with remainin script
-        Useful as it is likely easy to implement into existing models
-        """
-        from torch.distributions.kl import kl_divergence as KL
 
         log_iw = None
         for _ in range(k_samples):
@@ -2557,10 +2553,10 @@ class VI(nn.Module):
 
             # Encode - sample from the encoder
             #  Latent variables mean,variance: mu_enc, log_var_enc
-            # y_pred: Sample from q(z|x) by passing data through encoder and reparameterizing
+            # y_pred: Sample from q(z|x) by passing data through encoder and reparametrizing
             y_pred, mu_enc, log_var_enc = self.forward(x)
 
-            # there is not much of a decoder - hence we use the identity as decoder 'stub'
+            # there is not much of a decoder - hence we use the identity below as decoder 'stub'
             dec_mu = mu_enc
             dec_log_var = log_var_enc
 
@@ -2574,22 +2570,16 @@ class VI(nn.Module):
             # KL (well, not true for IWAE) - probability of y_pred w.r.t the decoded variational likelihood
             log_pxCz = ll_gaussian(y_pred, dec_mu, dec_log_var)
 
-            #iw_log_sum = log_pxCz + log_pz - log_qz
-
-            #return (log_qzCx + self.beta * (log_pz - log_pxCz)).mean()
             i_sum = log_qzCx + log_pz - log_pxCz
             if log_iw is None:
                 log_iw = i_sum
             else:
                 log_iw = torch.cat([log_iw, i_sum], 1)
 
-        #print(log_iw.shape)
         # loss calculation
         log_iw = log_iw.reshape(-1, k_samples)
-        #print(log_iw.shape)
-        iwelbo = torch.logsumexp(log_iw, dim=1) - np.log(k_samples)
-        #print(iwelbo.shape)
 
+        iwelbo = torch.logsumexp(log_iw, dim=1) - np.log(k_samples)
 
         return iwelbo.mean()
 
@@ -2626,6 +2616,7 @@ class VIAnomalyScore(SupervisedLearningTransformer):
         self.prior_mu = 0.0
         self.prior_sigma = 1.0
         self.beta = 1.0
+        self.iwae_samples = 10
 
     def execute(self, df):
 
@@ -2702,7 +2693,7 @@ class VIAnomalyScore(SupervisedLearningTransformer):
                 optim.zero_grad()
                 y_pred, mu, log_var = vi_model(X)
                 loss = -vi_model.elbo(y_pred, Y, mu, log_var)
-                iwae = -vi_model.iwae(X, Y, 10)
+                iwae = -vi_model.iwae(X, Y, self.iwae_samples)  # default is to try with 10 samples
                 if epoch % 10 == 0:
                     logger.debug('Epoch: ' + str(epoch) + ', neg ELBO: ' + str(loss.item()) + ', IWAE ELBO: ' + str(iwae.item()))
 
@@ -2717,7 +2708,7 @@ class VIAnomalyScore(SupervisedLearningTransformer):
             except Exception as e:
                 logger.error('Model store failed with ' + str(e))
 
-        # if training was not allowed or failed
+        # check if training was not allowed or failed
         if vi_model is not None:
             self.active_models[entity] = vi_model
 
@@ -2748,6 +2739,103 @@ class VIAnomalyScore(SupervisedLearningTransformer):
         # define arguments that behave as function outputs
         outputs = []
         return inputs, outputs
+
+#######################################################################################
+# Call to deployed WML model
+#######################################################################################
+
+class InvokeWMLModel(BaseTransformer):
+    '''
+    _allow_empty_df = True  # allow this task to run even if it receives no incoming data
+    produces_output_items = False  # this task does not contribute new data items
+    requires_input_items = True  # this task does not require dependent data items
+    '''
+    def __init__(self, wml_auth, wml_endpoint, instance_id, deployment_id, apikey, input_items, output_items = 'http_preload_done'):
+        super().__init__()
+
+        logger.debug(input_items)
+
+        self.whoami = 'InvokeWMLModel'
+
+        self.input_items = input_items
+        self.output_items = output_items
+        self._output_list = [output_items]
+        input_items.sort()
+        logging.debug('sorted input_items %s' , input_items)
+        self.input_columns = input_items #.replace(' ', '').split(',')
+        self.wml_endpoint = wml_endpoint
+        # auth as documented here https://dataplatform.cloud.ibm.com/docs/content/wsj/analyze-data/ml-authentication.html
+        #   to be pulled from a tenant constant
+        self.uid = "bx"
+        self.password = "bx"
+        self.instance_id = instance_id
+        self.deployment_id = deployment_id
+        self.apikey = apikey
+
+        # retrieve WML credentials as constant
+        #    {"apikey": api_key, "url": 'https://' + location + '.ml.cloud.ibm.com'}
+        c = self._entity_type.get_attributes_dict()
+        try:
+            wml_credentials = c[wml_auth]
+            print('WML Credentials ' , str(auth_token))
+        except Exception as ae:
+            logger.error('WML Credentials constant ' + wml_auth + ' not present. Error ' + str(ae))
+
+        # get client and check credentials
+        self.client = APIClient(wml_credentials)
+        # ToDo - test return and error msg
+
+        # check deployment
+        deployment_details = self.client.get_details(deployment_id, 1)
+        # ToDo - test return and error msg
+
+        # find scoring endpoint
+        self.scoring_endpoint = self.client.deployments.get_scoring_href(deployment_id)
+
+    def execute(self, df):
+
+        # Create missing columns before doing group-apply
+        df = df.copy()
+        missing_cols = [x for x in (self.output_columns) if x not in df.columns]
+        for m in missing_cols:
+            df[m] = None
+
+        return super().execute(df)
+
+    def _calc(self, df):
+
+        scoring_payload = {
+            'input_data': [{
+                'fields': self.input_items,
+                'values': None}]
+        }
+
+        if (len(self.input_columns) == 1):
+            logging.debug('reformating column ' + str(self.input_columns))
+            s_df = df[self.input_columns]
+            rows = [list(r) for i,r in s_df.iterrows()]
+            # rows = [[i] for r,i in df['deviceid'].iteritems() ]
+            scoring_payload['input_data']['values'] = rows
+        elif (len(input_columns) > 1):
+            s_df = df[input_columns]
+            rows = [list(r) for i,r in s_df.iterrows()]
+            scoring_payload['input_data']['values'] = rows
+        else:
+            logging.error("no input columns provided, forwarding all")
+            return df
+
+        logging.debug('payload ' + str(scoring_payload))
+        results = self.client.deployments.score(self.deployment_id, scoring_payload)
+        if results:
+            logging.debug('results received' )
+            # df.loc[:, self.output_items] = results['values']
+            # df[self.output_items] = results['values']
+            df[self.output_items] = [i[0] for i in results['values'] ]
+        else:
+            logging.error('error invoking external model')
+            logging.debug(df[self.output_items].dtype.name)
+
+        return df
 
 
 #######################################################################################
