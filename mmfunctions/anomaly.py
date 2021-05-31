@@ -2751,7 +2751,7 @@ class InvokeWMLModel(BaseTransformer):
     produces_output_items = False  # this task does not contribute new data items
     requires_input_items = True  # this task does not require dependent data items
     '''
-    def __init__(self, wml_auth, wml_endpoint, instance_id, deployment_id, apikey, input_items, output_items = 'http_preload_done'):
+    def __init__(self, wml_auth, instance_id, deployment_id, apikey, input_items, output_items = 'http_preload_done'):
         super().__init__()
 
         logger.debug(input_items)
@@ -2760,18 +2760,14 @@ class InvokeWMLModel(BaseTransformer):
 
         self.input_items = input_items
         self.output_items = output_items
-        self._output_list = [output_items]
-        input_items.sort()
-        logging.debug('sorted input_items %s' , input_items)
-        self.input_columns = input_items #.replace(' ', '').split(',')
-        self.wml_endpoint = wml_endpoint
+        self.wml_auth = wml_auth
         # auth as documented here https://dataplatform.cloud.ibm.com/docs/content/wsj/analyze-data/ml-authentication.html
         #   to be pulled from a tenant constant
-        self.uid = "bx"
-        self.password = "bx"
-        self.instance_id = instance_id
+        #self.uid = "bx"
+        #self.password = "bx"
+        self.instance_id = instance_id   # deprecated
         self.deployment_id = deployment_id
-        self.apikey = apikey
+        self.apikey = apikey             # deprecated
 
         # retrieve WML credentials as constant
         #    {"apikey": api_key, "url": 'https://' + location + '.ml.cloud.ibm.com'}
@@ -2780,18 +2776,22 @@ class InvokeWMLModel(BaseTransformer):
             wml_credentials = c[wml_auth]
             print('WML Credentials ' , str(auth_token))
         except Exception as ae:
+            wml_credentials = {'apikey': self.apikey , 'url': self.wml_auth}
             logger.error('WML Credentials constant ' + wml_auth + ' not present. Error ' + str(ae))
 
         # get client and check credentials
         self.client = APIClient(wml_credentials)
         # ToDo - test return and error msg
+        print(self.client)
 
         # check deployment
         deployment_details = self.client.get_details(deployment_id, 1)
         # ToDo - test return and error msg
+        print(deployment_details)
 
         # find scoring endpoint
         self.scoring_endpoint = self.client.deployments.get_scoring_href(deployment_id)
+        print(self.scoring_endpoint)
 
     def execute(self, df):
 
@@ -2811,14 +2811,14 @@ class InvokeWMLModel(BaseTransformer):
                 'values': None}]
         }
 
-        if (len(self.input_columns) == 1):
-            logging.debug('reformating column ' + str(self.input_columns))
-            s_df = df[self.input_columns]
+        if (len(self.input_items) == 1):
+            logging.debug('reformating column ' + str(self.input_items))
+            s_df = df[self.input_items]
             rows = [list(r) for i,r in s_df.iterrows()]
             # rows = [[i] for r,i in df['deviceid'].iteritems() ]
             scoring_payload['input_data']['values'] = rows
-        elif (len(input_columns) > 1):
-            s_df = df[input_columns]
+        elif (len(input_items) > 1):
+            s_df = df[input_items]
             rows = [list(r) for i,r in s_df.iterrows()]
             scoring_payload['input_data']['values'] = rows
         else:
@@ -2826,7 +2826,7 @@ class InvokeWMLModel(BaseTransformer):
             return df
 
         logging.debug('payload ' + str(scoring_payload))
-        results = self.client.deployments.score(self.deployment_id, scoring_payload)
+        results = self.client.deployments.score(self.scoring_endpoint, scoring_payload)
         if results:
             logging.debug('results received' )
             # df.loc[:, self.output_items] = results['values']
