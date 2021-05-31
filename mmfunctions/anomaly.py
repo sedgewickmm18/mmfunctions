@@ -2857,7 +2857,7 @@ class InvokeWMLModel(BaseTransformer):
         results = self.client.deployments.score(self.deployment_id, scoring_payload)
 
         if results:
-            logging.debug('results received' )
+            logging.debug('results received' + str(results))
             # df.loc[:, self.output_items] = results['values']
             # df[self.output_items] = results['values']
             df[self.output_items] = [i[0] for i in results['values'] ]
