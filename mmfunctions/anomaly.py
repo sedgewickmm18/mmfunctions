@@ -2828,22 +2828,25 @@ class InvokeWMLModel(BaseTransformer):
 
     def _calc(self, df):
 
-        scoring_payload = {
-            'input_data': [{
-                'fields': self.input_items,
-                'values': None}]
-        }
-
         if (len(self.input_items) == 1):
             logging.debug('reformating column ' + str(self.input_items))
             s_df = df[self.input_items]
             rows = [list(r) for i,r in s_df.iterrows()]
             # rows = [[i] for r,i in df['deviceid'].iteritems() ]
-            scoring_payload['input_data']['values'] = rows
+            scoring_payload = {
+                'input_data': [{
+                    'fields': self.input_items,
+                    'values': rows}]
+            }
+
         elif (len(input_items) > 1):
             s_df = df[input_items]
             rows = [list(r) for i,r in s_df.iterrows()]
-            scoring_payload['input_data']['values'] = rows
+            scoring_payload = {
+                'input_data': [{
+                    'fields': self.input_items,
+                    'values': rows}]
+            }
         else:
             logging.error("no input columns provided, forwarding all")
             return df
