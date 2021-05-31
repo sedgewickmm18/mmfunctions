@@ -2751,7 +2751,7 @@ class InvokeWMLModel(BaseTransformer):
     produces_output_items = False  # this task does not contribute new data items
     requires_input_items = True  # this task does not require dependent data items
     '''
-    def __init__(self, wml_auth, instance_id, deployment_id, apikey, input_items, output_items = 'http_preload_done'):
+    def __init__(self, wml_endpoint, instance_id, deployment_id, apikey, input_items, output_items = 'http_preload_done'):
         super().__init__()
 
         logger.debug(input_items)
@@ -2760,7 +2760,7 @@ class InvokeWMLModel(BaseTransformer):
 
         self.input_items = input_items
         self.output_items = output_items
-        self.wml_auth = wml_auth
+        self.wml_auth = wml_endpoint
         # auth as documented here https://dataplatform.cloud.ibm.com/docs/content/wsj/analyze-data/ml-authentication.html
         #   to be pulled from a tenant constant
         #self.uid = "bx"
@@ -2773,11 +2773,11 @@ class InvokeWMLModel(BaseTransformer):
         #    {"apikey": api_key, "url": 'https://' + location + '.ml.cloud.ibm.com'}
         c = self._entity_type.get_attributes_dict()
         try:
-            wml_credentials = c[wml_auth]
+            wml_credentials = c[self.wml_auth]
             print('WML Credentials ' , str(auth_token))
         except Exception as ae:
             wml_credentials = {'apikey': self.apikey , 'url': self.wml_auth}
-            logger.error('WML Credentials constant ' + wml_auth + ' not present. Error ' + str(ae))
+            logger.error('WML Credentials constant ' + self.wml_auth + ' not present. Error ' + str(ae))
 
         # get client and check credentials
         self.client = APIClient(wml_credentials)
