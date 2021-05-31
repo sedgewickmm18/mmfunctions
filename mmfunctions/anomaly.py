@@ -2799,6 +2799,9 @@ class InvokeWMLModel(BaseTransformer):
         # ToDo - test return and error msg
         print(self.client)
 
+        # set space
+        client.set.default_space(wml_credentials['space_id'])
+
         # check deployment
         deployment_details = self.client.deployments.get_details(self.deployment_id, 1)
         # ToDo - test return and error msg
