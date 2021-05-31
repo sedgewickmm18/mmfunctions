@@ -2798,7 +2798,7 @@ class InvokeWMLModel(BaseTransformer):
         # get client and check credentials
         self.client = APIClient(wml_credentials)
         # ToDo - test return and error msg
-        print(self.client)
+        print('Client', self.client)
 
         # set space
         self.client.set.default_space(wml_credentials['space_id'])
@@ -2806,11 +2806,11 @@ class InvokeWMLModel(BaseTransformer):
         # check deployment
         deployment_details = self.client.deployments.get_details(self.deployment_id, 1)
         # ToDo - test return and error msg
-        print(deployment_details)
+        print('Details', deployment_details)
 
         # find scoring endpoint
-        self.scoring_endpoint = self.client.deployments.get_scoring_href(self.deployment_id)
-        print(self.scoring_endpoint)
+        #self.scoring_endpoint = self.client.deployments.get_scoring_href(self.deployment_id)
+        #print('Scoring endpoint', self.scoring_endpoint)
 
     def execute(self, df):
 
@@ -2849,7 +2849,10 @@ class InvokeWMLModel(BaseTransformer):
             return df
 
         logging.debug('payload ' + str(scoring_payload))
-        results = self.client.deployments.score(self.scoring_endpoint, scoring_payload)
+
+        #results = self.client.deployments.score(self.scoring_endpoint, scoring_payload)
+        results = self.client.deployments.score(self.deployment_id, scoring_payload)
+
         if results:
             logging.debug('results received' )
             # df.loc[:, self.output_items] = results['values']
