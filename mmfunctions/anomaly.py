@@ -2773,6 +2773,8 @@ class InvokeWMLModel(BaseTransformer):
         self.deployment_id = '901aa001-5cc6-4cce-99c9-6d04a3dda1f9'
         self.apikey = 'NrJN6HE48DSIehKDpV-w-7ektZvusgDGhTzq1VsizqvS'
         self.wml_auth = 'https://us-south.ml.cloud.ibm.com'
+        self.space_id = '5f799467-25dc-4c98-8556-0dadbac73d12'
+
 
         self.scoring_endpoint = None
 
@@ -2789,7 +2791,7 @@ class InvokeWMLModel(BaseTransformer):
             wml_credentials = c[self.wml_auth]
             print('WML Credentials ' , str(auth_token))
         except Exception as ae:
-            wml_credentials = {'apikey': self.apikey , 'url': self.wml_auth}
+            wml_credentials = {'apikey': self.apikey , 'url': self.wml_auth, 'space_id': self.space_id}
             logger.error('WML Credentials constant ' + self.wml_auth + ' not present. Error ' + str(ae))
 
         # get client and check credentials
