@@ -2769,6 +2769,14 @@ class InvokeWMLModel(BaseTransformer):
         self.deployment_id = deployment_id
         self.apikey = apikey             # deprecated
 
+        self.scoring_endpoint = None
+
+    def login(self):
+
+        # only do it once
+        if self.scoring_endpoint is not None:
+            return
+
         # retrieve WML credentials as constant
         #    {"apikey": api_key, "url": 'https://' + location + '.ml.cloud.ibm.com'}
         c = self._entity_type.get_attributes_dict()
@@ -2800,6 +2808,8 @@ class InvokeWMLModel(BaseTransformer):
         missing_cols = [x for x in (self.output_columns) if x not in df.columns]
         for m in missing_cols:
             df[m] = None
+
+        self.login()
 
         return super().execute(df)
 
