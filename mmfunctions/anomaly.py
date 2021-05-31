@@ -46,8 +46,9 @@ if iotfunctions.__version__ != '8.2.1':
 
 import statsmodels.api as sm
 from statsmodels.nonparametric.kernel_density import KDEMultivariate
-from statsmodels.tsa.forecasting.stl import STLForecast
 from statsmodels.tsa.arima.model import ARIMA
+# EXCLUDED until we upgrade to statsmodels 0.12
+#from statsmodels.tsa.forecasting.stl import STLForecast
 
 from iotfunctions.base import (BaseTransformer, BaseRegressor, BaseEstimatorFunction, BaseSimpleAggregator)
 from iotfunctions.bif import (AlertHighValue)
