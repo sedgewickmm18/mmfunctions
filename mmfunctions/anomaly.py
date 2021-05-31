@@ -2857,10 +2857,11 @@ class InvokeWMLModel(BaseTransformer):
         results = self.client.deployments.score(self.deployment_id, scoring_payload)
 
         if results:
-            logging.debug('results received' + str(results))
+            print('results received', results)
+            #logging.debug('results received' + str(results))
             # df.loc[:, self.output_items] = results['values']
             # df[self.output_items] = results['values']
-            df[self.output_items] = [i[0] for i in results['values'] ]
+            #df[self.output_items] = [i[0] for i in results['values'] ]
         else:
             logging.error('error invoking external model')
             logging.debug(df[self.output_items].dtype.name)
