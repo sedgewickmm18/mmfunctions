@@ -2898,7 +2898,8 @@ class InvokeWMLModelOrig(BaseTransformer):
     produces_output_items = False  # this task does not contribute new data items
     requires_input_items = True  # this task does not require dependent data items
     '''
-    def __init__(self, input_items, wml_endpoint, space_id, deployment_id, apikey, output_items):
+    #def __init__(self, input_items, wml_endpoint, space_id, deployment_id, apikey, output_items):
+    def __init__(self, wml_endpoint, space_id, deployment_id, apikey, input_items, output_items):
 
         super().__init__(None, input_items, output_items)
 
