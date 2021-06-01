@@ -2751,7 +2751,7 @@ class InvokeWMLModel(BaseTransformer):
     produces_output_items = False  # this task does not contribute new data items
     requires_input_items = True  # this task does not require dependent data items
     '''
-    def __init__(self, wml_endpoint, instance_id, deployment_id, apikey, input_items, output_items = 'http_preload_done'):
+    def __init__(self, wml_auth, input_items, output_items):
         super().__init__()
 
         logger.debug(input_items)
@@ -2760,23 +2760,31 @@ class InvokeWMLModel(BaseTransformer):
 
         self.input_items = input_items
         self.output_items = output_items
-        self.wml_auth = wml_endpoint
-        # auth as documented here https://dataplatform.cloud.ibm.com/docs/content/wsj/analyze-data/ml-authentication.html
-        #   to be pulled from a tenant constant
-        #self.uid = "bx"
-        #self.password = "bx"
-        self.instance_id = instance_id   # deprecated
-        self.deployment_id = deployment_id
-        self.apikey = apikey             # deprecated
+        self.wml_auth = wml_auth
 
-        # override
-        self.deployment_id = '901aa001-5cc6-4cce-99c9-6d04a3dda1f9'
-        self.apikey = 'NrJN6HE48DSIehKDpV-w-7ektZvusgDGhTzq1VsizqvS'
-        self.wml_auth = 'https://us-south.ml.cloud.ibm.com'
-        self.space_id = '5f799467-25dc-4c98-8556-0dadbac73d12'
+        self.deployment_id = None
+        self.apikey = None
+        self.wml_endpoint = None
+        self.space_id = None
 
 
-        self.scoring_endpoint = None
+    def __str__(self):
+        out = self.__class__.__name__
+        try:
+            out = out + 'Input: ' + str(self.input_items) + '\n'
+            out = out + 'Output: ' + str(self.output_items) + '\n'
+
+            if self.wml_auth is not None:
+                out = out + 'WML auth: ' + str(self.wml_auth) + '\n'
+            else:
+                out = out + 'APIKey: ' + str(self.apikey) + '\n'
+                out = out + 'WML endpoint: ' + str(self.wml_endpoint) + '\n'
+                out = out + 'WML space id: ' + str(self.space_id) + '\n'
+                out = out + 'WML deployment id: ' + str(self.deployment_id) + '\n'
+        except Exception:
+            pass
+        return out
+
 
     def login(self):
 
@@ -2786,14 +2794,19 @@ class InvokeWMLModel(BaseTransformer):
 
         # retrieve WML credentials as constant
         #    {"apikey": api_key, "url": 'https://' + location + '.ml.cloud.ibm.com'}
-        c = self._entity_type.get_attributes_dict()
-        try:
-            wml_credentials = c[self.wml_auth]
-            print('WML Credentials ' , str(auth_token))
-        except Exception as ae:
-            wml_credentials = {'apikey': self.apikey , 'url': self.wml_auth, 'space_id': self.space_id}
-            logger.error('WML Credentials constant ' + self.wml_auth + ' not present. Error ' + str(ae))
-            pass
+        if self.wml_auth is not None:
+            c = self._entity_type.get_attributes_dict()
+            try:
+                wml_credentials = c[self.wml_auth]
+                print('WML Credentials ' , str(auth_token))
+            except Exception as ae:
+                wml_credentials = {'apikey': self.apikey , 'url': self.wml_endpoint, 'space_id': self.space_id}
+                logger.error('WML Credentials constant ' + self.wml_auth + ' not present. Error ' + str(ae))
+                pass
+            self.deployment_id = wml_credentials['deployment_id']
+            self.space_id = wml_credentials['space_id']
+        else:
+            wml_credentials = {'apikey': self.apikey , 'url': self.wml_endpoint, 'space_id': self.space_id}
 
         # get client and check credentials
         self.client = APIClient(wml_credentials)
@@ -2808,9 +2821,6 @@ class InvokeWMLModel(BaseTransformer):
         # ToDo - test return and error msg
         print('Details', deployment_details)
 
-        # find scoring endpoint
-        #self.scoring_endpoint = self.client.deployments.get_scoring_href(self.deployment_id)
-        #print('Scoring endpoint', self.scoring_endpoint)
 
     def execute(self, df):
 
@@ -2857,19 +2867,81 @@ class InvokeWMLModel(BaseTransformer):
         results = self.client.deployments.score(self.deployment_id, scoring_payload)
 
         if results:
-            print('results received', results)
-            print('results received', results['predictions'])
-            print('results received', results['predictions'][0]['values'])
-            #logging.debug('results received' + str(results))
-            # df.loc[:, self.output_items] = results['values']
-            # df[self.output_items] = results['values']
-            #df[self.output_items] = [i[0] for i in results['values'] ]
+            #print('results received', results)
+            #print('results received', results['predictions'])
+            #print('results received', results['predictions'][0]['values'])
             df[self.output_items] = np.array(results['predictions'][0]['values']).flatten()
         else:
             logging.error('error invoking external model')
-            logging.debug(df[self.output_items].dtype.name)
+            #logging.debug(df[self.output_items].dtype.name)
 
         return df
+
+    @classmethod
+    def build_ui(cls):
+        #define arguments that behave as function inputs
+        inputs = []
+        inputs.append(ui.UIMultiItem(name = 'input_items', datatype=float,
+                                     description = "Data items adjust", is_output_datatype_derived = True))
+        inputs.append(ui.UISingle(name='wml_auth', datatype=str,
+                                  description='Endpoint to WML service where model is hosted', tags=['TEXT'], required=True))
+
+        # define arguments that behave as function outputs
+        outputs=[]
+        outputs.append(ui.UISingle(name='output_items', datatype=float))
+        return (inputs, outputs)
+
+
+class InvokeWMLModelOrig(BaseTransformer):
+    '''
+    _allow_empty_df = True  # allow this task to run even if it receives no incoming data
+    produces_output_items = False  # this task does not contribute new data items
+    requires_input_items = True  # this task does not require dependent data items
+    '''
+    def __init__(self, deployment_id, wml_endpoint, space_id, apikey, input_items, output_items):
+
+        super().__init__(None, input_items, output_items)
+
+        logger.debug(input_items)
+
+        self.whoami = 'InvokeWMLModelOrig'
+
+        self.deployment_id = deployment_id
+        self.apikey = apikey
+        self.wml_endpoint = wml_endpoint
+        self.space_id = space_id
+
+        # auth as documented here https://dataplatform.cloud.ibm.com/docs/content/wsj/analyze-data/ml-authentication.html
+        #   to be pulled from a tenant constant
+
+        # override
+        #self.deployment_id = '901aa001-5cc6-4cce-99c9-6d04a3dda1f9'
+        #self.apikey = 'NrJN6HE48DSIehKDpV-w-7ektZvusgDGhTzq1VsizqvS'
+        #self.wml_endpoint = 'https://us-south.ml.cloud.ibm.com'
+        #self.space_id = '5f799467-25dc-4c98-8556-0dadbac73d12'
+
+
+        self.scoring_endpoint = None
+
+    @classmethod
+    def build_ui(cls):
+        #define arguments that behave as function inputs
+        inputs = []
+        inputs.append(ui.UIMultiItem(name = 'input_items', datatype=float,
+                                     description = "Data items adjust", is_output_datatype_derived = True))
+        inputs.append(ui.UISingle(name='wml_endpoint', datatype=str,
+                                  description='Endpoint to WML service where model is hosted', tags=['TEXT'], required=True))
+        inputs.append(ui.UISingle(name='space_id', datatype=str,
+                                  description='Space ID for the WML project', tags=['TEXT'], required=True))
+        inputs.append(ui.UISingle(name='deployment_id', datatype=str,
+                                  description='Deployment ID for WML model', tags=['TEXT'], required=True))
+        inputs.append(ui.UISingle(name='apikey', datatype=str,
+                                  description='IBM Cloud API Key', tags=['TEXT'], required=True))
+
+        # define arguments that behave as function outputs
+        outputs=[]
+        outputs.append(ui.UISingle(name='output_items', datatype=float))
+        return (inputs, outputs)
 
 
 #######################################################################################
