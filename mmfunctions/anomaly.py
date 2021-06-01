@@ -2800,7 +2800,7 @@ class InvokeWMLModel(BaseTransformer):
             c = self._entity_type.get_attributes_dict()
             try:
                 wml_credentials = c[self.wml_auth]
-                print('WML Credentials ' , str(auth_token))
+                print('WML Credentials ' , str(wml_credentials))
             except Exception as ae:
                 wml_credentials = {'apikey': self.apikey , 'url': self.wml_endpoint, 'space_id': self.space_id}
                 logger.error('WML Credentials constant ' + self.wml_auth + ' not present. Error ' + str(ae))
