@@ -2858,7 +2858,8 @@ class InvokeWMLModel(BaseTransformer):
 
         if results:
             print('results received', results)
-            print('results received', results.predictions.values)
+            print('results received', results['predictions'])
+            print('results received', results['predictions']['values'])
             #logging.debug('results received' + str(results))
             # df.loc[:, self.output_items] = results['values']
             # df[self.output_items] = results['values']
