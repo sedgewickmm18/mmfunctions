@@ -2858,10 +2858,12 @@ class InvokeWMLModel(BaseTransformer):
 
         if results:
             print('results received', results)
+            print('results received', results.predictions.values)
             #logging.debug('results received' + str(results))
             # df.loc[:, self.output_items] = results['values']
             # df[self.output_items] = results['values']
             #df[self.output_items] = [i[0] for i in results['values'] ]
+            df[self.output_items] = np.array(results.predictions.values).flatten()
         else:
             logging.error('error invoking external model')
             logging.debug(df[self.output_items].dtype.name)
