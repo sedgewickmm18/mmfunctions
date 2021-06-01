@@ -2767,6 +2767,8 @@ class InvokeWMLModel(BaseTransformer):
         self.wml_endpoint = None
         self.space_id = None
 
+        self.logged_on = False
+
 
     def __str__(self):
         out = self.__class__.__name__
@@ -2789,7 +2791,7 @@ class InvokeWMLModel(BaseTransformer):
     def login(self):
 
         # only do it once
-        if self.scoring_endpoint is not None:
+        if self.logged_on:
             return
 
         # retrieve WML credentials as constant
@@ -2820,6 +2822,8 @@ class InvokeWMLModel(BaseTransformer):
         deployment_details = self.client.deployments.get_details(self.deployment_id, 1)
         # ToDo - test return and error msg
         print('Details', deployment_details)
+
+        self.logged_on = True
 
 
     def execute(self, df):
@@ -2881,14 +2885,14 @@ class InvokeWMLModel(BaseTransformer):
     def build_ui(cls):
         #define arguments that behave as function inputs
         inputs = []
-        inputs.append(ui.UIMultiItem(name = 'input_items', datatype=float,
-                                     description = "Data items adjust", is_output_datatype_derived = True))
-        inputs.append(ui.UISingle(name='wml_auth', datatype=str,
-                                  description='Endpoint to WML service where model is hosted', tags=['TEXT'], required=True))
+        inputs.append(UIMultiItem(name = 'input_items', datatype=float,
+                                  description = "Data items adjust", is_output_datatype_derived = True))
+        inputs.append(UISingle(name='wml_auth', datatype=str,
+                               description='Endpoint to WML service where model is hosted', tags=['TEXT'], required=True))
 
         # define arguments that behave as function outputs
         outputs=[]
-        outputs.append(ui.UISingle(name='output_items', datatype=float))
+        outputs.append(UISingle(name='output_items', datatype=float))
         return (inputs, outputs)
 
 
@@ -2898,8 +2902,8 @@ class InvokeWMLModelOrig(BaseTransformer):
     produces_output_items = False  # this task does not contribute new data items
     requires_input_items = True  # this task does not require dependent data items
     '''
-    #def __init__(self, input_items, wml_endpoint, space_id, deployment_id, apikey, output_items):
-    def __init__(self, wml_endpoint, space_id, deployment_id, apikey, input_items, output_items):
+    def __init__(self, input_items, wml_endpoint, space_id, deployment_id, apikey, output_items):
+    #def __init__(self, wml_endpoint, space_id, deployment_id, apikey, input_items, output_items):
 
         super().__init__(None, input_items, output_items)
 
@@ -2928,20 +2932,20 @@ class InvokeWMLModelOrig(BaseTransformer):
     def build_ui(cls):
         #define arguments that behave as function inputs
         inputs = []
-        inputs.append(ui.UIMultiItem(name = 'input_items', datatype=float,
-                                     description = "Data items adjust", is_output_datatype_derived = True))
-        inputs.append(ui.UISingle(name='wml_endpoint', datatype=str,
-                                  description='Endpoint to WML service where model is hosted', tags=['TEXT'], required=True))
-        inputs.append(ui.UISingle(name='space_id', datatype=str,
-                                  description='Space ID for the WML project', tags=['TEXT'], required=True))
-        inputs.append(ui.UISingle(name='deployment_id', datatype=str,
-                                  description='Deployment ID for WML model', tags=['TEXT'], required=True))
-        inputs.append(ui.UISingle(name='apikey', datatype=str,
-                                  description='IBM Cloud API Key', tags=['TEXT'], required=True))
+        inputs.append(UIMultiItem(name = 'input_items', datatype=float,
+                                  description = "Data items adjust", is_output_datatype_derived = True))
+        inputs.append(UISingle(name='wml_endpoint', datatype=str,
+                               description='Endpoint to WML service where model is hosted', tags=['TEXT'], required=True))
+        inputs.append(UISingle(name='space_id', datatype=str,
+                               description='Space ID for the WML project', tags=['TEXT'], required=True))
+        inputs.append(UISingle(name='deployment_id', datatype=str,
+                               description='Deployment ID for WML model', tags=['TEXT'], required=True))
+        inputs.append(UISingle(name='apikey', datatype=str,
+                               description='IBM Cloud API Key', tags=['TEXT'], required=True))
 
         # define arguments that behave as function outputs
         outputs=[]
-        outputs.append(ui.UISingle(name='output_items', datatype=float))
+        outputs.append(UISingle(name='output_items', datatype=float))
         return (inputs, outputs)
 
 
