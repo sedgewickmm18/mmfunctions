@@ -2851,7 +2851,7 @@ class InvokeWMLModel(BaseTransformer):
             s_df = df[self.input_items]
             rows = [list(r) for i,r in s_df.iterrows()]
             print('As list of lists', rows)
-            rows = df[[self.input_items]].values.to_list()
+            rows = df[self.input_items].values.to_list()
             print('After to_list()', rows)
             scoring_payload = {
                 'input_data': [{
