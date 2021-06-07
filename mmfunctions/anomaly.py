@@ -2849,10 +2849,8 @@ class InvokeWMLModel(BaseTransformer):
         if (len(self.input_items) == 1):
             logging.debug('reformating column ' + str(self.input_items))
             s_df = df[self.input_items]
-            rows = [list(r) for i,r in s_df.iterrows()]
-            print('As list of lists', rows)
+            #rows = [list(r) for i,r in s_df.iterrows()]
             rows = df[self.input_items].values.tolist()
-            print('After to_list()', rows)
             scoring_payload = {
                 'input_data': [{
                     'fields': self.input_items,
@@ -2861,7 +2859,8 @@ class InvokeWMLModel(BaseTransformer):
 
         elif (len(self.input_items) > 1):
             s_df = df[self.input_items]
-            rows = [list(r) for i,r in s_df.iterrows()]
+            #rows = [list(r) for i,r in s_df.iterrows()]
+            rows = df[self.input_items].values.tolist()
             scoring_payload = {
                 'input_data': [{
                     'fields': self.input_items,
