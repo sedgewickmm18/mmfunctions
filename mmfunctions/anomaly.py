@@ -2767,6 +2767,8 @@ class InvokeWMLModel(BaseTransformer):
         self.wml_endpoint = None
         self.space_id = None
 
+        self.client = None
+
         self.logged_on = False
 
 
@@ -2813,7 +2815,9 @@ class InvokeWMLModel(BaseTransformer):
         # get client and check credentials
         self.client = APIClient(wml_credentials)
         # ToDo - test return and error msg
-        print('Client', self.client)
+        if self.client is None:
+            logger.error('WML API Key invalid')
+            raise RuntimeError("WML API Key invalid")
 
         # set space
         self.client.set.default_space(wml_credentials['space_id'])
@@ -2821,7 +2825,7 @@ class InvokeWMLModel(BaseTransformer):
         # check deployment
         deployment_details = self.client.deployments.get_details(self.deployment_id, 1)
         # ToDo - test return and error msg
-        print('Details', deployment_details)
+        logger.debug('Deployment Details check results in ' + str(deployment_details))
 
         self.logged_on = True
 
@@ -2846,15 +2850,17 @@ class InvokeWMLModel(BaseTransformer):
             logging.debug('reformating column ' + str(self.input_items))
             s_df = df[self.input_items]
             rows = [list(r) for i,r in s_df.iterrows()]
-            # rows = [[i] for r,i in df['deviceid'].iteritems() ]
+            print('As list of lists', rows)
+            rows = df[[self.input_items]].values.to_list()
+            print('After to_list()', rows)
             scoring_payload = {
                 'input_data': [{
                     'fields': self.input_items,
                     'values': rows}]
             }
 
-        elif (len(input_items) > 1):
-            s_df = df[input_items]
+        elif (len(self.input_items) > 1):
+            s_df = df[self.input_items]
             rows = [list(r) for i,r in s_df.iterrows()]
             scoring_payload = {
                 'input_data': [{
@@ -2867,17 +2873,12 @@ class InvokeWMLModel(BaseTransformer):
 
         logging.debug('payload ' + str(scoring_payload))
 
-        #results = self.client.deployments.score(self.scoring_endpoint, scoring_payload)
         results = self.client.deployments.score(self.deployment_id, scoring_payload)
 
         if results:
-            #print('results received', results)
-            #print('results received', results['predictions'])
-            #print('results received', results['predictions'][0]['values'])
             df[self.output_items] = np.array(results['predictions'][0]['values']).flatten()
         else:
             logging.error('error invoking external model')
-            #logging.debug(df[self.output_items].dtype.name)
 
         return df
 
