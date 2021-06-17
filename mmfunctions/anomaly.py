@@ -22,6 +22,7 @@ import numpy as np
 import pandas as pd
 import scipy as sp
 from pyod.models.cblof import CBLOF
+import ruptures as rpt
 
 # for Spectral Analysis
 from scipy import signal, fftpack
@@ -635,7 +636,8 @@ class AnomalyScorer(BaseTransformer):
                     elif diff < 0:
                         zScoreII = scores[i][0:temperature.size]
                     else:
-                        zScoreII = scores[i].size
+                        #zScoreII = scores[i].size
+                        zScoreII = scores[i]
 
                     df[output_item] = zScoreII
 
@@ -648,8 +650,26 @@ class AnomalyScorer(BaseTransformer):
 
     def score(self, temperature):
 
-        scores = np.zeros((len(self.output_items), ) + temperature.shape)
+        #scores = np.zeros((len(self.output_items), ) + temperature.shape)
+        scores = []
+        for output_item in self.output_items:
+            scores.append(np.zeros(temperature.shape))
+
+        try:
+            # super simple 1-dimensional z-score
+            ets_zscore = abs(sp.stats.zscore(temperature))
+
+            scores[0] = ets_zscore
+
+            # 2nd argument to return the modified input argument (for no data)
+            if len(self.output_items) > 1:
+                scores[1] = temperature
+
+        except Exception as e:
+            logger.error(self.whoami + ' failed with ' + str(e))
+
         return scores
+
 
     def scale(self, temperature, entity):
 
@@ -758,6 +778,138 @@ class Interpolator(AnomalyScorer):
         return (inputs, outputs)
 
 
+class NoDataAnomalyScoreExt(AnomalyScorer):
+    """
+    An unsupervised anomaly detection function.
+     Uses z-score AnomalyScorer to find gaps in data.
+     The function moves a sliding window across the data signal and applies the anomaly model to each window.
+     The window size is typically set to 12 data points.
+    """
+    def __init__(self, input_item, output_item, nodata_signal):
+        super().__init__(input_item, 1, [output_item, nodata_signal])
+
+        self.whoami = 'NoDataExt'
+        self.normalizer = 1
+
+        logger.debug('NoDataExt')
+
+    def prepare_data(self, dfEntity):
+
+        logger.debug(self.whoami + ': prepare Data')
+
+        # operate on simple timestamp index
+        if len(dfEntity.index.names) > 1:
+            index_names = dfEntity.index.names
+            dfe = dfEntity.reset_index(index_names[1:])
+        else:
+            dfe = dfEntity
+
+        # count the timedelta in seconds between two events
+        timeSeq = (dfEntity.index.values - dfEntity.index[0].to_datetime64()) / np.timedelta64(1, 's')
+
+        dfe = dfEntity.copy()
+
+        # one dimensional time series - named temperature for catchyness
+        #   we look at the gradient of the time series timestamps for anomaly detection
+        #   might throw an exception - we catch it in the super class !!
+        try:
+            temperature = np.gradient(timeSeq)
+            dfe[[self.input_item]] = temperature
+        except Exception as pe:
+            logger.info("NoData Gradient failed with " + str(pe))
+            dfe[[self.input_item]] = 0
+            temperature = dfe[[self.input_item]].values
+            temperature[0] = 10 ** 10
+
+        return dfe, temperature
+
+    @classmethod
+    def build_ui(cls):
+
+        # define arguments that behave as function inputs
+        inputs = []
+        inputs.append(UISingleItem(name='input_item', datatype=float, description='Data item to analyze'))
+        # define arguments that behave as function outputs
+        outputs = []
+        outputs.append(
+            UIFunctionOutSingle(name='output_item', datatype=float, description='Plain z-score'))
+        outputs.append(UIFunctionOutSingle(name='nodata_signal', datatype=float,
+                                           description='nodata signal'))
+        return inputs, outputs
+
+
+class ChangePointDetector(AnomalyScorer):
+    '''
+    An unsupervised anomaly detection function.
+     Applies a spectral analysis clustering techniqueto extract features from time series data and to create z scores.
+     Moves a sliding window across the data signal and applies the anomalymodelto each window.
+     The window size is typically set to 12 data points.
+     Try several anomaly detectors on your data and use the one that fits your data best.
+    '''
+    def __init__(self, input_item, chg_pts, chg_pts_sig, chg_pts_inv):
+        super().__init__(input_item, 1, [chg_pts, chg_pts_sig, chg_pts_inv])
+
+        logger.debug(input_item)
+
+        self.whoami = 'ChangePointDetector'
+
+    def score(self, temperature):
+
+        scores = []
+        for output_item in self.output_items:
+            scores.append(np.zeros(temperature.shape))
+
+        try:
+            # Fourier transform:
+            #   frequency, time, spectral density
+            frequency_temperature, time_series_temperature, spectral_density_temperature = signal.spectrogram(
+                temperature, fs=self.frame_rate, window='hanning', nperseg=self.windowsize,
+                noverlap=self.windowoverlap, detrend='l', scaling='spectrum')
+
+            # cut off freqencies too low to fit into the window
+            frequency_temperatureb = (frequency_temperature > 2 / self.windowsize).astype(int)
+            frequency_temperature = frequency_temperature * frequency_temperatureb
+            frequency_temperature[frequency_temperature == 0] = 1 / self.windowsize
+
+            signal_energy = np.dot(spectral_density_temperature.T, frequency_temperature)
+
+            signal_energy[signal_energy < SmallEnergy] = SmallEnergy
+            inv_signal_energy = np.divide(np.ones(signal_energy.size), signal_energy)
+
+            chg_pts = []
+            algo = rpt.BottomUp(model="l2", jump=2).fit(temperature)
+            chg_pts.append(algo.predict(n_bkps=15))
+            algo2 = rpt.BottomUp(model="l2", jump=2).fit(signal_energy)
+            chg_pts.append(algo2.predict(n_bkps=15))
+            algo3 = rpt.BottomUp(model="l2", jump=2).fit(inv_signal_energy)
+            chg_pts.append(algo3.predict(n_bkps=15))
+
+            for i in range(len(chg_pts)):
+                print (i, chg_pts[i])
+                for j in chg_pts[i]:
+                    scores[i][j-1] = 1
+
+        except Exception as e:
+            logger.error(self.whoami + ' failed with ' + str(e))
+
+        return scores
+
+    @classmethod
+    def build_ui(cls):
+        # define arguments that behave as function inputs
+        inputs = []
+        inputs.append(UISingleItem(name='input_item', datatype=float, description='Data item to analyze'))
+
+        # define arguments that behave as function outputs
+        outputs = []
+        outputs.append(UIFunctionOutSingle(name='chg_pts', datatype=float, description='Change points'))
+        outputs.append(UIFunctionOutSingle(name='chg_pts_sig', datatype=float, description='Change points - signal energy'))
+        outputs.append(UIFunctionOutSingle(name='chg_pts_inv', datatype=float,
+                 description='Change points - inverted signal energy'))
+        return inputs, outputs
+
+
+
 class SpectralAnomalyScore(AnomalyScorer):
     '''
     An unsupervised anomaly detection function.
@@ -806,6 +958,14 @@ class SpectralAnomalyScore(AnomalyScorer):
             if len(self.output_items) > 1:
                 scores[1] = inv_zscore
 
+            # 3rd argument to return the raw windowed signal energy
+            if len(self.output_items) > 2:
+                scores[2] = signal_energy
+
+            # 4th argument to return the modified input argument (for no data)
+            if len(self.output_items) > 3:
+                scores[3] = temperature.copy()
+
             logger.debug(
                 'Spectral z-score max: ' + str(ets_zscore.max()) + ',   Spectral inv z-score max: ' + str(
                     inv_zscore.max()))
@@ -839,8 +999,8 @@ class SpectralAnomalyScoreExt(SpectralAnomalyScore):
      The window size is typically set to 12 data points.
      Try several anomaly detectors on your data and use the one that fits your data best.
     '''
-    def __init__(self, input_item, windowsize, output_item, inv_zscore):
-        super().__init__(input_item, windowsize, [output_item, inv_zscore])
+    def __init__(self, input_item, windowsize, output_item, inv_zscore, signal_energy):
+        super().__init__(input_item, windowsize, [output_item, inv_zscore, signal_energy])
 
         logger.debug(input_item)
 
@@ -861,7 +1021,10 @@ class SpectralAnomalyScoreExt(SpectralAnomalyScore):
             UIFunctionOutSingle(name='output_item', datatype=float, description='Spectral anomaly score (z-score)'))
         outputs.append(UIFunctionOutSingle(name='inv_zscore', datatype=float,
                                            description='z-score of inverted signal energy - detects unusually low activity'))
+        outputs.append(UIFunctionOutSingle(name='signal_enerty', datatype=float,
+                                           description='signal energy'))
         return inputs, outputs
+
 
 
 class KMeansAnomalyScore(AnomalyScorer):
@@ -1548,7 +1711,7 @@ class RobustThreshold(SupervisedLearningTransformer):
 
         self.whoami = 'RobustThreshold'
 
-        logger.info(self.whoami + ' from ' + self.input_item + ' quantile threshold ' +  self.threshold +
+        logger.info(self.whoami + ' from ' + self.input_item + ' quantile threshold ' +  str(self.threshold) +
                     ' exceeding boolean ' + self.output_item)
 
 
