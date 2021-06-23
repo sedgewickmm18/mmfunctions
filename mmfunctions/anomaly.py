@@ -14,6 +14,7 @@ The Built In Functions module contains preinstalled functions
 
 import itertools as it
 import datetime as dt
+import importlib
 import logging
 
 # for gradient boosting
@@ -620,8 +621,10 @@ class AnomalyScorer(BaseTransformer):
             logger.debug('->')
             try:
                 for i,output_item in enumerate(self.output_items):
+
                     # check for fast path, no interpolation required
                     diff = temperature.size - scores[i].size
+
                     # slow path - interpolate result score to stretch it to the size of the input data
                     if diff > 0:
                         dfe[output_item] = 0.0006
@@ -636,7 +639,6 @@ class AnomalyScorer(BaseTransformer):
                     elif diff < 0:
                         zScoreII = scores[i][0:temperature.size]
                     else:
-                        #zScoreII = scores[i].size
                         zScoreII = scores[i]
 
                     df[output_item] = zScoreII
@@ -846,8 +848,8 @@ class ChangePointDetector(AnomalyScorer):
      The window size is typically set to 12 data points.
      Try several anomaly detectors on your data and use the one that fits your data best.
     '''
-    def __init__(self, input_item, chg_pts, chg_pts_sig, chg_pts_inv):
-        super().__init__(input_item, 1, [chg_pts, chg_pts_sig, chg_pts_inv])
+    def __init__(self, input_item, windowsize, chg_pts):
+        super().__init__(input_item, windowsize, [chg_pts])
 
         logger.debug(input_item)
 
@@ -856,42 +858,24 @@ class ChangePointDetector(AnomalyScorer):
     def score(self, temperature):
 
         scores = []
-        for output_item in self.output_items:
-            scores.append(np.zeros(temperature.shape))
+
+        sc = np.zeros(temperature.shape)
 
         try:
-            # Fourier transform:
-            #   frequency, time, spectral density
-            frequency_temperature, time_series_temperature, spectral_density_temperature = signal.spectrogram(
-                temperature, fs=self.frame_rate, window='hanning', nperseg=self.windowsize,
-                noverlap=self.windowoverlap, detrend='l', scaling='spectrum')
-
-            # cut off freqencies too low to fit into the window
-            frequency_temperatureb = (frequency_temperature > 2 / self.windowsize).astype(int)
-            frequency_temperature = frequency_temperature * frequency_temperatureb
-            frequency_temperature[frequency_temperature == 0] = 1 / self.windowsize
-
-            signal_energy = np.dot(spectral_density_temperature.T, frequency_temperature)
-
-            signal_energy[signal_energy < SmallEnergy] = SmallEnergy
-            inv_signal_energy = np.divide(np.ones(signal_energy.size), signal_energy)
-
-            chg_pts = []
             algo = rpt.BottomUp(model="l2", jump=2).fit(temperature)
-            chg_pts.append(algo.predict(n_bkps=15))
-            algo2 = rpt.BottomUp(model="l2", jump=2).fit(signal_energy)
-            chg_pts.append(algo2.predict(n_bkps=15))
-            algo3 = rpt.BottomUp(model="l2", jump=2).fit(inv_signal_energy)
-            chg_pts.append(algo3.predict(n_bkps=15))
+            chg_pts = algo.predict(n_bkps=15)
 
-            for i in range(len(chg_pts)):
-                print (i, chg_pts[i])
-                for j in chg_pts[i]:
-                    scores[i][j-1] = 1
+            for j in chg_pts:
+                x = np.arange(0, temperature.shape[0], 1)
+                Gaussian = sp.stats.norm(j-1, temperature.shape[0]/20) # high precision
+                y = Gaussian.pdf(x) * temperature.shape[0]/8  # max is ~1
+
+                sc += y
 
         except Exception as e:
             logger.error(self.whoami + ' failed with ' + str(e))
 
+        scores.append(sc)
         return scores
 
     @classmethod
@@ -903,9 +887,89 @@ class ChangePointDetector(AnomalyScorer):
         # define arguments that behave as function outputs
         outputs = []
         outputs.append(UIFunctionOutSingle(name='chg_pts', datatype=float, description='Change points'))
-        outputs.append(UIFunctionOutSingle(name='chg_pts_sig', datatype=float, description='Change points - signal energy'))
-        outputs.append(UIFunctionOutSingle(name='chg_pts_inv', datatype=float,
-                 description='Change points - inverted signal energy'))
+        return inputs, outputs
+
+
+class EnsembleAnomalyScore(BaseTransformer):
+    '''
+    whatever
+    '''
+    def __init__(self, input_item, windowsize, scorers, thresholds, output_item):
+        super().__init__()
+
+        self.input_item = input_item
+        self.windowsize = windowsize
+        self.output_item = output_item
+
+        logger.debug(input_item)
+
+        self.whoami = 'EnsembleAnomalyScore'
+
+        self.list_of_scorers = scorers.split(',')
+        self.thresholds = list(map(int, thresholds.split(',')))
+
+        self.klasses = []
+        self.instances = []
+        self.output_items = []
+
+        module = importlib.import_module('mmfunctions.anomaly')
+        i = 0
+        for m in self.list_of_scorers:
+            klass = getattr(module, m)
+            self.klasses.append(klass)
+            print(klass.__name__)
+            if klass.__name__ == 'SpectralAnomalyScoreExt':
+                inst = klass(input_item, windowsize, output_item + '_count_' + str(i),
+                             output_item + '_count_' + str(i) + '_1')
+            else:
+                inst = klass(input_item, windowsize, output_item + '_count_' + str(i))
+            self.output_items.append(output_item + '_count_' + str(i))
+            self.instances.append(inst)
+            i+=1
+
+
+    def execute(self, df):
+        logger.debug('Execute ' + self.whoami)
+        df_copy = df # no copy
+
+        binned_indices_list = []
+        for inst, output, threshold in zip(self.instances, self.output_items, self.thresholds):
+            df_copy = inst.execute(df_copy)
+            arr = df_copy[output]
+            print(arr[1:3])
+
+            # sort results into bins that depend on the thresholds
+            #   0 - below 3/4 threshold, 1 - up to the threshold, 2 - crossed the threshold,
+            #     3 - very high, 4 - extreme
+            bins = [threshold * 0.75, threshold, threshold * 1.5, threshold * 2]
+            binned_indices_list.append(np.searchsorted(bins, arr, side='left'))
+
+            if inst.__class__.__name__ == 'SpectralAnomalyScorerExt':
+                arr = df_copy[output + '_1']
+                print(arr[1:3])
+                binned_indices_list.append(np.searchsorted(bins, arr, side='left'))
+
+        binned_indices = np.around(np.vstack(binned_indices_list).mean(axis=0))
+
+        # explicitly drop the columns generated by the ensemble members
+        #df[self.output_item] = binned_indices
+        df_copy[self.output_item] = binned_indices
+
+        return df_copy
+
+    @classmethod
+    def build_ui(cls):
+        # define arguments that behave as function inputs
+        inputs = []
+        inputs.append(UISingleItem(name='input_item', datatype=float, description='Data item to analyze'))
+
+        inputs.append(UISingle(name='windowsize', datatype=int,
+                               description='Size of each sliding window in data points. Typically set to 12.'))
+
+        # define arguments that behave as function outputs
+        outputs = []
+        outputs.append(
+            UIFunctionOutSingle(name='output_item', datatype=float, description='Spectral anomaly score (z-score)'))
         return inputs, outputs
 
 
@@ -999,8 +1063,11 @@ class SpectralAnomalyScoreExt(SpectralAnomalyScore):
      The window size is typically set to 12 data points.
      Try several anomaly detectors on your data and use the one that fits your data best.
     '''
-    def __init__(self, input_item, windowsize, output_item, inv_zscore, signal_energy):
-        super().__init__(input_item, windowsize, [output_item, inv_zscore, signal_energy])
+    def __init__(self, input_item, windowsize, output_item, inv_zscore, signal_energy=None):
+        if signal_energy is None:
+            super().__init__(input_item, windowsize, [output_item, inv_zscore])
+        else:
+            super().__init__(input_item, windowsize, [output_item, inv_zscore, signal_energy])
 
         logger.debug(input_item)
 
