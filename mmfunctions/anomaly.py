@@ -1278,22 +1278,27 @@ class NoDataAnomalyScore(GeneralizedAnomalyScore):
 
         # operate on simple timestamp index
         if len(dfEntity.index.names) > 1:
-            index_names = dfEntity.index.names
-            index_names = index_names[0:1] + index_names[2:]
+            index_names = dfEntity.index.names[1]
+            #index_names = index_names[0:1] + index_names[2:]
             dfe = dfEntity.reset_index(index_names)
         else:
             dfe = dfEntity
 
         # count the timedelta in seconds between two events
-        logger.info('type of index[0] is ' + str(type(dfEntity.index[0])))
-        logger.info('index[0] is ' + str(dfEntity.index[0]))
+        print('1. type of index[0] is ' + str(type(dfEntity.index[0])))
+        print('2. index[0] is ' + str(dfEntity.index[0]))
         try:
             timeSeq = (dfEntity.index.values - dfEntity.index[0].to_datetime64()) / np.timedelta64(1, 's')
         except Exception:
-            logger.info('type of index[0][0] is ' + str(type(dfEntity.index[0][0])))
-            logger.info('index[0][0] is ' + str(dfEntity.index[0][0]))
-            time_to_numpy = np.array(dfEntity.index[0])
-            timeSeq = (time_to_numpy - dfEntity.index[0][0].to_datetime64()) / np.timedelta64(1, 's')
+            print('3. type of index[0][0] is ' + str(type(dfEntity.index[0][0])))
+            print('4. index[0][0] is ' + str(dfEntity.index[0][0]))
+            try:
+                time_to_numpy = np.array(dfEntity.index[0], dtype='datetime64')
+                print('5. ', type(time_to_numpy), dfEntity.index[0][0])
+                timeSeq = (time_to_numpy - dfEntity.index[0][0].to_datetime64()) / np.timedelta64(1, 's')
+            except Exception:
+                print('Nochens')
+                timeSeq = 1.0
 
         dfe = dfEntity.copy()
 
