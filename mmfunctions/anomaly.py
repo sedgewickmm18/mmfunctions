@@ -1292,7 +1292,7 @@ class NoDataAnomalyScore(GeneralizedAnomalyScore):
         except Exception:
             logger.info('type of index[0][0] is ' + str(type(dfEntity.index[0][0])))
             logger.info('index[0][0] is ' + str(dfEntity.index[0][0]))
-            time_to_numpy = np.array(dfEntity.index[0].values)
+            time_to_numpy = np.array(dfEntity.index[0])
             timeSeq = (time_to_numpy - dfEntity.index[0][0]) / np.timedelta64(1, 's')
 
         dfe = dfEntity.copy()
