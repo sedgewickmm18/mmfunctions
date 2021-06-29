@@ -1286,9 +1286,12 @@ class NoDataAnomalyScore(GeneralizedAnomalyScore):
 
         # count the timedelta in seconds between two events
         logger.info('type of index[0] is ' + str(type(dfEntity.index[0])))
+        logger.info('index[0] is ' + str(dfEntity.index[0]))
         try:
             timeSeq = (dfEntity.index.values - dfEntity.index[0].to_datetime64()) / np.timedelta64(1, 's')
         except Exception:
+            logger.info('type of index[0][0] is ' + str(type(dfEntity.index[0][0])))
+            logger.info('index[0][0] is ' + str(dfEntity.index[0][0]))
             timeSeq = (dfEntity.index.values - dfEntity.index[0][0].to_datetime64()) / np.timedelta64(1, 's')
 
         dfe = dfEntity.copy()
