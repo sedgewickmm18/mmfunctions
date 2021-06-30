@@ -808,9 +808,9 @@ class NoDataAnomalyScoreExt(AnomalyScorer):
             dfe = dfEntity
 
         # count the timedelta in seconds between two events
-        timeSeq = (dfEntity.index.values - dfEntity.index[0].to_datetime64()) / np.timedelta64(1, 's')
+        timeSeq = (dfe.index.values - dfe.index[0].to_datetime64()) / np.timedelta64(1, 's')
 
-        dfe = dfEntity.copy()
+        #dfe = dfEntity.copy()
 
         # one dimensional time series - named temperature for catchyness
         #   we look at the gradient of the time series timestamps for anomaly detection
@@ -1278,29 +1278,28 @@ class NoDataAnomalyScore(GeneralizedAnomalyScore):
 
         # operate on simple timestamp index
         if len(dfEntity.index.names) > 1:
-            index_names = dfEntity.index.names[1]
-            #index_names = index_names[0:1] + index_names[2:]
+            index_names = dfEntity.index.names[1:]
             dfe = dfEntity.reset_index(index_names)
         else:
             dfe = dfEntity
 
         # count the timedelta in seconds between two events
-        print('1. type of index[0] is ' + str(type(dfEntity.index[0])))
-        print('2. index[0] is ' + str(dfEntity.index[0]))
+        print('1. type of index[0] is ' + str(type(dfe.index[0])))
+        print('2. index[0] is ' + str(dfe.index[0]))
         try:
-            timeSeq = (dfEntity.index.values - dfEntity.index[0].to_datetime64()) / np.timedelta64(1, 's')
+            timeSeq = (dfe.index.values - dfe.index[0].to_datetime64()) / np.timedelta64(1, 's')
         except Exception:
-            print('3. type of index[0][0] is ' + str(type(dfEntity.index[0][0])))
-            print('4. index[0][0] is ' + str(dfEntity.index[0][0]))
+            print('3. type of index[0][0] is ' + str(type(dfe.index[0][0])))
+            print('4. index[0][0] is ' + str(dfe.index[0][0]))
             try:
-                time_to_numpy = np.array(dfEntity.index[0], dtype='datetime64')
-                print('5. ', type(time_to_numpy), dfEntity.index[0][0])
-                timeSeq = (time_to_numpy - dfEntity.index[0][0].to_datetime64()) / np.timedelta64(1, 's')
+                time_to_numpy = np.array(dfe.index[0], dtype='datetime64')
+                print('5. ', type(time_to_numpy), dfe.index[0][0])
+                timeSeq = (time_to_numpy - dfe.index[0][0].to_datetime64()) / np.timedelta64(1, 's')
             except Exception:
                 print('Nochens')
                 timeSeq = 1.0
 
-        dfe = dfEntity.copy()
+        #dfe = dfEntity.copy()
 
         # one dimensional time series - named temperature for catchyness
         #   we look at the gradient of the time series timestamps for anomaly detection
