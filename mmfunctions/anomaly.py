@@ -1808,6 +1808,7 @@ class RobustThreshold(SupervisedLearningTransformer):
 
     def execute(self, df):
         # set output columns to zero
+        logger.debug('Called ' + self.whoami + ' with columns: ' + str(df.columns))
         df[self.output_item] = 0
         return super().execute(df)
 

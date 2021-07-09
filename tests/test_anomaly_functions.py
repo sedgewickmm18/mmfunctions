@@ -12,7 +12,7 @@ from iotfunctions.bif import AggregateWithExpression
 
 from mmfunctions.anomaly import (SaliencybasedGeneralizedAnomalyScore, SpectralAnomalyScore, NoDataAnomalyScore,
                                  FFTbasedGeneralizedAnomalyScore, KMeansAnomalyScore, MatrixProfileAnomalyScore)
-from nose.tools import assert_true
+from nose.tools import (assert_true, nottest)
 
 logger = logging.getLogger('Test Regressor')
 
@@ -28,7 +28,7 @@ mat = 'TemperatureMatrixProfileScore'
 nod = 'TemperatureNoDataScore'
 
 
-#@nottest
+@nottest
 class DatabaseDummy:
     tenant_id = '###_IBM_###'
     db_type = 'db2'
@@ -119,7 +119,6 @@ def test_anomaly_scores():
 
     # assert_true(comp2[kmeans] > 0.9)
     df_agg = df_i.copy()
-    df_agg['site'] = 'Munich'
 
     # build closure from aggregation class
     func = AggregateWithExpression
@@ -145,7 +144,7 @@ def test_anomaly_scores():
 
 
     jobsettings = { 'db': db, '_db_schema': 'public'} #, 'save_trace_to_file' : True}
-    EngineLogging.configure_console_logging(logging.DEBUG)
+    #EngineLogging.configure_console_logging(logging.DEBUG)
 
     #aggobj = Aggregation(None, ids=['entity'], timestamp='timestamp', granularity=('5T', (Temperature,), True, 0),
     #                simple_aggregators=[([Temperature], func_clos, TempDiff)])
@@ -154,7 +153,9 @@ def test_anomaly_scores():
     et = aggobj._build_entity_type(columns=[Column(Temperature, Float())], **jobsettings)
     df_agg = aggobj.execute(df=df_agg)
 
-    print("----->", df_agg.index, df_agg.columns)
+    df_agg['site'] = 'Munich'
+    df_agg = df_agg.set_index('site', append=True)
+    print("----->", df_agg.index.names, df_agg.columns)
 
 
     # add frequency to time
@@ -197,7 +198,8 @@ def test_anomaly_scores():
     nodi._entity_type = et
     df_agg = nodi.execute(df=df_agg)
 
-    print(df_agg.describe())
+    print(df_agg.index, df_agg.describe())
+    print(df_agg.index)
 
     '''
     # useless because df_o contains the non aggregated scores
