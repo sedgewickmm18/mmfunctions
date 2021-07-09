@@ -1757,6 +1757,7 @@ class KDEMaxMin:
         self.Max = None
 
     def fit(self, X, alpha):
+
         self.kde.fit(X.reshape(-1,1))
 
         kde_X = self.kde.score_samples(X.reshape(-1,1))
@@ -1824,16 +1825,21 @@ class RobustThreshold(SupervisedLearningTransformer):
 
         if robust_model is None and self.auto_train:
             robust_model = KDEMaxMin(version=version)
-            robust_model.fit(feature, self.threshold)
             try:
+                robust_model.fit(feature, self.threshold)
                 db.model_store.store_model(model_name, robust_model)
             except Exception as e:
                 logger.error('Model store failed with ' + str(e))
+                robust_model = None
 
-        self.Min[entity] = robust_model.Min
-        self.Max[entity] = robust_model.Max
+        if robust_model is not None:
+            self.Min[entity] = robust_model.Min
+            self.Max[entity] = robust_model.Max
 
-        df[self.output_item] = robust_model.predict(feature, self.threshold)
+            df[self.output_item] = robust_model.predict(feature, self.threshold)
+        else:
+            df[self.output_item] = 0
+
         return df.droplevel(0)
 
 
