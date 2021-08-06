@@ -2103,12 +2103,12 @@ class GBMRegressor(BaseEstimatorFunction):
         # from https://github.com/ashitole/Time-Series-Project/blob/main/Auto-Arima%20and%20LGBM.ipynb
         #   as taken from https://www.kaggle.com/rohanrao/ashrae-half-and-half
         #
-        n_estimators = 500
-        num_leaves = 40
-        learning_rate = 0.2   # default 0.001
+        self.n_estimators = n_estimators  # 500
+        self.num_leaves = num_leaves    # 40
+        self.learning_rate = learning_rate #0.2   # default 0.001
         feature_fraction = 0.85  # default 1.0
         reg_lambda = 2  # default 0
-        max_depth = -1
+        self.max_depth = max_depth # -1
         self.lagged_features = features
         self.lags = lags
 
@@ -2129,11 +2129,15 @@ class GBMRegressor(BaseEstimatorFunction):
         self.parameter_tuning_iterations = 1
         self.cv = 1
 
-        self.params = {'gbm__n_estimators': [n_estimators], 'gbm__num_leaves': [num_leaves],
-                       'gbm__learning_rate': [learning_rate], 'gbm__max_depth': [max_depth], 'gbm__verbosity': [2]}
+        self.set_parameters()
 
         self.stop_auto_improve_at = -2
         self.whoami = 'GBMRegressor'
+
+
+    def set_parameters(self):
+        self.params = {'gbm__n_estimators': [self.n_estimators], 'gbm__num_leaves': [self.num_leaves],
+                       'gbm__learning_rate': [self.learning_rate], 'gbm__max_depth': [self.max_depth], 'gbm__verbosity': [2]}
 
     #
     # forecasting support
