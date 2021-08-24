@@ -788,8 +788,8 @@ class NoDataAnomalyScoreExt(AnomalyScorer):
      The function moves a sliding window across the data signal and applies the anomaly model to each window.
      The window size is typically set to 12 data points.
     """
-    def __init__(self, input_item, output_item, nodata_signal):
-        super().__init__(input_item, 1, [output_item, nodata_signal])
+    def __init__(self, input_item, windowsize, output_item):
+        super().__init__(input_item, windowsize, [output_item])
 
         self.whoami = 'NoDataExt'
         self.normalizer = 1
