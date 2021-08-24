@@ -11,7 +11,8 @@ from iotfunctions.aggregate import (Aggregation, add_simple_aggregator_execute)
 from iotfunctions.bif import AggregateWithExpression
 
 from mmfunctions.anomaly import (SaliencybasedGeneralizedAnomalyScore, SpectralAnomalyScore, NoDataAnomalyScore,
-                                 FFTbasedGeneralizedAnomalyScore, KMeansAnomalyScore, MatrixProfileAnomalyScore)
+                                 FFTbasedGeneralizedAnomalyScore, KMeansAnomalyScore, MatrixProfileAnomalyScore,
+                                 NoDataAnomalyScoreExt)
 from nose.tools import (assert_true, nottest)
 
 logger = logging.getLogger('Test Regressor')
@@ -26,6 +27,7 @@ sal = 'SaliencyAnomalyScore'
 gen = 'TemperatureGeneralizedScore'
 mat = 'TemperatureMatrixProfileScore'
 nod = 'TemperatureNoDataScore'
+nodext = 'TemperatureNoDataScoreExt'
 
 
 @nottest
@@ -94,6 +96,12 @@ def test_anomaly_scores():
     et = nodi._build_entity_type(columns=[Column(Temperature, Float())])
     nodi._entity_type = et
     df_comp = nodi.execute(df=df_i)
+
+    print('Compute NoData Anomaly Score Extended')
+    nodiext = NoDataAnomalyScoreExt(Temperature, 12, nodext)
+    et = nodiext._build_entity_type(columns=[Column(Temperature, Float())])
+    nodiext._entity_type = et
+    df_comp = nodiext.execute(df=df_i)
 
     print("Executed Anomaly functions")
 
@@ -218,4 +226,4 @@ def test_anomaly_scores():
 
 
 # uncomment to run from the command line
-test_anomaly_scores()
+#test_anomaly_scores()

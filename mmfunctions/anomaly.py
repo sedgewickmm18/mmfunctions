@@ -832,12 +832,13 @@ class NoDataAnomalyScoreExt(AnomalyScorer):
         # define arguments that behave as function inputs
         inputs = []
         inputs.append(UISingleItem(name='input_item', datatype=float, description='Data item to analyze'))
+
+        inputs.append(UISingle(name='windowsize', datatype=int,
+                               description='Size of each sliding window in data points. Typically set to 12.'))
+
         # define arguments that behave as function outputs
         outputs = []
-        outputs.append(
-            UIFunctionOutSingle(name='output_item', datatype=float, description='Plain z-score'))
-        outputs.append(UIFunctionOutSingle(name='nodata_signal', datatype=float,
-                                           description='nodata signal'))
+        outputs.append(UIFunctionOutSingle(name='output_item', datatype=float, description='No data anomaly score'))
         return inputs, outputs
 
 
