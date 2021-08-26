@@ -1,8 +1,8 @@
 # *****************************************************************************
-# © Copyright IBM Corp. 2018-2020.  All Rights Reserved.
+# © Copyright IBM Corp. 2018-2021.  All Rights Reserved.
 #
 # This program and the accompanying materials
-# are made available under the terms of the Apache V2.0
+# are made available under the terms of the Apache V2.0 license
 # which accompanies this distribution, and is available at
 # http://www.apache.org/licenses/LICENSE-2.0
 #
@@ -61,9 +61,6 @@ from iotfunctions.ui import (UISingle, UIMulti, UIMultiItem, UIFunctionOutSingle
 import torch
 import torch.autograd
 import torch.nn as nn
-
-# WML
-from ibm_watson_machine_learning import APIClient
 
 logger = logging.getLogger(__name__)
 logger.info('IOT functions version ' + iotfunctions.__version__)
@@ -1285,13 +1282,11 @@ class NoDataAnomalyScore(GeneralizedAnomalyScore):
             dfe = dfEntity
 
         # count the timedelta in seconds between two events
-        print('1. type of index[0] is ' + str(type(dfe.index[0])))
-        print('2. index[0] is ' + str(dfe.index[0]))
+        logger.debug('type of index[0] is ' + str(type(dfEntity.index[0])))
+
         try:
             timeSeq = (dfe.index.values - dfe.index[0].to_datetime64()) / np.timedelta64(1, 's')
         except Exception:
-            print('3. type of index[0][0] is ' + str(type(dfe.index[0][0])))
-            print('4. index[0][0] is ' + str(dfe.index[0][0]))
             try:
                 time_to_numpy = np.array(dfe.index[0], dtype='datetime64')
                 print('5. ', type(time_to_numpy), dfe.index[0][0])
@@ -3006,214 +3001,6 @@ class VIAnomalyScore(SupervisedLearningTransformer):
         # define arguments that behave as function outputs
         outputs = []
         return inputs, outputs
-
-#######################################################################################
-# Call to deployed WML model
-#######################################################################################
-
-class InvokeWMLModel(BaseTransformer):
-    '''
-    _allow_empty_df = True  # allow this task to run even if it receives no incoming data
-    produces_output_items = False  # this task does not contribute new data items
-    requires_input_items = True  # this task does not require dependent data items
-    '''
-    def __init__(self, input_items, wml_auth, output_items):
-        super().__init__()
-
-        logger.debug(input_items)
-
-        self.whoami = 'InvokeWMLModel'
-
-        self.input_items = input_items
-        self.output_items = output_items
-        self.wml_auth = wml_auth
-
-        self.deployment_id = None
-        self.apikey = None
-        self.wml_endpoint = None
-        self.space_id = None
-
-        self.client = None
-
-        self.logged_on = False
-
-
-    def __str__(self):
-        out = self.__class__.__name__
-        try:
-            out = out + 'Input: ' + str(self.input_items) + '\n'
-            out = out + 'Output: ' + str(self.output_items) + '\n'
-
-            if self.wml_auth is not None:
-                out = out + 'WML auth: ' + str(self.wml_auth) + '\n'
-            else:
-                out = out + 'APIKey: ' + str(self.apikey) + '\n'
-                out = out + 'WML endpoint: ' + str(self.wml_endpoint) + '\n'
-                out = out + 'WML space id: ' + str(self.space_id) + '\n'
-                out = out + 'WML deployment id: ' + str(self.deployment_id) + '\n'
-        except Exception:
-            pass
-        return out
-
-
-    def login(self):
-
-        # only do it once
-        if self.logged_on:
-            return
-
-        # retrieve WML credentials as constant
-        #    {"apikey": api_key, "url": 'https://' + location + '.ml.cloud.ibm.com'}
-        if self.wml_auth is not None:
-            c = self._entity_type.get_attributes_dict()
-            try:
-                wml_credentials = c[self.wml_auth]
-                print('WML Credentials ' , str(wml_credentials))
-            except Exception as ae:
-                wml_credentials = {'apikey': self.apikey , 'url': self.wml_endpoint, 'space_id': self.space_id}
-                logger.error('WML Credentials constant ' + self.wml_auth + ' not present. Error ' + str(ae))
-                pass
-            self.deployment_id = wml_credentials['deployment_id']
-            self.space_id = wml_credentials['space_id']
-        else:
-            wml_credentials = {'apikey': self.apikey , 'url': self.wml_endpoint, 'space_id': self.space_id}
-
-        # get client and check credentials
-        self.client = APIClient(wml_credentials)
-        # ToDo - test return and error msg
-        if self.client is None:
-            logger.error('WML API Key invalid')
-            raise RuntimeError("WML API Key invalid")
-
-        # set space
-        self.client.set.default_space(wml_credentials['space_id'])
-
-        # check deployment
-        deployment_details = self.client.deployments.get_details(self.deployment_id, 1)
-        # ToDo - test return and error msg
-        logger.debug('Deployment Details check results in ' + str(deployment_details))
-
-        self.logged_on = True
-
-
-    def execute(self, df):
-
-        logger.info('InvokeWML exec')
-
-        # Create missing columns before doing group-apply
-        df = df.copy()
-        missing_cols = [x for x in (self.output_items) if x not in df.columns]
-        for m in missing_cols:
-            df[m] = None
-
-        self.login()
-
-        return super().execute(df)
-
-    def _calc(self, df):
-
-        if (len(self.input_items) == 1):
-            logging.debug('reformating column ' + str(self.input_items))
-            s_df = df[self.input_items]
-            #rows = [list(r) for i,r in s_df.iterrows()]
-            rows = df[self.input_items].values.tolist()
-            scoring_payload = {
-                'input_data': [{
-                    'fields': self.input_items,
-                    'values': rows}]
-            }
-
-        elif (len(self.input_items) > 1):
-            s_df = df[self.input_items]
-            #rows = [list(r) for i,r in s_df.iterrows()]
-            rows = df[self.input_items].values.tolist()
-            scoring_payload = {
-                'input_data': [{
-                    'fields': self.input_items,
-                    'values': rows}]
-            }
-        else:
-            logging.error("no input columns provided, forwarding all")
-            return df
-
-        logging.debug('payload ' + str(scoring_payload))
-
-        results = self.client.deployments.score(self.deployment_id, scoring_payload)
-
-        if results:
-            df[self.output_items] = np.array(results['predictions'][0]['values']).flatten()
-        else:
-            logging.error('error invoking external model')
-
-        return df
-
-    @classmethod
-    def build_ui(cls):
-        #define arguments that behave as function inputs
-        inputs = []
-        inputs.append(UIMultiItem(name = 'input_items', datatype=float,
-                                  description = "Data items adjust", is_output_datatype_derived = True))
-        inputs.append(UISingle(name='wml_auth', datatype=str,
-                               description='Endpoint to WML service where model is hosted', tags=['TEXT'], required=True))
-
-        # define arguments that behave as function outputs
-        outputs=[]
-        outputs.append(UISingle(name='output_items', datatype=float))
-        return (inputs, outputs)
-
-
-class InvokeWMLModelOrig(BaseTransformer):
-    '''
-    _allow_empty_df = True  # allow this task to run even if it receives no incoming data
-    produces_output_items = False  # this task does not contribute new data items
-    requires_input_items = True  # this task does not require dependent data items
-    '''
-    def __init__(self, input_items, wml_endpoint, space_id, deployment_id, apikey, output_items):
-    #def __init__(self, wml_endpoint, space_id, deployment_id, apikey, input_items, output_items):
-
-        super().__init__(None, input_items, output_items)
-
-        logger.debug(input_items)
-
-        self.whoami = 'InvokeWMLModelOrig'
-
-        self.deployment_id = deployment_id
-        self.apikey = apikey
-        self.wml_endpoint = wml_endpoint
-        self.space_id = space_id
-
-        # auth as documented here https://dataplatform.cloud.ibm.com/docs/content/wsj/analyze-data/ml-authentication.html
-        #   to be pulled from a tenant constant
-
-        # override
-        #self.deployment_id = '901aa001-5cc6-4cce-99c9-6d04a3dda1f9'
-        #self.apikey = 'NrJN6HE48DSIehKDpV-w-7ektZvusgDGhTzq1VsizqvS'
-        #self.wml_endpoint = 'https://us-south.ml.cloud.ibm.com'
-        #self.space_id = '5f799467-25dc-4c98-8556-0dadbac73d12'
-
-
-        self.scoring_endpoint = None
-
-    @classmethod
-    def build_ui(cls):
-        #define arguments that behave as function inputs
-        inputs = []
-        inputs.append(UIMultiItem(name = 'input_items', datatype=float,
-                                  description = "Data items adjust", is_output_datatype_derived = True))
-        inputs.append(UISingle(name='wml_endpoint', datatype=str,
-                               description='Endpoint to WML service where model is hosted', tags=['TEXT'], required=True))
-        inputs.append(UISingle(name='space_id', datatype=str,
-                               description='Space ID for the WML project', tags=['TEXT'], required=True))
-        inputs.append(UISingle(name='deployment_id', datatype=str,
-                               description='Deployment ID for WML model', tags=['TEXT'], required=True))
-        inputs.append(UISingle(name='apikey', datatype=str,
-                               description='IBM Cloud API Key', tags=['TEXT'], required=True))
-
-        # define arguments that behave as function outputs
-        outputs=[]
-        outputs.append(UISingle(name='output_items', datatype=float))
-        return (inputs, outputs)
-
 
 #######################################################################################
 # Crude change point detection
