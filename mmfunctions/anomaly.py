@@ -29,8 +29,10 @@ import ruptures as rpt
 # for Spectral Analysis
 from scipy import signal, fftpack
 
+import skimage as ski
+from skimage import util as skiutil # for nifty windowing
+
 # for KMeans
-# from skimage import util as skiutil  # for nifty windowing
 from sklearn import ensemble
 from sklearn import linear_model
 from sklearn import metrics
@@ -84,7 +86,7 @@ Generalized_normalizer = 1 / 300
 
 # from
 # https://stackoverflow.com/questions/44790072/sliding-window-on-time-series-data
-def view_as_windows(temperature, length, step):
+def view_as_windows1(temperature, length, step):
     logger.info('VIEW ' + str(temperature.shape) + ' ' + str(length) + ' ' + str(step))
 
     def moving_window(x, length, _step=1):
@@ -96,6 +98,10 @@ def view_as_windows(temperature, length, step):
 
     x_ = list(moving_window(temperature, length, step))
     return np.asarray(x_)
+
+
+def view_as_windows(temperature, length, step):
+    return skiutil.view_as_windows(temperature, window_shape=(length,), step=step)
 
 
 def custom_resampler(array_like):
