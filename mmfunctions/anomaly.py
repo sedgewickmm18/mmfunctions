@@ -1405,7 +1405,9 @@ if iotfunctions.__version__ != '8.2.1':
                 scores.append(np.zeros(temperature.shape))
 
             try:  # calculate scores
-                matrix_profile = stumpy.aamp(temperature, m=self.windowsize)[:, 0]
+                # replaced aamp with stump for stumpy 1.8.0 and above
+                #matrix_profile = stumpy.aamp(temperature, m=self.windowsize)[:, 0]
+                matrix_profile = stumpy.stump(temperature, m=self.windowsize, normalize=False)[:, 0]
                 # fill in a small value for newer data points outside the last possible window
                 fillers = np.array([self.DATAPOINTS_AFTER_LAST_WINDOW] * (self.windowsize - 1))
                 matrix_profile = np.append(matrix_profile, fillers)
