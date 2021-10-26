@@ -6,4 +6,4 @@
 	url = https://github.com/sedgewickmm18/telemanom.git
 [submodule "tf-levenberg-marquardt"]
 	path = tf-levenberg-marquardt
-	url = ssh://git@github.com/sedgewickmm18/tf-levenberg-marquardt
+	url = https://github.com/sedgewickmm18/tf-levenberg-marquardt
