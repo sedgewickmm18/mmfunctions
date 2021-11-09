@@ -18,7 +18,7 @@ import numpy as np
 import pandas as pd
 from pandas.tseries.offsets import MonthEnd
 
-from .loader import _generate_metadata
+from iotfunctions.loader import _generate_metadata, BaseLoader
 
 from iotfunctions.util import log_data_frame
 from iotfunctions.metadata import DATA_ITEM_KPI_FUNCTION_DTO_KEY
@@ -46,13 +46,7 @@ TYPE_OUTPUT_COLUMN_MAP = {DATA_ITEM_DATATYPE_BOOLEAN: OUTPUT_COLUMN_NAME_VALUE_B
                           DATA_ITEM_DATATYPE_TIMESTAMP: OUTPUT_COLUMN_NAME_VALUE_TIMESTAMP}
 
 
-class LoadColumnsFromHigherGrain:
-
-    def _set_dms(self, dms):
-        self.dms = dms
-
-    def _get_dms(self):
-        return self.dms
+class LoadColumnsFromHigherGrain(BaseLoader):
 
     NEW_TIMESTAMP_COLUMN = "###IBM###_TIMESTAMPS_FROM_INDEX"
 
@@ -66,6 +60,8 @@ class LoadColumnsFromHigherGrain:
             {'name': 'names', 'description': 'The names of the new data items.'}], 'tags': ['JUPYTER']})
 
     def __init__(self, names, data_item_names):
+        super().__init__()
+        
         self.logger = logging.getLogger('%s.%s' % (self.__module__, self.__class__.__name__))
 
         if data_item_names is not None and isinstance(data_item_names, str):
