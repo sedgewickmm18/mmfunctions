@@ -167,11 +167,8 @@ class LoadColumnsFromHigherGrain(BaseLoader):
             df_index_names = df.index.names
             df = df.reset_index()
 
-            loaded_df_index_names = loaded_df.index.names
-            loaded_df.reset_index(inplace=True)
-
             df = df.merge(loaded_df, left_on=[self.dms.entityIdName, self.NEW_TIMESTAMP_COLUMN],
-                          right_on=loaded_df_index_names, how='left')
+                          right_on=[self.dms.entityIdName, self.dms.eventTimestampName], how='left')
 
             df.set_index(keys=df_index_names, inplace=True)
 
