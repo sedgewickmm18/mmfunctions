@@ -163,15 +163,18 @@ class LoadColumnsFromHigherGrain(BaseLoader):
                                                    None)
 
             # Merge loaded_df into df by matching entity ids and timestamps of loaded df with modified event
-            # timestamps of df
+            # timestamps of df.
             df_index_names = df.index.names
             df = df.reset_index()
 
+            loaded_df.rename(columns={self.dms.eventTimestampName: self.NEW_TIMESTAMP_COLUMN}, inplace=True)
+
             df = df.merge(loaded_df, left_on=[self.dms.entityIdName, self.NEW_TIMESTAMP_COLUMN],
-                          right_on=[self.dms.entityIdName, self.dms.eventTimestampName], how='left')
+                          right_on=[self.dms.entityIdName, self.NEW_TIMESTAMP_COLUMN], how='left')
 
             df.set_index(keys=df_index_names, inplace=True)
-
+            log_data_frame('df after merge of higher grain ',df.head(30))   # kohlmann remove
+            df.drop(columns=[self.NEW_TIMESTAMP_COLUMN], inplace=True)
         else:
             # Empty data frame, just add columns for consistency
             for output_item_name in self.output_item_names:
