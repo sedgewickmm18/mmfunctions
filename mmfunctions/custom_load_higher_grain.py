@@ -87,7 +87,7 @@ class LoadColumnsFromHigherGrain(BaseLoader):
         self.output_item_names = names
         self.delta = None
 
-    def execute(self, df):
+    def execute(self, df, start_ts, end_ts, entities):
 
         # Find metadata for data_item_names and create mapping between output_item_names and column names of data_items
         output_item_name_to_column_name = {}
