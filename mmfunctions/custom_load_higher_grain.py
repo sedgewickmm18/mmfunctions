@@ -25,6 +25,10 @@ from iotfunctions.metadata import DATA_ITEM_KPI_FUNCTION_DTO_KEY
 
 logger = logging.getLogger(__name__)
 
+DATA_ITEM_COLUMN_NAME_KEY = 'columnName'
+DATA_ITEM_SOURCETABLE_KEY = 'sourceTableName'
+KPI_FUNCTION_GRANULARITY_KEY = 'granularityName'
+
 DATA_ITEM_DATATYPE_BOOLEAN = 'BOOLEAN'
 DATA_ITEM_DATATYPE_NUMBER = 'NUMBER'
 DATA_ITEM_DATATYPE_LITERAL = 'LITERAL'
@@ -61,7 +65,7 @@ class LoadColumnsFromHigherGrain(BaseLoader):
 
     def __init__(self, names, data_item_names):
         super().__init__()
-        
+
         self.logger = logging.getLogger('%s.%s' % (self.__module__, self.__class__.__name__))
 
         if data_item_names is not None and isinstance(data_item_names, str):
@@ -95,11 +99,11 @@ class LoadColumnsFromHigherGrain(BaseLoader):
         frequency = None
         for data_item_name, output_item_name in zip(self.data_item_names, self.output_item_names):
             required_data_item = self.dms.data_items.get(data_item_name)
-            required_column_name = required_data_item.get(self.dms.DATA_ITEM_COLUMN_NAME_KEY)
+            required_column_name = required_data_item.get(DATA_ITEM_COLUMN_NAME_KEY)
             output_item_name_to_column_name[output_item_name] = required_column_name
 
-            tmp_table_name = required_data_item.get(self.dms.DATA_ITEM_SOURCETABLE_KEY)
-            grain = required_data_item.get(DATA_ITEM_KPI_FUNCTION_DTO_KEY).get(self.dms.KPI_FUNCTION_GRANULARITY_KEY)
+            tmp_table_name = required_data_item.get(DATA_ITEM_SOURCETABLE_KEY)
+            grain = required_data_item.get(DATA_ITEM_KPI_FUNCTION_DTO_KEY).get(KPI_FUNCTION_GRANULARITY_KEY)
             if grain is not None:
                 tmp_frequency = grain[0]
                 if tmp_frequency is None or len(tmp_frequency) == 0:
