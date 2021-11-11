@@ -225,15 +225,14 @@ class LoadColumnsFromHigherGrain(BaseLoader):
                                     columns=OUTPUT_COLUMN_NAME_KEY)
 
                 # Rename columns to name of data items
-                col_data_item_mapping = {y: x for x, y in data_item_col_mapping.items()}
-                df.rename(columns=col_data_item_mapping, inplace=True, errors='ignore')
+                df.rename(columns=data_item_col_mapping, inplace=True, errors='ignore')
             else:
                 df = pd.DataFrame(columns=[OUTPUT_COLUMN_NAME_ENTITY_ID, OUTPUT_COLUMN_NAME_TIMESTAMP])
                 df = df.astype({OUTPUT_COLUMN_NAME_ENTITY_ID: str, OUTPUT_COLUMN_NAME_TIMESTAMP: 'datetime64[ns]'})
                 df.set_index(keys=[OUTPUT_COLUMN_NAME_ENTITY_ID, OUTPUT_COLUMN_NAME_TIMESTAMP], inplace=True)
             # Add columns for missing metrics (metric might be missing when there was no value for this metric in the
             # given time frame in the output table)
-            missing_cols = set(data_item_col_mapping.keys()).difference(df.columns)
+            missing_cols = set(data_item_col_mapping.values()).difference(df.columns)
             for missing_column in missing_cols:
                 df[missing_column] = np.nan
 
