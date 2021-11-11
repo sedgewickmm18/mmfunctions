@@ -94,16 +94,15 @@ class LoadColumnsFromHigherGrain(BaseLoader):
     def execute(self, df, start_ts, end_ts, entities):
 
         # Find metadata for data_item_names and create mapping between output_item_names and column names of data_items
-        output_item_name_to_column_name = {}
+        input_name_to_output_name = {}
         table_name = None
         frequency = None
         for data_item_name, output_item_name in zip(self.data_item_names, self.output_item_names):
-            required_data_item = self.dms.data_items.get(data_item_name)
-            required_column_name = required_data_item.get(DATA_ITEM_COLUMN_NAME_KEY)
-            output_item_name_to_column_name[output_item_name] = required_column_name
+            input_name_to_output_name[data_item_name] = output_item_name
 
-            tmp_table_name = required_data_item.get(DATA_ITEM_SOURCETABLE_KEY)
-            grain = required_data_item.get(DATA_ITEM_KPI_FUNCTION_DTO_KEY).get(KPI_FUNCTION_GRANULARITY_KEY)
+            requested_data_item = self.dms.data_items.get(data_item_name)
+            tmp_table_name = requested_data_item.get(DATA_ITEM_SOURCETABLE_KEY)
+            grain = requested_data_item.get(DATA_ITEM_KPI_FUNCTION_DTO_KEY).get(KPI_FUNCTION_GRANULARITY_KEY)
             if grain is not None:
                 grain = self.dms.granularities.get(grain)
                 tmp_frequency = grain[0]
@@ -159,7 +158,7 @@ class LoadColumnsFromHigherGrain(BaseLoader):
             latest_timestamp = df[self.NEW_TIMESTAMP_COLUMN].max()
 
             # load required data items from table
-            loaded_df = self._get_calc_metric_data({DATA_ITEM_DATATYPE_NUMBER: output_item_name_to_column_name},
+            loaded_df = self._get_calc_metric_data({DATA_ITEM_DATATYPE_NUMBER: input_name_to_output_name},
                                                    self.dms.schema, table_name, earliest_timestamp, latest_timestamp,
                                                    None)
 
@@ -174,7 +173,7 @@ class LoadColumnsFromHigherGrain(BaseLoader):
                           right_on=[self.dms.entityIdName, self.NEW_TIMESTAMP_COLUMN], how='left')
 
             df.set_index(keys=df_index_names, inplace=True)
-            log_data_frame('df after merge of higher grain ',df.head(30))   # kohlmann remove
+            log_data_frame('df after merge of higher grain ', df.head(30))   # kohlmann remove
             df.drop(columns=[self.NEW_TIMESTAMP_COLUMN], inplace=True)
         else:
             # Empty data frame, just add columns for consistency
