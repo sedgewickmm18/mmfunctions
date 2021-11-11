@@ -105,6 +105,7 @@ class LoadColumnsFromHigherGrain(BaseLoader):
             tmp_table_name = required_data_item.get(DATA_ITEM_SOURCETABLE_KEY)
             grain = required_data_item.get(DATA_ITEM_KPI_FUNCTION_DTO_KEY).get(KPI_FUNCTION_GRANULARITY_KEY)
             if grain is not None:
+                grain = self.dms.granularities.get(grain)
                 tmp_frequency = grain[0]
                 if tmp_frequency is None or len(tmp_frequency) == 0:
                     raise RuntimeError(f"Catalog function {self.__class__.__name__} cannot handle data items with "
