@@ -40,6 +40,7 @@ from sklearn.covariance import MinCovDet
 from sklearn.neighbors import (KernelDensity, LocalOutlierFactor)
 from sklearn.pipeline import Pipeline, TransformerMixin
 from sklearn.model_selection import train_test_split
+from sklearn.mixture import BayesianGaussianMixture
 from sklearn.preprocessing import (StandardScaler, RobustScaler, MinMaxScaler,
                                    minmax_scale, PolynomialFeatures)
 from sklearn.utils import check_array
@@ -50,6 +51,7 @@ if iotfunctions.__version__ != '8.2.1':
     import stumpy
 
 import statsmodels.api as sm
+from statsmodels.nonparametric.kde import KDEUnivariate
 from statsmodels.nonparametric.kernel_density import KDEMultivariate
 from statsmodels.tsa.arima.model import ARIMA
 # EXCLUDED until we upgrade to statsmodels 0.12
@@ -2616,6 +2618,103 @@ class ARIMAForecaster(SupervisedLearningTransformer):
         outputs.append(UIFunctionOutSingle(name='output_item', datatype=float, description='Interpolated data'))
         return inputs, outputs
 
+class GMMAnomalyScore(SupervisedLearningTransformer):
+    """
+    A supervised anomaly detection function.
+     Uses an additive Gaussian mixed model to assign an anomaly score
+    """
+    def __init__(self, input_item, modality, deviation, output_item):
+        logger.debug("init KDE Estimator")
+        self.name = 'GMMAnomalyScore'
+        self.whoami= 'GMMAnomalyScore'
+        super().__init__([input_item], [output_item])
+
+        self.modality = modality   # default: 2 - bimodal
+        self.deviation = deviation  # default: 3 - stddevs away
+        self.active_models = dict()
+        self.predictions = [output_item]
+
+    def execute(self, df):
+
+        # Create missing columns before doing group-apply
+        df = df.copy()
+        missing_cols = [x for x in self.predictions if x not in df.columns]
+        for m in missing_cols:
+            df[m] = None
+
+        return super().execute(df)
+
+    def _calc(self, df):
+
+        db = self._entity_type.db
+        entity = df.index.levels[0][0]
+
+        logger.debug('GMMAnomalyScore execute: ' + str(type(df)) + ' for entity ' + str(entity))
+
+        # check data okay
+        try:
+            logger.debug(self.features)
+            check_array(df[self.features].values, allow_nd=True)
+        except Exception as e:
+            logger.error(
+                'Found Nan or infinite value in feature columns for entity ' + str(entity) + ' error: ' + str(e))
+
+        # per entity - copy for later inplace operations
+        model_name, gmm_model, version = self.load_model(suffix=entity)
+
+
+        #xy = np.hstack([df[self.features].values, df[self.targets].values])
+        xy = df[self.features].values
+
+        # train new model
+        if gmm_model is None:
+
+            logger.debug('Running GMM with ' + str(xy.shape))
+            # all variables should be continuous
+
+            gmm_model = BayesianGaussianMixture(n_components=self.modality, verbose=1, n_init=5,
+                init_params='random', weight_concentration_prior_type='dirichlet_distribution',
+                covariance_type='full')
+
+            gmm_model.fit(xy)
+
+            # retrain as unimodal
+            if not gmm_model.converged_:
+                logger.debug('GMM failed to converge for entity :' + str(entity))
+                gmm_model = BayesianGaussianMixture(n_components=1, verbose=1, n_init=5,
+                    init_params='random', weight_concentration_prior_type='dirichlet_distribution',
+                    covariance_type='full')
+                gmm_model.fit(xy)
+
+            logger.debug('Created GMM ' + str(gmm_model))
+
+            try:
+                db.model_store.store_model(model_name, gmm_model)
+            except Exception as e:
+                logger.error('Model store failed with ' + str(e))
+
+        self.active_models[entity] = gmm_model
+
+        predictions = gmm_model.score_samples(xy).reshape(-1,1)
+        print(predictions.shape, df[self.predictions].values.shape)
+        df[self.predictions] = -predictions
+
+        return df
+
+    @classmethod
+    def build_ui(cls):
+        # define arguments that behave as function inputs
+        inputs = []
+        inputs.append(UISingleItem(name='input_item', datatype=float, required=True))
+        inputs.append(UISingle(name="modality", datatype=float,
+            description="Expected modality of the underlying distribution. Typically set to 2 for bimodal", required=True))
+        inputs.append(UISingle(name="deviation", datatype=float,
+            description="Probability threshold for outliers. Typically set to 3 standard deviations", required=True))
+        outputs.append(UISingleItem(name='output_item', datatype=float,
+            description="Anomaly score", required=True))
+        # define arguments that behave as function outputs
+        return inputs, outputs
+
 
 #
 # following Jake Vanderplas Data Science Handbook
@@ -2802,6 +2901,9 @@ class VI(nn.Module):
 
         # KL - probability of y_pred w.r.t the variational likelihood
         log_pxCz = ll_gaussian(y_pred, mu, log_var)
+
+        ### Alternatively we could compute the KL div to the gaussian normal with
+        # KL = (1 + torch.log(torch.square(mu)) - torch.square(torch.exp(log_var)) - torch.square(mu))/2
 
         if self.show_once:
             self.show_once = False
