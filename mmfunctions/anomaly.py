@@ -2710,6 +2710,7 @@ class GMMAnomalyScore(SupervisedLearningTransformer):
             description="Expected modality of the underlying distribution. Typically set to 2 for bimodal", required=True))
         inputs.append(UISingle(name="deviation", datatype=float,
             description="Probability threshold for outliers. Typically set to 3 standard deviations", required=True))
+        outputs = []
         outputs.append(UISingleItem(name='output_item', datatype=float,
             description="Anomaly score", required=True))
         # define arguments that behave as function outputs
