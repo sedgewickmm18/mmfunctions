@@ -51,7 +51,7 @@ if iotfunctions.__version__ != '8.2.1':
     import stumpy
 
 import statsmodels.api as sm
-from statsmodels.nonparametric.kde import KDEUnivariate
+#from statsmodels.nonparametric.kde import KDEUnivariate
 from statsmodels.nonparametric.kernel_density import KDEMultivariate
 from statsmodels.tsa.arima.model import ARIMA
 # EXCLUDED until we upgrade to statsmodels 0.12
@@ -2717,6 +2717,96 @@ class GMMAnomalyScore(SupervisedLearningTransformer):
         return inputs, outputs
 
 
+class KDEAnomalyScore1d(SupervisedLearningTransformer):
+    """
+    A supervised anomaly detection function.
+     Uses kernel density estimate to assign an anomaly score
+    """
+    def __init__(self, input_item, threshold, output_item):
+        logger.debug("init KDE1d Estimator")
+        self.name = 'KDEAnomalyScore1d'
+        self.whoami= 'KDEAnomalyScore1d'
+        super().__init__([input_item], [output_item])
+
+        self.threshold = threshold
+        self.active_models = dict()
+        self.predictions = [output_item]
+
+
+    def execute(self, df):
+
+        # Create missing columns before doing group-apply
+        df = df.copy()
+        missing_cols = [x for x in self.predictions if x not in df.columns]
+        for m in missing_cols:
+            df[m] = None
+
+        return super().execute(df)
+
+
+    def _calc(self, df):
+
+        db = self._entity_type.db
+        entity = df.index.levels[0][0]
+
+        logger.debug('KDEAnomalyScore execute: ' + str(type(df)) + ' for entity ' + str(entity))
+
+        # check data okay
+        try:
+            logger.debug(self.features)
+            check_array(df[self.features].values, allow_nd=True)
+        except Exception as e:
+            logger.error(
+                'Found Nan or infinite value in feature columns for entity ' + str(entity) + ' error: ' + str(e))
+
+        # per entity - copy for later inplace operations
+        model_name, kde_model, version = self.load_model(suffix=entity)
+
+        xy = df[self.features].values
+
+        # train new model
+        if kde_model is None:
+
+            logger.debug('Running KDE with ' + str(xy.shape))
+            # all variables should be continuous
+
+            kde_model = KernelDensity(kernel='gaussian', bandwidth=0.2).fit(xy)
+            #kde_model = KDEUnivariate(xy) #, var_type="c" * (len(self.features) + len(self.targets)))
+            #kde_model.fit()
+            logger.debug('Created KDE ' + str(kde_model))
+
+            try:
+                db.model_store.store_model(model_name, kde_model)
+            except Exception as e:
+                logger.error('Model store failed with ' + str(e))
+
+        self.active_models[entity] = kde_model
+
+        #predictions = kde_model.score_samples(xy.reshape(-1,)) #.reshape(-1,1)
+        predictions = kde_model.score_samples(xy).reshape(-1,1)
+
+        print(xy.shape, predictions.shape, df[self.predictions].values.shape)
+        df[self.predictions] = predictions
+
+        return df
+
+
+    @classmethod
+    def build_ui(cls):
+        # define arguments that behave as function inputs
+        inputs = []
+        inputs.append(UISingleItem(name='input_item', datatype=float, required=True))
+        inputs.append(UISingle(name="threshold", datatype=float,
+                               description="Probability threshold for outliers. Typically set to 10e-6.", required=True))
+        outputs = []
+        outputs.append(UISingleItem(name='output_item', datatype=float,
+            description="Anomaly score", required=True))
+        # define arguments that behave as function outputs
+        return inputs, outputs
+
+
+
+
 #
 # following Jake Vanderplas Data Science Handbook
 #   https://jakevdp.github.io/PythonDataScienceHandbook/05.13-kernel-density-estimation.html
@@ -2971,12 +3061,13 @@ class VIAnomalyScore(SupervisedLearningTransformer):
 
         self.epochs = 1500
         self.learning_rate = 0.005
+        self.quantile = 0.99
 
         self.active_models = dict()
         self.Input = {}
         self.Output = {}
         self.mu = {}
-        self.quantile095 = {}
+        self.quantile099 = {}
 
         if predictions is None:
             predictions = ['predicted_%s' % x for x in self.targets]
@@ -3005,7 +3096,8 @@ class VIAnomalyScore(SupervisedLearningTransformer):
     def _calc(self, df):
 
         db = self._entity_type.db
-        entity = df.index.levels[0][0]
+        #entity = df.index.levels[0][0]
+        entity = df.index[0][0]
 
         logger.debug('VIAnomalyScore execute: ' + str(type(df)) + ' for entity ' + str(entity))
 
@@ -3090,9 +3182,9 @@ class VIAnomalyScore(SupervisedLearningTransformer):
                 mue = mu_and_log_sigma[1]
                 sigma = torch.exp(0.5 * mu_and_log_sigma[2]) + 1e-5
                 mu = sp.stats.norm.ppf(0.5, loc=mue, scale=sigma).reshape(-1,)
-                q1 = sp.stats.norm.ppf(0.95, loc=mue, scale=sigma).reshape(-1,)
+                q1 = sp.stats.norm.ppf(self.quantile, loc=mue, scale=sigma).reshape(-1,)
                 self.mu[entity] = mu
-                self.quantile095[entity] = q1
+                self.quantile099[entity] = q1
 
             df[self.predictions] = (mu[ind_r] + vi_model.adjust_mean).reshape(-1,1)
             df[self.pred_stddev] = (q1[ind_r]).reshape(-1,1)
