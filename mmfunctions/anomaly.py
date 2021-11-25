@@ -2672,18 +2672,19 @@ class GMMAnomalyScore(SupervisedLearningTransformer):
             logger.debug('Running GMM with ' + str(xy.shape))
             # all variables should be continuous
 
-            gmm_model = BayesianGaussianMixture(n_components=self.modality, verbose=1, n_init=5,
-                init_params='random', weight_concentration_prior_type='dirichlet_distribution',
-                covariance_type='full')
+            gmm_model = Pipeline([('scale', MinMaxScaler()), ('gmm',
+                                        BayesianGaussianMixture(n_components=self.modality, verbose=1, n_init=5,
+                                            init_params='random', weight_concentration_prior_type='dirichlet_distribution',
+                                            covariance_type='full')) ])
 
             gmm_model.fit(xy)
 
             # retrain as unimodal
-            if not gmm_model.converged_:
+            if not gmm_model['gmm'].converged_:
                 logger.debug('GMM failed to converge for entity :' + str(entity))
-                gmm_model = BayesianGaussianMixture(n_components=1, verbose=1, n_init=5,
-                    init_params='random', weight_concentration_prior_type='dirichlet_distribution',
-                    covariance_type='full')
+
+                gmm_model['gmm'].n_components = 1
+
                 gmm_model.fit(xy)
 
             logger.debug('Created GMM ' + str(gmm_model))
