@@ -2931,8 +2931,9 @@ def l_gaussian(y, mu, log_var):
     return 1/torch.sqrt(2 * np.pi * sigma**2) / torch.exp((1 / (2 * sigma**2)) * (y-mu)**2)
 
 
+# not used - 100% buggy
 def kl_div(mu1, mu2, lg_sigma1, lg_sigma2):
-    return 0.5 * (2 * lg_sigma2 - 2 * lg_sigma1 + (lg_sigma1.exp() ** 2 + (mu1 - mu2)**2)/lg_sigma2.exp()**2 - 1)
+    return 0.5 * torch.sum(2 * lg_sigma2 - 2 * lg_sigma1 + (lg_sigma1.exp() ** 2 + (mu1 - mu2)**2)/lg_sigma2.exp()**2 - 1)
 
 
 class VI(nn.Module):
@@ -2982,21 +2983,19 @@ class VI(nn.Module):
     # see 2.3 in https://arxiv.org/pdf/1312.6114.pdf
     #
     def elbo(self, y_pred, y, mu, log_var):
-        # likelihood of observing y given Variational mu and sigma - reconstruction error
-        loglikelihood = ll_gaussian(y, mu, log_var)
+
         # Sample from p(x|z) by sampling from q(z|x), passing through decoder (y_pred)
         # likelihood of observing y given Variational decoder mu and sigma - reconstruction error
         log_qzCx = ll_gaussian(y, mu, log_var)
 
-        # KL - prior probability of sample y_pred w.r.t. N(0,1)
+        # KL - probability of sample y_pred w.r.t. prior
         log_pz = ll_gaussian(y_pred, self.prior_mu, torch.log(torch.tensor(self.prior_sigma)))
 
-        # KL - probability of y_pred w.r.t the variational likelihood
+        # KL - probability of sample y_pred w.r.t the variational likelihood
         log_pxCz = ll_gaussian(y_pred, mu, log_var)
 
-        ### Alternatively we could compute the KL div to the gaussian normal with
-        # KL = (1 + torch.log(torch.square(mu)) - torch.square(torch.exp(log_var)) - torch.square(mu))/2
-
+        ## Alternatively we could compute the KL div to the gaussian prior with something like
+        # KL = -0.5 * torch.sum(1 + log_var - torch.square(mu) - torch.exp(log_var)))
         if self.show_once:
             self.show_once = False
             logger.info('Cardinalities: Mu: ' + str(mu.shape) + ' Sigma: ' + str(log_var.shape) +
@@ -3013,7 +3012,6 @@ class VI(nn.Module):
 
         log_iw = None
         for _ in range(k_samples):
-
 
             # Encode - sample from the encoder
             #  Latent variables mean,variance: mu_enc, log_var_enc
@@ -3078,6 +3076,7 @@ class VIAnomalyScore(SupervisedLearningTransformer):
         self.predictions = predictions
         self.pred_stddev = pred_stddev
 
+        # make sure mean is > 0
         self.prior_mu = 0.0
         self.prior_sigma = 1.0
         self.beta = 1.0
@@ -3122,10 +3121,10 @@ class VIAnomalyScore(SupervisedLearningTransformer):
         features = scaler.transform(df[self.features].values)
         targets = df[self.targets].values
 
-        # deal with negative means - are the issues related to ReLU ?
-        #  adjust targets to have mean == 0
+        # deal with negative means - ReLU doesn't like negative values
+        #  adjust targets wth the (positive) prior mean to make sure it's > 0
         if vi_model is None:
-            adjust_mean = targets.mean()
+            adjust_mean = targets.mean() - self.prior_mu
         else:
             adjust_mean = vi_model.adjust_mean
         logger.info('Adjusting target mean with ' + str(adjust_mean))
@@ -3145,6 +3144,7 @@ class VIAnomalyScore(SupervisedLearningTransformer):
         # train new model if there is none and autotrain is set
         if vi_model is None and self.auto_train:
 
+            # equip prior with a 'plausible' deviation
             self.prior_sigma = targets.std()
 
             vi_model = VI(scaler, prior_mu=self.prior_mu, prior_sigma=self.prior_sigma,
