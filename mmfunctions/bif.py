@@ -232,7 +232,6 @@ class StateTimePreparation(BaseTransformer):
 
         # pair of +- seconds and regular timestamp
         v1 = eval("df_copy[self.source] " + self.state_name).astype(int).diff().values.astype(int)
-        logger.debug(str(v1))
         #v1 = (df_copy[self.source] > 50).astype(int).diff().values.astype(int)
 
         # first element is NaN - pretend a state change
@@ -263,6 +262,8 @@ class StateTimePreparation(BaseTransformer):
                     logger.debug('No Non-Zero 2')
                     # no non zero element
                     pass
+
+        logger.debug(str(v1))
 
         df_copy['__intermediate1__'] = v1
         np.savetxt('/tmp/test', df_copy['__intermediate1__'].values)
