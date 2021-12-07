@@ -129,9 +129,18 @@ class AggregateTimeInState(BaseSimpleAggregator):
 
         g0 = group_exp[0].values.copy() - 1
         g1 = group_exp[1].values.copy()
-        #logger.debug(str(g0) + ' ' + str(g1))
 
-        #logger.debug(str(np.all(g1[:-1] <= g1[1:]) ))
+        # now reduce pairs (1,1) or (-1,-1)
+        #gg0 = np.lib.stride_tricks.sliding_window_view(g0, 2)    # sliding windows
+        #hpairs = np.append((gg0[:, :-1] == gg0[:, 1:]), False)   # find pairs
+
+        gg0 = np.lib.stride_tricks.as_strided(g0,
+                 shape=(g0.size, 2), strides=(g0.itemsize, g0.itemsize))
+
+        hpairs = (gg0[:, :-1] == gg0[:, 1:])   # find pairs
+        gg0[hpairs.flatten()] = 0   # and remove the first element of each pair
+
+        logger.info('HERE1: ' + str(g0[0:400]))
 
         # adjust for intervals cut in half by aggregation
         '''
@@ -212,17 +221,8 @@ class AggregateTimeInState(BaseSimpleAggregator):
             logger.info('HERE5: ')
             pass
 
-        # now reduce pairs (1,1) or (-1,-1)
-        #gg0 = np.lib.stride_tricks.sliding_window_view(g0, 2)    # sliding windows
-        #hpairs = np.append((gg0[:, :-1] == gg0[:, 1:]), False)   # find pairs
+        logger.info('HERE2: ' + str(g0[0:400]))
 
-        gg0 = np.lib.stride_tricks.as_strided(g0,
-                 shape=(g0.size, 2), strides=(g0.itemsize, g0.itemsize))
-
-        hpairs = (gg0[:, :-1] == gg0[:, 1:])   # find pairs
-        gg0[hpairs.flatten()] = 0   # and remove the first element of each pair
-
-        logger.info('HERE4: ' + str(g0))
 
         y = -(g0 * g1).sum()
         #y = g1.sum()
