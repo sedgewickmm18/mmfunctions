@@ -238,7 +238,7 @@ class StateTimePreparation(BaseTransformer):
         if v1.size > 0:
             v1[0] = 0
             try:
-                nonzero = np.min(np.nonzero(v1 != 0))
+                nonzero = np.min(np.nonzero(v1))
                 if v1[nonzero] > 0:
                     v1[0] = -1
                 else:
@@ -253,7 +253,7 @@ class StateTimePreparation(BaseTransformer):
             if v1[-1] == 0:
                 try:
                     # last nonzero element
-                    nonzero = np.max(np.nonzero(v1 != 0))
+                    nonzero = np.max(np.nonzero(v1))
                     if v1[nonzero] > 0:
                         v1[-1] = -1
                     else:
@@ -265,13 +265,15 @@ class StateTimePreparation(BaseTransformer):
 
         logger.debug(str(v1))
 
+        '''
         df_copy['__intermediate1__'] = v1
-        np.savetxt('/tmp/test', df_copy['__intermediate1__'].values)
         df_copy['__intermediate2__'] = (df_copy[ts_name].astype(int)// 1000000000)
+
         df_copy[self.name] = df_copy['__intermediate1__'].map(str) + ',' + df_copy['__intermediate2__'].map(str)
 
         df_copy.drop(columns=['__intermediate1__','__intermediate2__'], inplace=True)
-        df_copy.to_csv('/tmp/testc')
+        '''
+        df_copy[self.name] = v1 * df_copy[ts_name].astype(int)// 1000000000
 
         #df_copy[self.name] = change_arr
         return df_copy.set_index(index_names)
