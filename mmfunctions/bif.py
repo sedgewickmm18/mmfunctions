@@ -306,7 +306,7 @@ class StateTimePreparation(BaseTransformer):
         logger.info('HERE4: ' + str(v1))
 
         df_copy['__intermediate1__'] = v1
-        df_copy['__intermediate2__'] = (df_copy[ts_name].astype(int)// 1000000000) * v1
+        df_copy['__intermediate2__'] = -(df_copy[ts_name].astype(int)// 1000000000) * v1
 
         df_copy[self.name] = df_copy['__intermediate1__'].map(str) + ',' + df_copy['__intermediate2__'].map(str)
 
