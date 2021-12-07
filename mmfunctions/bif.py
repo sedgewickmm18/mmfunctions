@@ -121,6 +121,8 @@ class AggregateTimeInState(BaseSimpleAggregator):
             return 0
 
         # group_exp[0] = change array, group_exp[1] = timestamps
+        logger.info(str(group[1:100]))
+
         try:
             group_exp = group.str.split(pat=',', n=1, expand=True).astype(int)
         except Exception as esplit:
@@ -138,16 +140,19 @@ class AggregateTimeInState(BaseSimpleAggregator):
         hpairs = (gg0[:, :-1] == gg0[:, 1:])   # find pairs
         g0[hpairs.flatten()] = 0   # and remove the first element of each pair
         '''
-        # now reduce false statechange sequences like -1, 0, 0, x-1x, 0, 1
+        # now reduce false statechange sequences like -1, 0, 0, -1, 0, 1
+        logger.info('HERE1: ' + str(g0[0:400]))
+
         flag = 0
         with np.nditer(g0, op_flags=['readwrite']) as it:
             for x in it:
-                if flag == x:
+                if flag == 0 and x != 0:
+                    flag = x
+                elif flag == x:
                     x[...] = 0
-                elif flag == -x or flag == 0:
+                elif flag == -x:
                     flag = x
 
-        #logger.info('HERE1: ' + str(g0[0:400]))
 
         # adjust for intervals cut in half by aggregation
         '''
