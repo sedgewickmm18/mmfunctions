@@ -138,9 +138,9 @@ class AggregateTimeInState(BaseSimpleAggregator):
                  shape=(g0.size, 2), strides=(g0.itemsize, g0.itemsize))
 
         hpairs = (gg0[:, :-1] == gg0[:, 1:])   # find pairs
-        gg0[hpairs.flatten()] = 0   # and remove the first element of each pair
+        g0[hpairs.flatten()] = 0   # and remove the first element of each pair
 
-        logger.info('HERE1: ' + str(g0[0:400]))
+        #logger.info('HERE1: ' + str(g0[0:400]))
 
         # adjust for intervals cut in half by aggregation
         '''
@@ -222,6 +222,7 @@ class AggregateTimeInState(BaseSimpleAggregator):
             pass
 
         logger.info('HERE2: ' + str(g0[0:400]))
+        logger.info('HERE2:    ' + str(np.count_nonzero(g0 == 1)) + ' ' + str(np.count(g0 == -1)))
 
 
         y = -(g0 * g1).sum()
