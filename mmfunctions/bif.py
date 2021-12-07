@@ -236,7 +236,7 @@ class StateTimePreparation(BaseTransformer):
         v1 = eval("df_copy[self.source] " + self.state_name).astype(int).diff().values.astype(int)
         #v1 = (df_copy[self.source] > 50).astype(int).diff().values.astype(int)
 
-        logger.info('HERE')
+        logger.info('HERE: ' + str(v1))
 
         # first element is NaN - pretend a state change
         if v1.size > 0:
