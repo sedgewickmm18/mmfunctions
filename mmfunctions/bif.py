@@ -130,15 +130,22 @@ class AggregateTimeInState(BaseSimpleAggregator):
         g0 = group_exp[0].values.copy()
         g1 = group_exp[1].values.copy()
 
+        '''
         # now reduce pairs (1,1) or (-1,-1)
-        #gg0 = np.lib.stride_tricks.sliding_window_view(g0, 2)    # sliding windows
-        #hpairs = np.append((gg0[:, :-1] == gg0[:, 1:]), False)   # find pairs
-
         gg0 = np.lib.stride_tricks.as_strided(g0,
                  shape=(g0.size, 2), strides=(g0.itemsize, g0.itemsize))
 
         hpairs = (gg0[:, :-1] == gg0[:, 1:])   # find pairs
         g0[hpairs.flatten()] = 0   # and remove the first element of each pair
+        '''
+        # now reduce false statechange sequences like -1, 0, 0, x-1x, 0, 1
+        flag = 0
+        with np.nditer(g0, op_flags=['readwrite']) as it:
+            for x in it:
+                if flag == x:
+                    x[...] = 0
+                elif flag == -x or flag == 0:
+                    flag = x
 
         #logger.info('HERE1: ' + str(g0[0:400]))
 
