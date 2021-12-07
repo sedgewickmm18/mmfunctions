@@ -131,7 +131,7 @@ class AggregateTimeInState(BaseSimpleAggregator):
         g1 = group_exp[1].values
         logger.debug(str(g0) + ' ' + str(g1))
 
-        logger.debug(str(np.all(a[:-1] <= a[1:]) ))
+        logger.debug(str(np.all(g1[:-1] <= g1[1:]) ))
 
         # adjust for intervals cut in half by aggregation
         '''
