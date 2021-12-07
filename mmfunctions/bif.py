@@ -120,6 +120,8 @@ class AggregateTimeInState(BaseSimpleAggregator):
         if lg == 0:
             return 0
 
+        pd.set_option("display.max_rows", 50)
+        logger.info(str(group))
         # group_exp[0] = change array, group_exp[1] = timestamps
         #logger.info(str(group[1:100]))
         df_group_exp = group.str.split(pat=',', n=2, expand=True)
