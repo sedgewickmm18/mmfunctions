@@ -129,9 +129,9 @@ class AggregateTimeInState(BaseSimpleAggregator):
 
         g0 = group_exp[0].values
         g1 = group_exp[1].values
-        logger.debug(str(g0) + ' ' + str(g1))
+        #logger.debug(str(g0) + ' ' + str(g1))
 
-        logger.debug(str(np.all(g1[:-1] <= g1[1:]) ))
+        #logger.debug(str(np.all(g1[:-1] <= g1[1:]) ))
 
         # adjust for intervals cut in half by aggregation
         '''
@@ -163,25 +163,27 @@ class AggregateTimeInState(BaseSimpleAggregator):
             pass
 
         if nonzeroMin > 0:
-            #print('YES1', nonzeroMin, g0[nonzeroMin])
+            logger.info('YES1 ' + str(nonzeroMin) + ' ' + str(g0[nonzeroMin]))
             if g0[nonzeroMin] < 0:
                 g0[0] = 1
         else:
-            #print('NO 1', nonzeroMin, g0[nonzeroMin])
+            logger.info('NO 1 ' + str(nonzeroMin) + ' ' + str(g0[nonzeroMin]))
             if g0[0] < 0:
                 g0[0] = 0
 
         if nonzeroMax > 0:
-            #print('YES2', nonzeroMax, g0[nonzeroMax], g0.size)
+            logger.info('YES2 ' + str(nonzeroMax) + ' ' + str(g0[nonzeroMax]))
             if g0[nonzeroMax] > 0:
                 g0[-1] = -1
                 # if nonzeroMax is last, ignore
                 if g0[nonzeroMax] < 0:
                     g0[-1] = 0
 
-        #y = abs((g0 * g1).sum())
-        y = g1.sum()
-        if y < 0: y = 0
+        y = -(g0 * g1).sum()
+        #y = g1.sum()
+        logger.info(str(y))
+        if y < 0:
+            y = 0
         logger.info('AggregateTimeInState returns ' + str(y) + ' seconds, computed from ' + str(g0.size))
         return y
 
@@ -234,10 +236,14 @@ class StateTimePreparation(BaseTransformer):
 
         # pair of +- seconds and regular timestamp
         v1 = eval("df_copy[self.source] " + self.state_name).astype(int).diff().values.astype(int)
+
+        v1 = np.roll(v1, -1)  # push the first element, NaN, to the end
+        v1[-1] = 0
         #v1 = (df_copy[self.source] > 50).astype(int).diff().values.astype(int)
 
         logger.info('HERE: ' + str(v1))
 
+        '''
         # first element is NaN - pretend a state change
         if v1.size > 0:
             v1[0] = 0
@@ -304,9 +310,10 @@ class StateTimePreparation(BaseTransformer):
             pass
 
         logger.info('HERE4: ' + str(v1))
+        '''
 
         df_copy['__intermediate1__'] = v1
-        df_copy['__intermediate2__'] = -(df_copy[ts_name].astype(int)// 1000000000) * v1
+        df_copy['__intermediate2__'] = (df_copy[ts_name].astype(int)// 1000000000)
 
         df_copy[self.name] = df_copy['__intermediate1__'].map(str) + ',' + df_copy['__intermediate2__'].map(str)
 
