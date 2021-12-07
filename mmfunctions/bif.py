@@ -222,7 +222,7 @@ class AggregateTimeInState(BaseSimpleAggregator):
             pass
 
         logger.info('HERE2: ' + str(g0[0:400]))
-        logger.info('HERE2:    ' + str(np.count_nonzero(g0 == 1)) + ' ' + str(np.count(g0 == -1)))
+        logger.info('HERE2:    ' + str(np.count_nonzero(g0 == 1)) + ' ' + str(np.count_nonzero(g0 == -1)))
 
 
         y = -(g0 * g1).sum()
