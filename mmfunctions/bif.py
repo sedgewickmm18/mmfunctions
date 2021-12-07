@@ -276,7 +276,7 @@ class StateTimePreparation(BaseTransformer):
         v1[-1] = 0
         #v1 = (df_copy[self.source] > 50).astype(int).diff().values.astype(int)
 
-        logger.info('HERE: ' + str(v1))
+        logger.info('HERE: ' + str(v1[0:600]))
 
         '''
         # first element is NaN - pretend a state change
