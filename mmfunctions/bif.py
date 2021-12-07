@@ -212,6 +212,11 @@ class AggregateTimeInState(BaseSimpleAggregator):
             logger.info('HERE5: ')
             pass
 
+        # now reduce pairs (1,1) or (-1,-1)
+        gg0 = np.stride_tricks.sliding_window_view(g0, 2)    # sliding windows
+        hpairs = np.append((gg0[:, :-1] == gg0[:, 1:]), False)   # find pairs
+        gg0[hpairs.flatten()] = 0   # and remove the first element of each pair
+
         logger.info('HERE4: ' + str(g0))
 
         y = -(g0 * g1).sum()
