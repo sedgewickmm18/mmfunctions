@@ -233,7 +233,8 @@ class StateTimePreparation(BaseTransformer):
         # pair of +- seconds and regular timestamp
         v1 = eval("df_copy[self.source] " + self.state_name).astype(int).diff().values.astype(int)
         #v1 = (df_copy[self.source] > 50).astype(int).diff().values.astype(int)
-        # first element is NaN
+
+        # first element is NaN - pretend a state change
         if v1.size > 0:
             v1[0] = 0
             try:
@@ -245,6 +246,20 @@ class StateTimePreparation(BaseTransformer):
             except Exception:
                 # no non zero element
                 pass
+
+        # if last element is 0 - pretend a state change
+        if v1.size > 0:
+            if v1[-1] == 0:
+                try:
+                    # last nonzero element
+                    nonzero = np.max(np.nonzero(v1 != 0))
+                    if v1[nonzero] > 0:
+                        v1[-1] = -1
+                    else:
+                        v1[-1] = 1
+                except Exception:
+                    # no non zero element
+                    pass
 
         df_copy['__intermediate1__'] = v1
         np.savetxt('/tmp/test', df_copy['__intermediate1__'].values)
