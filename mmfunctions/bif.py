@@ -214,10 +214,12 @@ class AggregateTimeInState(BaseSimpleAggregator):
 
         # now reduce pairs (1,1) or (-1,-1)
         #gg0 = np.lib.stride_tricks.sliding_window_view(g0, 2)    # sliding windows
+        #hpairs = np.append((gg0[:, :-1] == gg0[:, 1:]), False)   # find pairs
+
         gg0 = np.lib.stride_tricks.as_strided(g0,
                  shape=(g0.size, 2), strides=(g0.itemsize, g0.itemsize))
 
-        hpairs = np.append((gg0[:, :-1] == gg0[:, 1:]), False)   # find pairs
+        hpairs = (gg0[:, :-1] == gg0[:, 1:])   # find pairs
         gg0[hpairs.flatten()] = 0   # and remove the first element of each pair
 
         logger.info('HERE4: ' + str(g0))
