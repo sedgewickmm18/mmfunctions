@@ -180,7 +180,8 @@ class AggregateTimeInState(BaseSimpleAggregator):
                     g0[-1] = 0
 
         #y = abs((g0 * g1).sum())
-        y = abs((g0 * g1).sum())
+        y = g1.sum()
+        if y < 0: y = 0
         logger.info('AggregateTimeInState returns ' + str(y) + ' seconds, computed from ' + str(g0.size))
         return y
 
@@ -226,7 +227,7 @@ class StateTimePreparation(BaseTransformer):
         index_names = df.index.names
         ts_name = df.index.names[1]  # TODO: deal with non-standard dataframes (no timestamp)
 
-        print('Source ', self.source, 'state_name ', self.state_name, 'Name ', self.name)
+        logger.info('Source ', self.source, 'state_name ', self.state_name, 'Name ', self.name)
         #df[self.name] = (df[self.source] == self.state_name).astype(int).diff().fillna(1).astype(int)
         df_copy = df.reset_index()
 
@@ -234,7 +235,7 @@ class StateTimePreparation(BaseTransformer):
         v1 = eval("df_copy[self.source] " + self.state_name).astype(int).diff().values.astype(int)
         #v1 = (df_copy[self.source] > 50).astype(int).diff().values.astype(int)
 
-        logger.debug('HERE')
+        logger.info('HERE')
 
         # first element is NaN - pretend a state change
         if v1.size > 0:
@@ -250,7 +251,7 @@ class StateTimePreparation(BaseTransformer):
                 # no non zero element
                 pass
 
-        logger.debug('HERE2')
+        logger.info('HERE2')
         # if last element is 0 - pretend a state change
         if v1.size > 0:
             if v1[-1] == 0:
@@ -266,20 +267,17 @@ class StateTimePreparation(BaseTransformer):
                     # no non zero element
                     pass
 
-        logger.debug('HERE3')
-        logger.debug(str(v1))
+        logger.info('HERE3')
+        logger.info(str(v1))
 
-        '''
         df_copy['__intermediate1__'] = v1
-        df_copy['__intermediate2__'] = (df_copy[ts_name].astype(int)// 1000000000)
+        df_copy['__intermediate2__'] = (df_copy[ts_name].astype(int)// 1000000000) * v1
 
         df_copy[self.name] = df_copy['__intermediate1__'].map(str) + ',' + df_copy['__intermediate2__'].map(str)
 
         df_copy.drop(columns=['__intermediate1__','__intermediate2__'], inplace=True)
-        '''
-        df_copy[self.name] = (v1 * df_copy[ts_name].astype(int)// 1000000000)
+        #df_copy[self.name] = (v1 * df_copy[ts_name].astype(int)// 1000000000)
 
-        #df_copy[self.name] = change_arr
         return df_copy.set_index(index_names)
 
 
