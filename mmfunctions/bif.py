@@ -107,7 +107,8 @@ class AggregateTimeInState(BaseSimpleAggregator):
 
         outputs = []
         outputs.append(
-            UIFunctionOutSingle(name='name', datatype=float, description='Overall amount of seconds spent in a particular state'))
+            UIFunctionOutSingle(name='name', datatype=float,
+                                description='Overall amount of seconds spent in a particular state'))
 
         return (inputs, outputs)
 
@@ -128,7 +129,9 @@ class AggregateTimeInState(BaseSimpleAggregator):
 
         g0 = group_exp[0].values
         g1 = group_exp[1].values
-        #print(g0, g1)
+        logger.debug(str(g0) + ' ' + str(g1))
+
+        logger.debug(str(np.all(a[:-1] <= a[1:]) ))
 
         # adjust for intervals cut in half by aggregation
         '''
@@ -176,6 +179,7 @@ class AggregateTimeInState(BaseSimpleAggregator):
                 if g0[nonzeroMax] < 0:
                     g0[-1] = 0
 
+        #y = abs((g0 * g1).sum())
         y = abs((g0 * g1).sum())
         logger.info('AggregateTimeInState returns ' + str(y) + ' seconds, computed from ' + str(g0.size))
         return y
@@ -207,7 +211,8 @@ class StateTimePreparation(BaseTransformer):
         inputs = []
         inputs.append(UISingleItem(name='source', datatype=float,
                                   description='Data item to compute the state change array from'))
-        inputs.append(UISingle(name='state_name', datatype=str,  description='Condition for the state change array computation'))
+        inputs.append(UISingle(name='state_name', datatype=str,
+                              description='Condition for the state change array computation'))
 
         outputs = []
         outputs.append(
