@@ -286,7 +286,7 @@ class StateTimePreparation(BaseTransformer):
 
         siz = 0
         try:
-            siz = np.count_nonzero(v1))
+            siz = np.count_nonzero(v1)
             if siz == 1:
                 v1[0] = 0
             elif siz == 2 or siz == 0:
