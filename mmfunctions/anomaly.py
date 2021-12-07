@@ -582,7 +582,8 @@ class AnomalyScorer(BaseTransformer):
 
     def _calc(self, df):
 
-        entity = df.index.levels[0][0]
+        #entity = df.index.levels[0][0]
+        entity = df.index[0][0]
 
         # get rid of entity id as part of the index
         df = df.droplevel(0)
@@ -1823,7 +1824,8 @@ class RobustThreshold(SupervisedLearningTransformer):
     def _calc(self, df):
         # per entity - copy for later inplace operations
         db = self._entity_type.db
-        entity = df.index.levels[0][0]
+        #entity = df.index.levels[0][0]
+        entity = df.index[0][0]
 
         model_name, robust_model, version = self.load_model(suffix=entity)
 
@@ -1936,7 +1938,8 @@ class BayesRidgeRegressor(BaseEstimatorFunction):
     def _calc(self, df):
 
         db = self._entity_type.db
-        entity = df.index.levels[0][0]
+        #entity = df.index.levels[0][0]
+        entity = df.index[0][0]
 
         logger.debug('BayesRidgeRegressor execute: ' + str(type(df)) + ' for entity ' + str(entity) +
                      ' predicting ' + str(self.targets) + ' from ' + str(self.features) +
@@ -2043,7 +2046,8 @@ class BayesRidgeRegressorExt(BaseEstimatorFunction):
     def _calc(self, df):
 
         db = self._entity_type.db
-        entity = df.index.levels[0][0]
+        #entity = df.index.levels[0][0]
+        entity = df.index[0][0]
 
         logger.debug('BayesRidgeRegressor execute: ' + str(type(df)) + ' for entity ' + str(entity) +
                      ' predicting ' + str(self.targets) + ' from ' + str(self.features) +
@@ -2263,7 +2267,8 @@ class GBMRegressor(BaseEstimatorFunction):
     def _calc(self, df):
 
         db = self._entity_type.db
-        entity = df.index.levels[0][0]
+        #entity = df.index.levels[0][0]
+        entity = df.index[0][0]
 
         logger.debug('GBMRegressor execute: ' + str(type(df)) + ' for entity ' + str(entity) +
                      ' predicting ' + str(self.targets) + ' from ' + str(self.features) +
@@ -2624,7 +2629,7 @@ class GMMAnomalyScore(SupervisedLearningTransformer):
      Uses an additive Gaussian mixed model to assign an anomaly score
     """
     def __init__(self, input_item, modality, deviation, output_item):
-        logger.debug("init KDE Estimator")
+        logger.debug("init GMM Estimator")
         self.name = 'GMMAnomalyScore'
         self.whoami= 'GMMAnomalyScore'
         super().__init__([input_item], [output_item])
@@ -2647,7 +2652,8 @@ class GMMAnomalyScore(SupervisedLearningTransformer):
     def _calc(self, df):
 
         db = self._entity_type.db
-        entity = df.index.levels[0][0]
+        #entity = df.index.levels[0][0]
+        entity = df.index[0][0]
 
         logger.debug('GMMAnomalyScore execute: ' + str(type(df)) + ' for entity ' + str(entity))
 
@@ -2748,7 +2754,8 @@ class KDEAnomalyScore1d(SupervisedLearningTransformer):
     def _calc(self, df):
 
         db = self._entity_type.db
-        entity = df.index.levels[0][0]
+        #entity = df.index.levels[0][0]
+        entity = df.index[0][0]
 
         logger.debug('KDEAnomalyScore execute: ' + str(type(df)) + ' for entity ' + str(entity))
 
@@ -2844,7 +2851,8 @@ class KDEAnomalyScore(SupervisedLearningTransformer):
     def _calc(self, df):
 
         db = self._entity_type.db
-        entity = df.index.levels[0][0]
+        #entity = df.index.levels[0][0]
+        entity = df.index[0][0]
 
         logger.debug('KDEAnomalyScore execute: ' + str(type(df)) + ' for entity ' + str(entity))
 
@@ -2874,7 +2882,7 @@ class KDEAnomalyScore(SupervisedLearningTransformer):
             except Exception as e:
                 logger.error('Model store failed with ' + str(e))
 
-            self.active_models[entity] = kde_model
+        self.active_models[entity] = kde_model
 
         predictions = kde_model.pdf(xy).reshape(-1,1)
         print(predictions.shape, df[self.predictions].values.shape)

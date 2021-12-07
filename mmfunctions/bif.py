@@ -227,7 +227,8 @@ class StateTimePreparation(BaseTransformer):
         index_names = df.index.names
         ts_name = df.index.names[1]  # TODO: deal with non-standard dataframes (no timestamp)
 
-        logger.info('Source ', self.source, 'state_name ', self.state_name, 'Name ', self.name)
+        logger.info('Source: ' + self.source +  ', state_name ' +  self.state_name +  ', Name: ' + self.name +
+                    ', Entity: ' + df.index[0][0])
         #df[self.name] = (df[self.source] == self.state_name).astype(int).diff().fillna(1).astype(int)
         df_copy = df.reset_index()
 
@@ -276,6 +277,8 @@ class StateTimePreparation(BaseTransformer):
         df_copy[self.name] = df_copy['__intermediate1__'].map(str) + ',' + df_copy['__intermediate2__'].map(str)
 
         df_copy.drop(columns=['__intermediate1__','__intermediate2__'], inplace=True)
+
+        # suffices to return a signed integer
         #df_copy[self.name] = (v1 * df_copy[ts_name].astype(int)// 1000000000)
 
         return df_copy.set_index(index_names)
