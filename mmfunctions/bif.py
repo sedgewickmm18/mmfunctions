@@ -215,7 +215,7 @@ class AggregateTimeInState(BaseSimpleAggregator):
         # now reduce pairs (1,1) or (-1,-1)
         #gg0 = np.lib.stride_tricks.sliding_window_view(g0, 2)    # sliding windows
         gg0 = np.lib.stride_tricks.as_strided(g0,
-                 shape=(g0.size, 2), strides=(gg0.itemsize, gg0.itemsize))
+                 shape=(g0.size, 2), strides=(g0.itemsize, g0.itemsize))
 
         hpairs = np.append((gg0[:, :-1] == gg0[:, 1:]), False)   # find pairs
         gg0[hpairs.flatten()] = 0   # and remove the first element of each pair
