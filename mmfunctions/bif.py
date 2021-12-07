@@ -242,6 +242,7 @@ class StateTimePreparation(BaseTransformer):
         if v1.size > 0:
             v1[0] = 0
             try:
+                # first non-zero
                 nonzero = np.min(np.nonzero(v1))
                 if v1[nonzero] > 0:
                     v1[0] = -1
@@ -267,6 +268,38 @@ class StateTimePreparation(BaseTransformer):
                     logger.debug('No Non-Zero 2')
                     # no non zero element
                     pass
+
+        # we have odd
+        #   -1     1    -1      -> v1[0] = 0
+        #    1    -1     1      -> v1[-1] = 0
+        #         even
+        #   -1     1    -1     1   -> v1[0] = 0 & v1[-1] = 0
+        #    1    -1     1    -1
+        # small
+        #   -1     1
+        #    1    -1
+        # smallest
+        #   -1           -> v1[0] = 0
+        #    1           -> v1[0] = 0
+
+        siz = 0
+        try:
+            siz = np.count(np.nonzero(v1))
+        except Exception:
+            pass
+        if siz == 1:
+            v1[0] = 0
+        elif siz == 2:
+            print(2)
+        elif siz % 2 != 0:
+            # odd
+            if v1[0] == -1: v1[0] = 0
+            else: v1[-1] = 0
+        else:
+            # even
+            if v1[0] == -1:
+                v1[0] = 0
+                v1[-1] = 0
 
         logger.info('HERE3')
         logger.info(str(v1))
