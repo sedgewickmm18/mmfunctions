@@ -127,8 +127,8 @@ class AggregateTimeInState(BaseSimpleAggregator):
             logger.info('AggregateTimeInState returns 0 due to NaNs')
             return 0
 
-        g0 = group_exp[0].values
-        g1 = group_exp[1].values
+        g0 = group_exp[0].values.copy()
+        g1 = group_exp[1].values.copy()
         #logger.debug(str(g0) + ' ' + str(g1))
 
         #logger.debug(str(np.all(g1[:-1] <= g1[1:]) ))
@@ -155,8 +155,8 @@ class AggregateTimeInState(BaseSimpleAggregator):
         nonzeroMin = 0
         nonzeroMax = 0
         try:
-            nonzeroMin = np.min(np.nonzero(g0 != 0))
-            nonzeroMax = np.max(np.nonzero(g0 != 0))
+            nonzeroMin = np.min(np.nonzero(g0))
+            nonzeroMax = np.max(np.nonzero(g0))
         except Exception:
             logger.info('AggregateTimeInState all elements zero - returns ' + str(0) + ' seconds, from ' + str(g0.size))
             return 0
