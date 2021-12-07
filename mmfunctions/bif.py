@@ -234,6 +234,8 @@ class StateTimePreparation(BaseTransformer):
         v1 = eval("df_copy[self.source] " + self.state_name).astype(int).diff().values.astype(int)
         #v1 = (df_copy[self.source] > 50).astype(int).diff().values.astype(int)
 
+        logger.debug('HERE')
+
         # first element is NaN - pretend a state change
         if v1.size > 0:
             v1[0] = 0
@@ -248,6 +250,7 @@ class StateTimePreparation(BaseTransformer):
                 # no non zero element
                 pass
 
+        logger.debug('HERE2')
         # if last element is 0 - pretend a state change
         if v1.size > 0:
             if v1[-1] == 0:
@@ -263,6 +266,7 @@ class StateTimePreparation(BaseTransformer):
                     # no non zero element
                     pass
 
+        logger.debug('HERE3')
         logger.debug(str(v1))
 
         '''
@@ -273,7 +277,7 @@ class StateTimePreparation(BaseTransformer):
 
         df_copy.drop(columns=['__intermediate1__','__intermediate2__'], inplace=True)
         '''
-        df_copy[self.name] = v1 * df_copy[ts_name].astype(int)// 1000000000
+        df_copy[self.name] = (v1 * df_copy[ts_name].astype(int)// 1000000000)
 
         #df_copy[self.name] = change_arr
         return df_copy.set_index(index_names)
