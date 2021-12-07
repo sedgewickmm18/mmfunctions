@@ -269,6 +269,8 @@ class StateTimePreparation(BaseTransformer):
                     # no non zero element
                     pass
 
+        logger.info('HERE3: ' + str(v1))
+
         # we have odd
         #   -1     1    -1      -> v1[0] = 0
         #    1    -1     1      -> v1[-1] = 0
@@ -285,24 +287,23 @@ class StateTimePreparation(BaseTransformer):
         siz = 0
         try:
             siz = np.count(np.nonzero(v1))
+            if siz == 1:
+                v1[0] = 0
+            elif siz == 2 or siz == 0:
+                print(2)
+            elif siz % 2 != 0:
+                # odd
+                if v1[0] == -1: v1[0] = 0
+                else: v1[-1] = 0
+            else:
+                # even
+                if v1[0] == -1:
+                    v1[0] = 0
+                    v1[-1] = 0
         except Exception:
             pass
-        if siz == 1:
-            v1[0] = 0
-        elif siz == 2:
-            print(2)
-        elif siz % 2 != 0:
-            # odd
-            if v1[0] == -1: v1[0] = 0
-            else: v1[-1] = 0
-        else:
-            # even
-            if v1[0] == -1:
-                v1[0] = 0
-                v1[-1] = 0
 
-        logger.info('HERE3')
-        logger.info(str(v1))
+        logger.info('HERE4: ' + str(v1))
 
         df_copy['__intermediate1__'] = v1
         df_copy['__intermediate2__'] = (df_copy[ts_name].astype(int)// 1000000000) * v1
