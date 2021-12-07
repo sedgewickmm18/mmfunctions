@@ -121,16 +121,21 @@ class AggregateTimeInState(BaseSimpleAggregator):
             return 0
 
         # group_exp[0] = change array, group_exp[1] = timestamps
-        logger.info(str(group[1:100]))
+        #logger.info(str(group[1:100]))
+        df_group_exp = group.str.split(pat=',', n=2, expand=True)
+        logger.info(str(df_group_exp))
 
+        g0 = None
+        g1 = None
         try:
-            group_exp = group.str.split(pat=',', n=1, expand=True).astype(int)
+            g0 = df_group_exp[0].values.astype(int).copy()
+            g1 = df_group_exp[1].values.astype(int).copy()
         except Exception as esplit:
             logger.info('AggregateTimeInState returns 0 due to NaNs')
             return 0
 
-        g0 = group_exp[0].values.copy()
-        g1 = group_exp[1].values.copy()
+        #g0 = group_exp[0].values.copy()
+        #g1 = group_exp[1].values.copy()
 
         '''
         # now reduce pairs (1,1) or (-1,-1)
