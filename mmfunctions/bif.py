@@ -163,21 +163,56 @@ class AggregateTimeInState(BaseSimpleAggregator):
             pass
 
         if nonzeroMin > 0:
-            logger.info('YES1 ' + str(nonzeroMin) + ' ' + str(g0[nonzeroMin]))
+            #logger.info('YES1 ' + str(nonzeroMin) + ' ' + str(g0[nonzeroMin]))
             if g0[nonzeroMin] < 0:
                 g0[0] = 1
         else:
-            logger.info('NO 1 ' + str(nonzeroMin) + ' ' + str(g0[nonzeroMin]))
+            #logger.info('NO 1 ' + str(nonzeroMin) + ' ' + str(g0[nonzeroMin]))
             if g0[0] < 0:
                 g0[0] = 0
 
         if nonzeroMax > 0:
-            logger.info('YES2 ' + str(nonzeroMax) + ' ' + str(g0[nonzeroMax]))
+            #logger.info('YES2 ' + str(nonzeroMax) + ' ' + str(g0[nonzeroMax]))
             if g0[nonzeroMax] > 0:
                 g0[-1] = -1
                 # if nonzeroMax is last, ignore
                 if g0[nonzeroMax] < 0:
                     g0[-1] = 0
+
+        # we have odd
+        #   -1     1    -1      -> g0[0] = 0
+        #    1    -1     1      -> g0[-1] = 0
+        #         even
+        #   -1     1    -1     1   -> g0[0] = 0 & g0[-1] = 0
+        #    1    -1     1    -1
+        # small
+        #   -1     1
+        #    1    -1
+        # smallest
+        #   -1           -> g0[0] = 0
+        #    1           -> g0[0] = 0
+
+        siz = 0
+        try:
+            siz = np.count_nonzero(g0)
+            if siz == 1:
+                g0[0] = 0
+            elif siz == 2 or siz == 0:
+                print(2)
+            elif siz % 2 != 0:
+                # odd
+                if g0[0] == -1: g0[0] = 0
+                else: g0[-1] = 0
+            else:
+                # even
+                if g0[0] == -1:
+                    g0[0] = 0
+                    g0[-1] = 0
+        except Exception:
+            logger.info('HERE5: ')
+            pass
+
+        logger.info('HERE4: ' + str(g0))
 
         y = -(g0 * g1).sum()
         #y = g1.sum()
