@@ -117,7 +117,8 @@ class AggregateTimeInState(BaseSimpleAggregator):
 
         lg = group.size
         if lg == 0:
-            return 0
+            logger.info('AggregateTimeInState no elements - returns 0 seconds, from 0')
+            return 0.0
 
         # debug stuff
         #pd.set_option("display.max_rows", 50)
@@ -132,8 +133,8 @@ class AggregateTimeInState(BaseSimpleAggregator):
             g0 = df_group_exp[0].values.astype(int).copy()
             g1 = df_group_exp[1].values.astype(int).copy()
         except Exception as esplit:
-            logger.info('AggregateTimeInState returns 0 due to NaNs')
-            return 0
+            logger.info('AggregateTimeInState elements with NaN- returns 0 seconds, from ' + str(g0.size))
+            return 0.0
 
         #g0 = group_exp[0].values.copy()
         #g1 = group_exp[1].values.copy()
@@ -177,7 +178,7 @@ class AggregateTimeInState(BaseSimpleAggregator):
             nonzeroMin = np.min(np.nonzero(g0))
             nonzeroMax = np.max(np.nonzero(g0))
         except Exception:
-            logger.info('AggregateTimeInState all elements zero - returns ' + str(0) + ' seconds, from ' + str(g0.size))
+            logger.info('AggregateTimeInState all elements zero - returns 0 seconds, from ' + str(g0.size))
             return 0.0
             pass
 
