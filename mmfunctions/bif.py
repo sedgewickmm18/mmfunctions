@@ -114,18 +114,17 @@ class AggregateTimeInState(BaseSimpleAggregator):
 
     def execute(self, group):
         logger.info('Execute AggregateTimeInState')
-        #print('Source ', self.source,  'Name ', self.name, ' Index ', group.index)
 
         lg = group.size
         if lg == 0:
             return 0
 
-        pd.set_option("display.max_rows", 50)
-        logger.info(str(group))
-        # group_exp[0] = change array, group_exp[1] = timestamps
-        #logger.info(str(group[1:100]))
+        # debug stuff
+        #pd.set_option("display.max_rows", 50)
+        #logger.info(str(group))
+
         df_group_exp = group.str.split(pat=',', n=2, expand=True)
-        logger.info(str(df_group_exp))
+        #logger.info(str(df_group_exp))
 
         g0 = None
         g1 = None
@@ -139,16 +138,8 @@ class AggregateTimeInState(BaseSimpleAggregator):
         #g0 = group_exp[0].values.copy()
         #g1 = group_exp[1].values.copy()
 
-        '''
-        # now reduce pairs (1,1) or (-1,-1)
-        gg0 = np.lib.stride_tricks.as_strided(g0,
-                 shape=(g0.size, 2), strides=(g0.itemsize, g0.itemsize))
-
-        hpairs = (gg0[:, :-1] == gg0[:, 1:])   # find pairs
-        g0[hpairs.flatten()] = 0   # and remove the first element of each pair
-        '''
         # now reduce false statechange sequences like -1, 0, 0, -1, 0, 1
-        logger.info('HERE1: ' + str(g0[0:400]))
+        #logger.info('HERE1: ' + str(g0[0:400]))
 
         flag = 0
         with np.nditer(g0, op_flags=['readwrite']) as it:
@@ -187,7 +178,7 @@ class AggregateTimeInState(BaseSimpleAggregator):
             nonzeroMax = np.max(np.nonzero(g0))
         except Exception:
             logger.info('AggregateTimeInState all elements zero - returns ' + str(0) + ' seconds, from ' + str(g0.size))
-            return 0
+            return 0.0
             pass
 
         if nonzeroMin > 0:
@@ -240,15 +231,14 @@ class AggregateTimeInState(BaseSimpleAggregator):
             logger.info('HERE5: ')
             pass
 
-        logger.info('HERE2: ' + str(g0[0:400]))
-        logger.info('HERE2:    ' + str(np.count_nonzero(g0 == 1)) + ' ' + str(np.count_nonzero(g0 == -1)))
-
+        #logger.debug('HERE2: ' + str(g0[0:400]))
+        logger.debug('AggregateTimeInState:  state changes ' + str(np.count_nonzero(g0 == 1)) + ' ' + str(np.count_nonzero(g0 == -1)))
 
         y = -(g0 * g1).sum()
         #y = g1.sum()
         logger.info(str(y))
         if y < 0:
-            y = 0
+            y = 0.0
         logger.info('AggregateTimeInState returns ' + str(y) + ' seconds, computed from ' + str(g0.size))
         return y
 
@@ -296,7 +286,7 @@ class StateTimePreparation(BaseTransformer):
 
         logger.info('Source: ' + self.source +  ', state_name ' +  self.state_name +  ', Name: ' + self.name +
                     ', Entity: ' + df.index[0][0])
-        #df[self.name] = (df[self.source] == self.state_name).astype(int).diff().fillna(1).astype(int)
+
         df_copy = df.reset_index()
 
         # pair of +- seconds and regular timestamp
@@ -304,78 +294,8 @@ class StateTimePreparation(BaseTransformer):
 
         v1 = np.roll(v1, -1)  # push the first element, NaN, to the end
         v1[-1] = 0
-        #v1 = (df_copy[self.source] > 50).astype(int).diff().values.astype(int)
 
-        logger.info('HERE: ' + str(v1[0:600]))
-
-        '''
-        # first element is NaN - pretend a state change
-        if v1.size > 0:
-            v1[0] = 0
-            try:
-                # first non-zero
-                nonzero = np.min(np.nonzero(v1))
-                if v1[nonzero] > 0:
-                    v1[0] = -1
-                else:
-                    v1[0] = 1
-            except Exception:
-                logger.debug('No Non-Zero')
-                # no non zero element
-                pass
-
-        logger.info('HERE2')
-        # if last element is 0 - pretend a state change
-        if v1.size > 0:
-            if v1[-1] == 0:
-                try:
-                    # last nonzero element
-                    nonzero = np.max(np.nonzero(v1))
-                    if v1[nonzero] > 0:
-                        v1[-1] = -1
-                    else:
-                        v1[-1] = 1
-                except Exception:
-                    logger.debug('No Non-Zero 2')
-                    # no non zero element
-                    pass
-
-        logger.info('HERE3: ' + str(v1))
-
-        # we have odd
-        #   -1     1    -1      -> v1[0] = 0
-        #    1    -1     1      -> v1[-1] = 0
-        #         even
-        #   -1     1    -1     1   -> v1[0] = 0 & v1[-1] = 0
-        #    1    -1     1    -1
-        # small
-        #   -1     1
-        #    1    -1
-        # smallest
-        #   -1           -> v1[0] = 0
-        #    1           -> v1[0] = 0
-
-        siz = 0
-        try:
-            siz = np.count_nonzero(v1)
-            if siz == 1:
-                v1[0] = 0
-            elif siz == 2 or siz == 0:
-                print(2)
-            elif siz % 2 != 0:
-                # odd
-                if v1[0] == -1: v1[0] = 0
-                else: v1[-1] = 0
-            else:
-                # even
-                if v1[0] == -1:
-                    v1[0] = 0
-                    v1[-1] = 0
-        except Exception:
-            pass
-
-        logger.info('HERE4: ' + str(v1))
-        '''
+        #logger.debug('HERE: ' + str(v1[0:600]))
 
         df_copy['__intermediate1__'] = v1
         df_copy['__intermediate2__'] = (df_copy[ts_name].astype(int)// 1000000000)
@@ -384,8 +304,6 @@ class StateTimePreparation(BaseTransformer):
 
         df_copy.drop(columns=['__intermediate1__','__intermediate2__'], inplace=True)
 
-        # suffices to return a signed integer
-        #df_copy[self.name] = (v1 * df_copy[ts_name].astype(int)// 1000000000)
 
         return df_copy.set_index(index_names)
 
