@@ -524,7 +524,7 @@ class DBPreload(BaseTransformer):
 
         # align dataframe with data received
         db_columns = db.get_column_names(table=self.table, schema=schema)
-        logger.info('DBPreload: columns loaded: ' + str(db.columns))
+        logger.info('DBPreload: columns loaded: ' + str(db_columns))
         new_columns = list(set(db_columns) - set(df.columns) - set(index_names))
         logger.info('DBPreload: new columns: ' + str(new_columns))
         old_columns = list(set(db_columns) - set(new_columns) - set(index_names))
