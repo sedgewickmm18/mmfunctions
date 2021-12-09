@@ -493,6 +493,7 @@ class DBPreload(BasePreload):
         # create an instance variable with the same name as each arg
         self.table = table
         self.timestamp_column = timestamp_column
+        self.output_item = output_item
 
     def execute(self, df, start_ts=None, end_ts=None, entities=None):
 
@@ -504,38 +505,40 @@ class DBPreload(BasePreload):
         start_ts = None
         end_ts = None
 
-        df = db.read_table(self.table, None, None, None, self.timestamp_column, start_ts, end_ts)
+        df_input = db.read_table(self.table, None, None, None, self.timestamp_column, start_ts, end_ts)
+
+        # preserve index
+        index_names = df.index.names
+        ts_name = df.index.names[1]  # TODO: deal with non-standard dataframes (no timestamp)
+
+        df = df.reset_index().set_index(ts_name)  # copy
 
         # align dataframe with data received
+        db_columns = db.get_column_names(table=table, schema=schema)
+        new_columns = list(set(db_columns) - set(df.columns))
+        old_columns = list(set(db_columns) - set(new_columns))
 
-        # use supplied column map to rename columns
-        #df = df.rename(self.column_map, axis='columns')
-        # fill in missing columns with nulls
+        # ditch old columns - no overwriting
+        if len(old_columns) > 0:
+            df_input.drop(columns=old_columns, inplace=True)
 
-        # some hygiene
-        required_cols = db.get_column_names(table=table, schema=schema)
-        missing_cols = list(set(required_cols) - set(df.columns))
-        if len(missing_cols) > 0:
-            kwargs = {'missing_cols': missing_cols}
-            entity_type.trace_append(created_by=self, msg='http data was missing columns. Adding values.',
-                                     log_method=logger.debug, **kwargs)
-            for m in missing_cols:
-                if m == entity_type._timestamp:
-                    df[m] = dt.datetime.utcnow() - dt.timedelta(seconds=15)
-                elif m == 'devicetype':
-                    df[m] = entity_type.logical_name
-                else:
-                    df[m] = None
+        output_column = new_columns.pop()
 
-        # remove columns that are not required
-        df = df[required_cols]
+        if len(new_columns) > 1:
+            df_input.drop(columns=new_columns, inplace=True)
+
+        # rename output column
+        df_input = df_input.rename(columns={output_column: self.output_item}).set_index(tsname)
+
+        # merge data
+        df = df.merge_ordered(df_input, on=index, how='outer')
 
         # write the dataframe to the database table
-        self.write_frame(df=df, table_name=table)
-        kwargs = {'table_name': table, 'schema': schema, 'row_count': len(df.index)}
-        entity_type.trace_append(created_by=self, msg='Wrote data to table', log_method=logger.debug, **kwargs)
+        #self.write_frame(df=df, table_name=table)
+        #kwargs = {'table_name': table, 'schema': schema, 'row_count': len(df.index)}
+        #entity_type.trace_append(created_by=self, msg='Wrote data to table', log_method=logger.debug, **kwargs)
 
-        return True
+        return df
 
     @classmethod
     def build_ui(cls):
@@ -548,6 +551,8 @@ class DBPreload(BasePreload):
         inputs.append(UISingle(name='timestamp_column', datatype=str, description='name of the timestamp column'))
         # define arguments that behave as function outputs
         outputs = []
-        outputs.append(UIStatusFlag(name='output_item'))
+        outputs.append(
+            UIFunctionOutSingle(name='output_item', datatype=float, description='Data from database'))
+
         return (inputs, outputs)
 
