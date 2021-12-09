@@ -137,7 +137,7 @@ class AggregateTimeInState(BaseSimpleAggregator):
         index = 0
         with np.nditer(gchange, op_flags=['readwrite']) as it:
             for x in it:
-                # interval start, adjust
+                # apparently a StateTimePrep interval start, adjust
                 if x == 2:
                     # we haven't seen a statechange yet, so state == statechange
                     if flag == 0:
@@ -148,7 +148,7 @@ class AggregateTimeInState(BaseSimpleAggregator):
                     # same state as before, just set to zero
                     else:
                         x[...] = 0
-                # no interval start but statechange, so adjust flag
+                # no interval start but state change, so change the flag accordingly
                 elif x != 0:
                     flag = x
                 index += 1
@@ -305,6 +305,9 @@ class StateTimePreparation(BaseTransformer):
         # pair of +- seconds and regular timestamp
         vstate = eval("df_copy[self.source] " + self.state_name).astype(int)
         vchange = eval("df_copy[self.source] " + self.state_name).astype(int).diff().values.astype(int)
+
+        logger.info(str(vstate))
+        logger.info(str(vchange))
 
         #v1 = np.roll(v1_, -1)  # push the first element, NaN, to the end
         # v1[-1] = 0
