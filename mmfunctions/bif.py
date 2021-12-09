@@ -519,7 +519,10 @@ class DBPreload(BaseTransformer):
         end_ts = df.index.max()
 
         df_input = db.read_table(self.table, None, None, None, self.timestamp_column, start_ts, end_ts)
-        df_input = df_input.reset_index().rename(columns={self.timestamp_column: ts_name, \
+        logger.info('DBPreload: load columns ' + str(df_input.columns) + ', index ' + str(df_input.index))
+        #df_input = df_input.reset_index().rename(columns={self.timestamp_column: ts_name, \
+        #    entity_type._entity_id: entity_type._df_index_entity_id}).set_index(ts_name)
+        df_input = df_input.reset_index().rename(columns={\
             entity_type._entity_id: entity_type._df_index_entity_id}).set_index(ts_name)
 
         # align dataframe with data received
