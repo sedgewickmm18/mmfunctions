@@ -522,7 +522,7 @@ class DBPreload(BaseTransformer):
 
         # align dataframe with data received
         db_columns = db.get_column_names(table=self.table, schema=schema)
-        new_columns = list(set(db_columns) - set(df.columns))
+        new_columns = list(set(db_columns) - set(df.columns) - set(index_names))
         old_columns = list(set(db_columns) - set(new_columns) - set(index_names))
 
         # ditch old columns - no overwriting
