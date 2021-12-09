@@ -310,7 +310,7 @@ class StateTimePreparation(BaseTransformer):
         # v1[-1] = 0
 
         # first value is a NaN, replace it with special value for Aggregator
-        v1[0] = 2
+        vchange[0] = 2
 
         #logger.debug('HERE: ' + str(v1[0:600]))
 
