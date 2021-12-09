@@ -497,6 +497,9 @@ class DBPreload(BasePreload):
 
     def execute(self, df, start_ts=None, end_ts=None, entities=None):
 
+        if df is None:
+            return df
+
         entity_type = self.get_entity_type()
         db = entity_type.db
         table = entity_type.name
