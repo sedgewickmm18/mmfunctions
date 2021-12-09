@@ -521,7 +521,7 @@ class DBPreload(BaseTransformer):
         df_input = df_input.reset_index().rename(columns={self.timestamp_column: ts_name}).set_index(ts_name)
 
         # align dataframe with data received
-        db_columns = db.get_column_names(table=table, schema=schema)
+        db_columns = db.get_column_names(table=self.table, schema=schema)
         new_columns = list(set(db_columns) - set(df.columns))
         old_columns = list(set(db_columns) - set(new_columns) - set(index_names))
 
