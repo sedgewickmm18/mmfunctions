@@ -509,6 +509,7 @@ class DBPreload(BaseTransformer):
         # preserve index
         index_names = df.index.names
         ts_name = df.index.names[1]  # TODO: deal with non-standard dataframes (no timestamp)
+        logger.info('DBPreload: Index is ' + str(index_names))
 
         df = df.reset_index().set_index(ts_name)  # copy
 
@@ -522,8 +523,11 @@ class DBPreload(BaseTransformer):
 
         # align dataframe with data received
         db_columns = db.get_column_names(table=self.table, schema=schema)
+        logger.info('DBPreload: columns loaded: ' + str(db.columns))
         new_columns = list(set(db_columns) - set(df.columns) - set(index_names))
+        logger.info('DBPreload: new columns: ' + str(new_columns))
         old_columns = list(set(db_columns) - set(new_columns) - set(index_names))
+        logger.info('DBPreload: old columns: ' + str(old_columns))
 
         # ditch old columns - no overwriting
         if len(old_columns) > 0:
