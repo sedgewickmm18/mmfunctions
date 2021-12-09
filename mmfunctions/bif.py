@@ -479,7 +479,7 @@ class AggregateKDEDensity1d(BaseSimpleAggregator):
 
         return raw_threshold
 
-class DBPreload(BasePreload):
+class DBPreload(BaseTransformer):
     """
     Do a DB request as a preload activity. Load results of the get into the Entity Type time series table.
     """
