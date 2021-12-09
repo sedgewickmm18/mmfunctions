@@ -500,6 +500,8 @@ class DBPreload(BasePreload):
         if df is None:
             return df
 
+        logger.info('Execute DBPreload')
+
         entity_type = self.get_entity_type()
         db = entity_type.db
         table = entity_type.name
@@ -516,26 +518,31 @@ class DBPreload(BasePreload):
         end_ts = df.index.max()
 
         df_input = db.read_table(self.table, None, None, None, self.timestamp_column, start_ts, end_ts)
+        df_input = df_input.reset_index().rename(columns={self.timestamp_column: ts_name}).set_index(ts_name)
 
         # align dataframe with data received
         db_columns = db.get_column_names(table=table, schema=schema)
         new_columns = list(set(db_columns) - set(df.columns))
-        old_columns = list(set(db_columns) - set(new_columns))
+        old_columns = list(set(db_columns) - set(new_columns) - set(index_names))
 
         # ditch old columns - no overwriting
         if len(old_columns) > 0:
-            df_input.drop(columns=old_columns, inplace=True)
+            logger.info('DBPreload: Dropping columns: ' + str(old_columns))
+            df_input = df_input.drop(columns=old_columns)
 
         output_column = new_columns.pop()
 
         if len(new_columns) > 1:
+            logger.info('DBPreload: Dropping superfluous columns: ' + str(new_columns))
             df_input.drop(columns=new_columns, inplace=True)
 
         # rename output column
+        logger.info('DBPreload: Rename output column: ' + str(output_column))
         df_input = df_input.rename(columns={output_column: self.output_item}).set_index(tsname)
 
         # merge data
         df = df.merge_ordered(df_input, on=index, how='outer')
+        logger.info('DBPreload: Merged columns: ' + str(df.columns))
 
         # write the dataframe to the database table
         #self.write_frame(df=df, table_name=table)
