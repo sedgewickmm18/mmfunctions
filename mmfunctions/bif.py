@@ -30,7 +30,7 @@ from scipy.stats.mstats import mquantiles
 from iotfunctions.base import (BaseTransformer, BaseEvent, BaseSCDLookup, BaseSCDLookupWithDefault, BaseMetadataProvider,
                                BasePreload, BaseDatabaseLookup, BaseDataSource, BaseDBActivityMerge, BaseSimpleAggregator)
 from iotfunctions.ui import (UISingle, UIMultiItem, UIFunctionOutSingle, UISingleItem, UIFunctionOutMulti, UIMulti, UIExpression,
-                             UIText, UIParameters)
+                             UIText, UIParameters, UIStatusFlag)
 
 logger = logging.getLogger(__name__)
 PACKAGE_URL = 'git+https://github.com/sedgewickmm18/mmfunctions.git'
@@ -478,4 +478,76 @@ class AggregateKDEDensity1d(BaseSimpleAggregator):
         logger.info('AggregateKDEDensity1d returns ' + str(raw_threshold))
 
         return raw_threshold
+
+class DBPreload(BasePreload):
+    """
+    Do a DB request as a preload activity. Load results of the get into the Entity Type time series table.
+    """
+
+    out_table_name = None
+
+    def __init__(self, table, timestamp_column, output_item='db_preload_done'):
+
+        super().__init__(dummy_items=[], output_item=output_item)
+
+        # create an instance variable with the same name as each arg
+        self.table = table
+        self.timestamp_column = timestamp_column
+
+    def execute(self, df, start_ts=None, end_ts=None, entities=None):
+
+        entity_type = self.get_entity_type()
+        db = entity_type.db
+        table = entity_type.name
+
+        schema = entity_type._db_schema
+        start_ts = None
+        end_ts = None
+
+        df = db.read_table(self.table, None, None, None, self.timestamp_column, start_ts, end_ts)
+
+        # align dataframe with data received
+
+        # use supplied column map to rename columns
+        df = df.rename(self.column_map, axis='columns')
+        # fill in missing columns with nulls
+
+        # some hygiene
+        required_cols = db.get_column_names(table=table, schema=schema)
+        missing_cols = list(set(required_cols) - set(df.columns))
+        if len(missing_cols) > 0:
+            kwargs = {'missing_cols': missing_cols}
+            entity_type.trace_append(created_by=self, msg='http data was missing columns. Adding values.',
+                                     log_method=logger.debug, **kwargs)
+            for m in missing_cols:
+                if m == entity_type._timestamp:
+                    df[m] = dt.datetime.utcnow() - dt.timedelta(seconds=15)
+                elif m == 'devicetype':
+                    df[m] = entity_type.logical_name
+                else:
+                    df[m] = None
+
+        # remove columns that are not required
+        df = df[required_cols]
+
+        # write the dataframe to the database table
+        self.write_frame(df=df, table_name=table)
+        kwargs = {'table_name': table, 'schema': schema, 'row_count': len(df.index)}
+        entity_type.trace_append(created_by=self, msg='Wrote data to table', log_method=logger.debug, **kwargs)
+
+        return True
+
+    @classmethod
+    def build_ui(cls):
+        """
+        Registration metadata
+        """
+        # define arguments that behave as function inputs
+        inputs = []
+        inputs.append(UISingle(name='table', datatype=str, description='db table name'))
+        inputs.append(UISingle(name='timestamp_column', datatype=str, description='name of the timestamp column'))
+        # define arguments that behave as function outputs
+        outputs = []
+        outputs.append(UIStatusFlag(name='output_item'))
+        return (inputs, outputs)
 
