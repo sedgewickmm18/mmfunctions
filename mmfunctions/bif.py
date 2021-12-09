@@ -501,17 +501,18 @@ class DBPreload(BasePreload):
         db = entity_type.db
         table = entity_type.name
 
-        schema = entity_type._db_schema
-        start_ts = None
-        end_ts = None
-
-        df_input = db.read_table(self.table, None, None, None, self.timestamp_column, start_ts, end_ts)
-
         # preserve index
         index_names = df.index.names
         ts_name = df.index.names[1]  # TODO: deal with non-standard dataframes (no timestamp)
 
         df = df.reset_index().set_index(ts_name)  # copy
+
+        # read data
+        schema = entity_type._db_schema
+        start_ts = df.index.min()
+        end_ts = df.index.max()
+
+        df_input = db.read_table(self.table, None, None, None, self.timestamp_column, start_ts, end_ts)
 
         # align dataframe with data received
         db_columns = db.get_column_names(table=table, schema=schema)
@@ -538,7 +539,7 @@ class DBPreload(BasePreload):
         #kwargs = {'table_name': table, 'schema': schema, 'row_count': len(df.index)}
         #entity_type.trace_append(created_by=self, msg='Wrote data to table', log_method=logger.debug, **kwargs)
 
-        return df
+        return df.reset_index().set_index(index_names)
 
     @classmethod
     def build_ui(cls):
