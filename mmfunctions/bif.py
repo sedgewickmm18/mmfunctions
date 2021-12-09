@@ -509,7 +509,7 @@ class DBPreload(BasePreload):
         # align dataframe with data received
 
         # use supplied column map to rename columns
-        df = df.rename(self.column_map, axis='columns')
+        #df = df.rename(self.column_map, axis='columns')
         # fill in missing columns with nulls
 
         # some hygiene
