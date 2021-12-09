@@ -545,7 +545,7 @@ class DBPreload(BaseTransformer):
 
         # rename output column
         logger.info('DBPreload: Rename output column: ' + str(output_column))
-        df_input = df_input.rename(columns={output_column: self.output_item}).set_index(ts_name)
+        df_input = df_input.rename(columns={output_column: self.output_item})
 
         # merge data
         df = df.merge_ordered(df_input, on=index, how='outer')
