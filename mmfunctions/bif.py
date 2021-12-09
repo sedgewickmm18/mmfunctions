@@ -522,8 +522,7 @@ class DBPreload(BaseTransformer):
         logger.info('DBPreload: load columns ' + str(df_input.columns) + ', index ' + str(df_input.index))
         #df_input = df_input.reset_index().rename(columns={self.timestamp_column: ts_name, \
         #    entity_type._entity_id: entity_type._df_index_entity_id}).set_index(ts_name)
-        df_input = df_input.reset_index().rename(columns={\
-            entity_type._entity_id: entity_type._df_index_entity_id}).set_index(ts_name)
+        df_input = df_input.rename(columns={'deviceid':'id'}).set_index('self.timestamp_column')
 
         # align dataframe with data received
         db_columns = df_input.columns
