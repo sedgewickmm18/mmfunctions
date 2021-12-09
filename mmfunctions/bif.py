@@ -1,8 +1,8 @@
 # *****************************************************************************
-# Â© Copyright IBM Corp. 2018.  All Rights Reserved.
+# © Copyright IBM Corp. 2018.  All Rights Reserved.
 #
 # This program and the accompanying materials
-# are made available under the terms of the Apache V2.0
+# are made available under the terms of the Apache V2.0 license
 # which accompanies this distribution, and is available at
 # http://www.apache.org/licenses/LICENSE-2.0
 #
@@ -20,7 +20,6 @@ import warnings
 from collections import OrderedDict
 
 import numpy as np
-import scipy as sp
 import pandas as pd
 from statsmodels.tsa.seasonal import seasonal_decompose, STL
 from sklearn.neighbors import KernelDensity
@@ -50,7 +49,6 @@ class AggregateWithExpression(BaseSimpleAggregator):
     x.max() - x.min()
 
     """
-
     def __init__(self, source=None, expression=None, name=None):
         super().__init__()
         logger.info('AggregateWithExpression _init')
@@ -58,7 +56,6 @@ class AggregateWithExpression(BaseSimpleAggregator):
         self.source = source
         self.expression = expression
         self.name = name
-        print(dir(self))
 
     @classmethod
     def build_ui(cls):
@@ -66,19 +63,14 @@ class AggregateWithExpression(BaseSimpleAggregator):
         inputs.append(UIMultiItem(name='source', datatype=None,
                                   description=('Choose the data items that you would like to aggregate'),
                                   output_item='name', is_output_datatype_derived=True))
-
         inputs.append(UIExpression(name='expression', description='Paste in or type an AS expression'))
-
         return (inputs, [])
-
-    def aggregate(self, x):
-        return eval(self.expression)
 
     def execute(self, x):
         logger.info('Execute AggregateWithExpression')
-        print('Source ', self.source, 'Expression ', self.expression, 'Name ', self.name)
+        logger.debug('Source ' + str(self.source) +  'Expression ' +  str(self.expression) + 'Name ' + str(self.name))
         y = eval(self.expression)
-        logger.info('AggregateWithExpression returns ' + str(y))
+        self.log_df_info(y, 'AggregateWithExpression evaluation')
         return y
 
 
@@ -127,23 +119,44 @@ class AggregateTimeInState(BaseSimpleAggregator):
         df_group_exp = group.str.split(pat=',', n=2, expand=True)
         #logger.info(str(df_group_exp))
 
-        g0 = None
-        g1 = None
+        gchange = None
+        gstate = None
+        gtime = None
         try:
-            g0 = df_group_exp[0].values.astype(int).copy()
-            g1 = df_group_exp[1].values.astype(int).copy()
+            gchange = df_group_exp[0].values.astype(int).copy()
+            gstate = df_group_exp[1].values.astype(int).copy()
+            gtime = df_group_exp[2].values.astype(int).copy()
         except Exception as esplit:
-            logger.info('AggregateTimeInState elements with NaN- returns 0 seconds, from ' + str(g0.size))
+            logger.info('AggregateTimeInState elements with NaN- returns 0 seconds, from ' + str(gchange.size))
             return 0.0
 
-        #g0 = group_exp[0].values.copy()
-        #g1 = group_exp[1].values.copy()
+        # look for state change 2 - start interval for StateTimePrep
+        #
+        # |  previous run  -1 ...  |2 ..  1 next run    |
+        flag = 0
+        index = 0
+        with np.nditer(gchange, op_flags=['readwrite']) as it:
+            for x in it:
+                # interval start, adjust
+                if x == 2:
+                    # we haven't seen a statechange yet, so state == statechange
+                    if flag == 0:
+                        x[...] = gstate[index]
+                    # we have seen a statechange before, check whether our state is different
+                    elif gstate[index] != flag:
+                        x[...] = -flag
+                    # same state as before, just set to zero
+                    else:
+                        x[...] = 0
+                # no interval start but statechange, so adjust flag
+                elif x != 0:
+                    flag = x
+                index += 1
 
         # now reduce false statechange sequences like -1, 0, 0, -1, 0, 1
-        #logger.info('HERE1: ' + str(g0[0:400]))
-
+        #logger.info('HERE1: ' + str(gchange[0:400]))
         flag = 0
-        with np.nditer(g0, op_flags=['readwrite']) as it:
+        with np.nditer(gchange, op_flags=['readwrite']) as it:
             for x in it:
                 if flag == 0 and x != 0:
                     flag = x
@@ -151,7 +164,6 @@ class AggregateTimeInState(BaseSimpleAggregator):
                     x[...] = 0
                 elif flag == -x:
                     flag = x
-
 
         # adjust for intervals cut in half by aggregation
         '''
@@ -175,72 +187,73 @@ class AggregateTimeInState(BaseSimpleAggregator):
         nonzeroMin = 0
         nonzeroMax = 0
         try:
-            nonzeroMin = np.min(np.nonzero(g0))
-            nonzeroMax = np.max(np.nonzero(g0))
+            nonzeroMin = np.min(np.nonzero(gchange))
+            nonzeroMax = np.max(np.nonzero(gchange))
         except Exception:
-            logger.info('AggregateTimeInState all elements zero - returns 0 seconds, from ' + str(g0.size))
+            logger.info('AggregateTimeInState all elements zero - returns 0 seconds, from ' + str(gchange.size))
             return 0.0
             pass
 
         if nonzeroMin > 0:
-            #logger.info('YES1 ' + str(nonzeroMin) + ' ' + str(g0[nonzeroMin]))
-            if g0[nonzeroMin] < 0:
-                g0[0] = 1
+            #logger.info('YES1 ' + str(nonzeroMin) + ' ' + str(gchange[nonzeroMin]))
+            if gchange[nonzeroMin] < 0:
+                gchange[0] = 1
         else:
-            #logger.info('NO 1 ' + str(nonzeroMin) + ' ' + str(g0[nonzeroMin]))
-            if g0[0] < 0:
-                g0[0] = 0
+            #logger.info('NO 1 ' + str(nonzeroMin) + ' ' + str(gchange[nonzeroMin]))
+            if gchange[0] < 0:
+                gchange[0] = 0
 
         if nonzeroMax > 0:
-            #logger.info('YES2 ' + str(nonzeroMax) + ' ' + str(g0[nonzeroMax]))
-            if g0[nonzeroMax] > 0:
-                g0[-1] = -1
+            #logger.info('YES2 ' + str(nonzeroMax) + ' ' + str(gchange[nonzeroMax]))
+            if gchange[nonzeroMax] > 0:
+                gchange[-1] = -1
                 # if nonzeroMax is last, ignore
-                if g0[nonzeroMax] < 0:
-                    g0[-1] = 0
+                if gchange[nonzeroMax] < 0:
+                    gchange[-1] = 0
 
         # we have odd
-        #   -1     1    -1      -> g0[0] = 0
-        #    1    -1     1      -> g0[-1] = 0
+        #   -1     1    -1      -> gchange[0] = 0
+        #    1    -1     1      -> gchange[-1] = 0
         #         even
-        #   -1     1    -1     1   -> g0[0] = 0 & g0[-1] = 0
+        #   -1     1    -1     1   -> gchange[0] = 0 & gchange[-1] = 0
         #    1    -1     1    -1
         # small
         #   -1     1
         #    1    -1
         # smallest
-        #   -1           -> g0[0] = 0
-        #    1           -> g0[0] = 0
+        #   -1           -> gchange[0] = 0
+        #    1           -> gchange[0] = 0
 
         siz = 0
         try:
-            siz = np.count_nonzero(g0)
+            siz = np.count_nonzero(gchange)
             if siz == 1:
-                g0[0] = 0
+                gchange[0] = 0
             elif siz == 2 or siz == 0:
                 print(2)
             elif siz % 2 != 0:
                 # odd
-                if g0[0] == -1: g0[0] = 0
-                else: g0[-1] = 0
+                if gchange[0] == -1: gchange[0] = 0
+                else: gchange[-1] = 0
             else:
                 # even
-                if g0[0] == -1:
-                    g0[0] = 0
-                    g0[-1] = 0
+                if gchange[0] == -1:
+                    gchange[0] = 0
+                    gchange[-1] = 0
         except Exception:
-            logger.info('HERE5: ')
+            logger.debug('AggregateTimeInState: no state change')
             pass
 
-        #logger.debug('HERE2: ' + str(g0[0:400]))
-        logger.debug('AggregateTimeInState:  state changes ' + str(np.count_nonzero(g0 == 1)) + ' ' + str(np.count_nonzero(g0 == -1)))
+        #logger.debug('HERE2: ' + str(gchange[0:400]))
+        logger.debug('AggregateTimeInState:  state changes ' + str(np.count_nonzero(gchange == 1)) +\
+                     ' ' + str(np.count_nonzero(gchange == -1)))
 
-        y = -(g0 * g1).sum()
-        #y = g1.sum()
+        y = -(gchange * gtime).sum()
+        #y = gtime.sum()
         logger.info(str(y))
         if y < 0:
             y = 0.0
-        logger.info('AggregateTimeInState returns ' + str(y) + ' seconds, computed from ' + str(g0.size))
+        logger.info('AggregateTimeInState returns ' + str(y) + ' seconds, computed from ' + str(gchange.size))
         return y
 
 class StateTimePreparation(BaseTransformer):
@@ -248,8 +261,8 @@ class StateTimePreparation(BaseTransformer):
     Together with AggregateTimeInState StateTimePreparation
     calculates the amount of time a selected metric has been in a
     particular state.
-    StateTimePreparation outputs an encoded pair of a state change
-    variable (-1 for leaving the state, 0 for no change,
+    StateTimePreparation outputs an encoded triple of a state variable,
+    a state change variable (-1 for leaving the state, 0 for no change,
      1 for entering the state) together with a unix epoch
     timestamp.
     The condition for the state change is given as binary operator
@@ -271,8 +284,7 @@ class StateTimePreparation(BaseTransformer):
         inputs.append(UISingleItem(name='source', datatype=float,
                                   description='Data item to compute the state change array from'))
         inputs.append(UISingle(name='state_name', datatype=str,
-                              description='Condition for the state change array computation'))
-
+                               description='Condition for the state change array computation'))
         outputs = []
         outputs.append(
             UIFunctionOutSingle(name='name', datatype=str, description='State change array output'))
@@ -291,19 +303,26 @@ class StateTimePreparation(BaseTransformer):
         df_copy = df.reset_index()
 
         # pair of +- seconds and regular timestamp
-        v1 = eval("df_copy[self.source] " + self.state_name).astype(int).diff().values.astype(int)
+        vstate = eval("df_copy[self.source] " + self.state_name).astype(int)
+        vchange = eval("df_copy[self.source] " + self.state_name).astype(int).diff().values.astype(int)
 
-        v1 = np.roll(v1, -1)  # push the first element, NaN, to the end
-        v1[-1] = 0
+        #v1 = np.roll(v1_, -1)  # push the first element, NaN, to the end
+        # v1[-1] = 0
+
+        # first value is a NaN, replace it with special value for Aggregator
+        v1[0] = 2
 
         #logger.debug('HERE: ' + str(v1[0:600]))
 
-        df_copy['__intermediate1__'] = v1
-        df_copy['__intermediate2__'] = (df_copy[ts_name].astype(int)// 1000000000)
+        df_copy['__intermediate1__'] = vchange
+        df_copy['__intermediate2__'] = vstate
+        df_copy['__intermediate3__'] = (df_copy[ts_name].astype(int)// 1000000000)
 
-        df_copy[self.name] = df_copy['__intermediate1__'].map(str) + ',' + df_copy['__intermediate2__'].map(str) + ',' + df.index[0][0]
+        df_copy[self.name] = df_copy['__intermediate1__'].map(str) + ',' +\
+                             df_copy['__intermediate2__'].map(str) + ',' +\
+                             df_copy['__intermediate3__'].map(str) + ',' + df.index[0][0]
 
-        df_copy.drop(columns=['__intermediate1__','__intermediate2__'], inplace=True)
+        df_copy.drop(columns=['__intermediate1__','__intermediate2__','__intermediate3__'], inplace=True)
 
 
         return df_copy.set_index(index_names)
