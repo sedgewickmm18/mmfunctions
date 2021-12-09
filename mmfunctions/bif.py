@@ -116,7 +116,7 @@ class AggregateTimeInState(BaseSimpleAggregator):
         #pd.set_option("display.max_rows", 50)
         #logger.info(str(group))
 
-        df_group_exp = group.str.split(pat=',', n=2, expand=True)
+        df_group_exp = group.str.split(pat=',', n=3, expand=True)
         #logger.info(str(df_group_exp))
 
         gchange = None
