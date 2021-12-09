@@ -523,7 +523,7 @@ class DBPreload(BaseTransformer):
             entity_type._entity_id: entity_type._df_index_entity_id}).set_index(ts_name)
 
         # align dataframe with data received
-        db_columns = db.get_column_names(table=self.table, schema=schema)
+        db_columns = df_input.columns
         logger.info('DBPreload: columns loaded: ' + str(db_columns))
         new_columns = list(set(db_columns) - set(df.columns) - set(index_names))
         logger.info('DBPreload: new columns: ' + str(new_columns))
