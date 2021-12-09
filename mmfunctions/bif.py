@@ -303,7 +303,7 @@ class StateTimePreparation(BaseTransformer):
         df_copy = df.reset_index()
 
         # pair of +- seconds and regular timestamp
-        vstate = eval("df_copy[self.source] " + self.state_name).astype(int)
+        vstate = eval("df_copy[self.source] " + self.state_name).astype(int).values.astype(int)
         vchange = eval("df_copy[self.source] " + self.state_name).astype(int).diff().values.astype(int)
 
         logger.info(str(vstate))
