@@ -488,7 +488,7 @@ class DBPreload(BaseTransformer):
 
     def __init__(self, table, timestamp_column, output_item='db_preload_done'):
 
-        super().__init__(dummy_items=[], output_item=output_item)
+        super().__init__()
 
         # create an instance variable with the same name as each arg
         self.table = table
