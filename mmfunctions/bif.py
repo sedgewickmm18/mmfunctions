@@ -549,7 +549,7 @@ class DBPreload(BaseTransformer):
         df_input = df_input.rename(columns={output_column: self.output_item})
 
         # merge data - merge_ordered is not supported
-        df = pd.merge_ordered(df, df_input, on=ts_name, how='outer')
+        df = pd.merge_ordered(df, df_input, on=index_names, how='outer')
         logger.info('DBPreload: Merged columns: ' + str(df.columns))
 
         # write the dataframe to the database table
