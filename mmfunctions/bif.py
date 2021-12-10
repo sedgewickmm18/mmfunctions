@@ -515,8 +515,10 @@ class DBPreload(BaseTransformer):
 
         # read data
         schema = entity_type._db_schema
-        start_ts = df.index.min()
-        end_ts = df.index.max()
+        #start_ts = df.index.min()    # make that an extra argument - honor_time
+        #end_ts = df.index.max()
+        start_ts = None
+        end_ts = None
 
         df_input = db.read_table(self.table, None, None, None, self.timestamp_column, start_ts, end_ts)
         logger.info('DBPreload: load columns ' + str(df_input.columns) + ', index ' + str(df_input.index))
