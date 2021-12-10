@@ -571,6 +571,8 @@ class DBPreload(BaseTransformer):
         inputs.append(UISingle(name='table', datatype=str, description='db table name'))
         inputs.append(UISingle(name='timestamp_column', datatype=str, description='name of the timestamp column'))
         # define arguments that behave as function outputs
+        inputs.append(UISingle(name='time_offset', datatype=bool,
+                               description='If true interpret add an time offset to the timestamp column.'))
         outputs = []
         outputs.append(
             UIFunctionOutSingle(name='output_item', datatype=float, description='Data from database'))
