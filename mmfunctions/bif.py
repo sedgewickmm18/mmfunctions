@@ -486,13 +486,14 @@ class DBPreload(BaseTransformer):
 
     out_table_name = None
 
-    def __init__(self, table, timestamp_column, output_item='db_preload_done'):
+    def __init__(self, table, timestamp_column, time_offset=True, output_item='db_preload_done'):
 
         super().__init__()
 
         # create an instance variable with the same name as each arg
         self.table = table
         self.timestamp_column = timestamp_column
+        self.time_offset = time_offset
         self.output_item = output_item
 
     def execute(self, df, start_ts=None, end_ts=None, entities=None):
@@ -515,17 +516,27 @@ class DBPreload(BaseTransformer):
 
         # read data
         schema = entity_type._db_schema
+
         #start_ts = df.index.min()    # make that an extra argument - honor_time
         #end_ts = df.index.max()
         start_ts = None
         end_ts = None
 
+
         df_input = db.read_table(self.table, None, None, None, self.timestamp_column, start_ts, end_ts)
         logger.info('DBPreload: load columns ' + str(df_input.columns) + ', index ' + str(df_input.index))
+
+
         #df_input = df_input.reset_index().rename(columns={self.timestamp_column: ts_name, \
         #    entity_type._entity_id: entity_type._df_index_entity_id}).set_index(ts_name)
         df_input[self.timestamp_column] = pd.to_datetime(df_input[self.timestamp_column])
-        df_input = df_input.rename(columns={'deviceid':'id'}).set_index(self.timestamp_column)
+
+        if self.time_offset:
+            offset = df.index.max() - df_input[self.timestamp_column].max()
+            df_input[self.timestamp_column] += offset
+
+        df_input = df_input.rename(columns={'deviceid':'id'}).set_index(self.timestamp_column).sort_index()
+
 
         # align dataframe with data received
         db_columns = df_input.columns
