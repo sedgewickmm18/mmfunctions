@@ -575,7 +575,8 @@ class AnomalyScorer(BaseTransformer):
         # group over entities
         group_base = [pd.Grouper(axis=0, level=0)]
 
-        df_copy = df_copy.groupby(group_base).apply(self._calc)
+        if not df_copy.empty:
+            df_copy = df_copy.groupby(group_base).apply(self._calc)
 
         logger.debug('Scoring done')
         return df_copy
@@ -829,6 +830,8 @@ class NoDataAnomalyScoreExt(AnomalyScorer):
             dfe[[self.input_item]] = 0
             temperature = dfe[[self.input_item]].values
             temperature[0] = 10 ** 10
+
+        temperature = temperature.astype('float64').reshape(-1)
 
         return dfe, temperature
 
@@ -1215,7 +1218,7 @@ class GeneralizedAnomalyScore(AnomalyScorer):
 
         logger.debug(str(temperature.size) + "," + str(self.windowsize))
 
-        temperature -= np.mean(temperature, axis=0)
+        temperature -= np.mean(temperature.astype(np.float64), axis=0)
         mcd = MinCovDet()
 
         # Chop into overlapping windows (default) or run through FFT first
@@ -1318,6 +1321,8 @@ class NoDataAnomalyScore(GeneralizedAnomalyScore):
             temperature = dfe[[self.input_item]].values
             temperature[0] = 10 ** 10
 
+        temperature = temperature.astype('float64').reshape(-1)
+
         return dfe, temperature
 
     @classmethod
@@ -1381,60 +1386,59 @@ class FFTbasedGeneralizedAnomalyScore(GeneralizedAnomalyScore):
         return inputs, outputs
 
 
-if iotfunctions.__version__ != '8.2.1':
-    class MatrixProfileAnomalyScore(AnomalyScorer):
-        """
-        An unsupervised anomaly detection function.
-         Applies matrix profile analysis on time series data.
-         Moves a sliding window across the data signal to calculate the euclidean distance from one window to all others to build a distance profile.
-         The window size is typically set to 12 data points.
-         Try several anomaly models on your data and use the one that fits your data best.
-        """
-        DATAPOINTS_AFTER_LAST_WINDOW = 1e-15
-        INIT_SCORES = 1e-20
-        ERROR_SCORES = 1e-16
+class MatrixProfileAnomalyScore(AnomalyScorer):
+    """
+    An unsupervised anomaly detection function.
+     Applies matrix profile analysis on time series data.
+     Moves a sliding window across the data signal to calculate the euclidean distance from one window to all others to build a distance profile.
+     The window size is typically set to 12 data points.
+     Try several anomaly models on your data and use the one that fits your data best.
+    """
+    DATAPOINTS_AFTER_LAST_WINDOW = 1e-15
+    INIT_SCORES = 1e-20
+    ERROR_SCORES = 1e-16
 
-        def __init__(self, input_item, window_size, output_item):
-            super().__init__(input_item, window_size, [output_item])
-            logger.debug(f'Input item: {input_item}')
+    def __init__(self, input_item, window_size, output_item):
+        super().__init__(input_item, window_size, [output_item])
+        logger.debug(f'Input item: {input_item}')
 
-            self.whoami = 'MatrixProfile'
+        self.whoami = 'MatrixProfile'
 
 
-        def score(self, temperature):
+    def score(self, temperature):
 
-            scores = []
-            for output_item in self.output_items:
-                scores.append(np.zeros(temperature.shape))
+        scores = []
+        for output_item in self.output_items:
+            scores.append(np.zeros(temperature.shape))
 
-            try:  # calculate scores
-                # replaced aamp with stump for stumpy 1.8.0 and above
-                #matrix_profile = stumpy.aamp(temperature, m=self.windowsize)[:, 0]
-                matrix_profile = stumpy.stump(temperature, m=self.windowsize, normalize=False)[:, 0]
-                # fill in a small value for newer data points outside the last possible window
-                fillers = np.array([self.DATAPOINTS_AFTER_LAST_WINDOW] * (self.windowsize - 1))
-                matrix_profile = np.append(matrix_profile, fillers)
-            except Exception as er:
-                logger.warning(f' Error in calculating Matrix Profile Scores. {er}')
-                matrix_profile = np.array([self.ERROR_SCORES] * temperature.shape[0])
+        try:  # calculate scores
+            # replaced aamp with stump for stumpy 1.8.0 and above
+            #matrix_profile = stumpy.aamp(temperature, m=self.windowsize)[:, 0]
+            matrix_profile = stumpy.stump(temperature, m=self.windowsize, normalize=False)[:, 0]
+            # fill in a small value for newer data points outside the last possible window
+            fillers = np.array([self.DATAPOINTS_AFTER_LAST_WINDOW] * (self.windowsize - 1))
+            matrix_profile = np.append(matrix_profile, fillers)
+        except Exception as er:
+            logger.warning(f' Error in calculating Matrix Profile Scores. {er}')
+            matrix_profile = np.array([self.ERROR_SCORES] * temperature.shape[0])
 
-            scores[0] = matrix_profile
+        scores[0] = matrix_profile
 
-            logger.debug('Matrix Profile score max: ' + str(matrix_profile.max()))
+        logger.debug('Matrix Profile score max: ' + str(matrix_profile.max()))
 
-            return scores
+        return scores
 
-        @classmethod
-        def build_ui(cls):
-            # define arguments that behave as function inputs
-            inputs = [UISingleItem(name="input_item", datatype=float, description="Time series data item to analyze", ),
-                      UISingle(name="window_size", datatype=int,
-                               description="Size of each sliding window in data points. Typically set to 12.")]
+    @classmethod
+    def build_ui(cls):
+        # define arguments that behave as function inputs
+        inputs = [UISingleItem(name="input_item", datatype=float, description="Time series data item to analyze", ),
+                  UISingle(name="window_size", datatype=int,
+                           description="Size of each sliding window in data points. Typically set to 12.")]
 
-            # define arguments that behave as function outputs
-            outputs = [UIFunctionOutSingle(name="output_item", datatype=float,
-                                           description="Anomaly score (MatrixProfileAnomalyScore)", )]
-            return inputs, outputs
+        # define arguments that behave as function outputs
+        outputs = [UIFunctionOutSingle(name="output_item", datatype=float,
+                                       description="Anomaly score (MatrixProfileAnomalyScore)", )]
+        return inputs, outputs
 
 
 class SaliencybasedGeneralizedAnomalyScore(GeneralizedAnomalyScore):
@@ -2144,6 +2148,18 @@ class GBMRegressor(BaseEstimatorFunction):
         self.stop_auto_improve_at = -2
         self.whoami = 'GBMRegressor'
 
+    def generate_model_name(self, target_name, prefix='model', suffix=None):
+        name = []
+        my_name = self._entity_type.name
+        if my_name is None:
+            my_name = 'Test'
+        if prefix is not None:
+            name.append(prefix)
+        name.extend([my_name, self.name, target_name])
+        if suffix is not None:
+            name.append(suffix)
+        name = '.'.join(name)
+        return name
 
     def set_parameters(self):
         self.params = {'gbm__n_estimators': [self.n_estimators], 'gbm__num_leaves': [self.num_leaves],
