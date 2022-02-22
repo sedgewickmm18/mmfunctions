@@ -520,6 +520,12 @@ class AnomalyScorer(BaseTransformer):
 
         self.whoami = 'Anomaly'
 
+    def _set_dms(self, dms):
+        self.dms = dms
+
+    def _get_dms(self):
+        return self.dms
+
     def get_model_name(self, prefix='model', suffix=None):
 
         name = []
@@ -2111,6 +2117,12 @@ class GBMRegressor(BaseEstimatorFunction):
 
     # class variables
     train_if_no_model = True
+
+    def _set_dms(self, dms):
+        self.dms = dms
+
+    def _get_dms(self):
+        return self.dms
 
     def GBMPipeline(self):
         #steps = [('scaler', StandardScaler()), ('gbm', lightgbm.LGBMRegressor())]
