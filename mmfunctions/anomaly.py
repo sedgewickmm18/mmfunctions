@@ -62,7 +62,7 @@ from statsmodels.tsa.arima.model import ARIMA
 from iotfunctions.base import (BaseTransformer, BaseRegressor, BaseEstimatorFunction, BaseSimpleAggregator)
 from iotfunctions.bif import (AlertHighValue)
 from iotfunctions.ui import (UISingle, UIMulti, UIMultiItem, UIFunctionOutSingle, UISingleItem, UIFunctionOutMulti)
-from dbtables import (FileModelStore, DBModelStore)
+from iotfunctions.dbtables import (FileModelStore, DBModelStore)
 
 # VAE
 import torch
