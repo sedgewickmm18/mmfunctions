@@ -2270,7 +2270,7 @@ class GBMRegressor(BaseEstimatorFunction):
         method_names = [attr for attr in dir(obj) if inspect.ismethod(getattr(obj,attr))]
         logger.info('List of self methods ' + str(method_names))
 
-        db = self.get_dms().db
+        db = self._get_dms().db
         self._entity_type.db = db
         logger.info('db is ' + str(db))
         logger.info('model store is ' + str(db.model_store))
