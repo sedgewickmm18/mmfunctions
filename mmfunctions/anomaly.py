@@ -2281,7 +2281,7 @@ class GBMRegressor(BaseEstimatorFunction):
         logger.info('schema ' + str(db.schema))
         if db.schema is None:
             db.schema = 'BLUADMIN'
-            db.model_store = dbtables.DBModelStore(db.tenant_id, db.entity_type_id, db.schema, db.native_connection, db.db_type)
+            db.model_store = DBModelStore(db.tenant_id, db.entity_type_id, db.schema, db.native_connection, db.db_type)
 
         # forecasting support
         if self.lags is not None:
