@@ -2255,6 +2255,8 @@ class GBMRegressor(BaseEstimatorFunction):
             if not pd.api.types.is_numeric_dtype(df_copy[feature].dtype):
                 logger.error('Regression on non-numeric feature:' + str(feature))
                 return (df_copy)
+            # make sure it's a floater
+            df_copy[feature] = pd.to_numeric(df_copy[feature], downcast='float')
 
         # delegate to _calc
         logger.debug('Execute ' + self.whoami + ' enter per entity execution')
@@ -2289,6 +2291,10 @@ class GBMRegressor(BaseEstimatorFunction):
         logger.debug('GBMRegressor execute: ' + str(type(df)) + ' for entity ' + str(entity) +
                      ' predicting ' + str(self.targets) + ' from ' + str(self.features) +
                      ' to appear in ' + str(self.predictions))
+
+        if df.count == 0:
+            logger.info('GBMRegressor for entity ' + str(entity) + ' has no data')
+            return df
 
         try:
             check_array(df[self.features].values, allow_nd=True)

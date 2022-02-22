@@ -138,18 +138,23 @@ class AggregateTimeInState(BaseSimpleAggregator):
         with np.nditer(gchange, op_flags=['readwrite']) as it:
             for x in it:
                 # apparently a StateTimePrep interval start, adjust
+                # apparently a StateTimePrep interval start, adjust
                 if x == 2:
                     # we haven't seen a statechange yet, so state == statechange
                     if flag == 0:
                         x[...] = gstate[index]
+                        x = gstate[index]
                     # we have seen a statechange before, check whether our state is different
                     elif gstate[index] != flag:
                         x[...] = -flag
+                        x = -flag
                     # same state as before, just set to zero
                     else:
                         x[...] = 0
+                        x = 0
                 # no interval start but state change, so change the flag accordingly
-                elif x != 0:
+                #   if x had been 2 before it is now corrected
+                if x != 0:
                     flag = x
                 index += 1
 
