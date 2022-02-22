@@ -2304,6 +2304,25 @@ class GBMRegressor(BaseEstimatorFunction):
             return df
 
         try:
+            df_train, df_test = self.execute_train_test_split(df)
+            steps = [('scaler', StandardScaler()), ('gbm',
+                lightgbm.LGBMRegressor(num_leaves=self.num_leaves, n_estimators=self.n_estimators,
+                                       learning_rate=self.learning_rate,reg_lambda=0.2))]
+            pipe = Pipeline(steps)
+
+            pipe.fit(X=df_train[features], y=df_train[target])
+
+            logger.info('Train score ' + str(pipe.score(df_train[features], df_train[target])) +\
+                        '   Test score ' + str(pipe.score(df_test[features], df_test[target])))
+
+            df[self.predictions] = pipe.predict(df[features])
+
+        except Exception as e:
+            logger.info('GBMRegressor for entity ' + str(entity) + ' failed with: ' + str(e))
+            df[self.predictions] = 0
+
+        '''
+        try:
             dfe = super()._execute(df, entity)
 
             logger.debug('GBMRegressor: Entity ' + str(entity) + ' Type of pred ' +
@@ -2316,7 +2335,7 @@ class GBMRegressor(BaseEstimatorFunction):
         except Exception as e:
             logger.info('GBMRegressor for entity ' + str(entity) + ' failed with: ' + str(e))
             df[self.predictions] = 0
-
+        '''
         return df
 
     @classmethod
