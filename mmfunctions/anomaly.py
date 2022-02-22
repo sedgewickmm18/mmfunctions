@@ -17,6 +17,7 @@ import datetime as dt
 import importlib
 import logging
 import time
+import inspect
 
 # for gradient boosting
 import lightgbm
@@ -2252,7 +2253,11 @@ class GBMRegressor(BaseEstimatorFunction):
         db = self._entity_type.db
         logger.info('db is ' + str(db))
         #if db is None:
-        db = self.dms.db
+
+        method_names = [attr for attr in dir(obj) if inspect.ismethod(getattr(obj,attr))]
+        logger.info('List of obj ' + str(method_names))
+
+        db = self.get_dms().db
         self._entity_type.db = db
         logger.info('db is ' + str(db))
         logger.info('model store is ' + str(db.model_store))
