@@ -2104,7 +2104,8 @@ class GBMRegressor(BaseEstimatorFunction):
     train_if_no_model = True
 
     def GBMPipeline(self):
-        steps = [('scaler', StandardScaler()), ('gbm', lightgbm.LGBMRegressor())]
+        #steps = [('scaler', StandardScaler()), ('gbm', lightgbm.LGBMRegressor())]
+        steps = [('scaler', StandardScaler()), ('gbm', GradientBoostingRegressor())]
         return Pipeline(steps=steps)
 
     def set_estimators(self):
@@ -2163,8 +2164,9 @@ class GBMRegressor(BaseEstimatorFunction):
         return name
 
     def set_parameters(self):
-        self.params = {'gbm__n_estimators': [self.n_estimators], 'gbm__num_leaves': [self.num_leaves],
-                       'gbm__learning_rate': [self.learning_rate], 'gbm__max_depth': [self.max_depth], 'gbm__verbosity': [2]}
+        #self.params = {'gbm__n_estimators': [self.n_estimators], 'gbm__num_leaves': [self.num_leaves],
+        #               'gbm__learning_rate': [self.learning_rate], 'gbm__max_depth': [self.max_depth], 'gbm__verbosity': [2]}
+        self.params = {'gbm__learning_rate': [self.learning_rate]}
 
     #
     # forecasting support
@@ -2304,6 +2306,7 @@ class GBMRegressor(BaseEstimatorFunction):
                 'Found Nan or infinite value in feature columns for entity ' + str(entity) + ' error: ' + str(e))
             return df
 
+        '''
         try:
             df_train, df_test = self.execute_train_test_split(df)
             #steps = [('scaler', StandardScaler()), ('gbm',
@@ -2330,8 +2333,8 @@ class GBMRegressor(BaseEstimatorFunction):
         except Exception as e:
             logger.info('GBMRegressor for entity ' + str(entity) + ' failed with: ' + str(e))
             df[self.predictions] = 0
-
         '''
+
         try:
             dfe = super()._execute(df, entity)
 
@@ -2345,7 +2348,7 @@ class GBMRegressor(BaseEstimatorFunction):
         except Exception as e:
             logger.info('GBMRegressor for entity ' + str(entity) + ' failed with: ' + str(e))
             df[self.predictions] = 0
-        '''
+
         return df
 
     @classmethod
