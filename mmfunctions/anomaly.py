@@ -2274,6 +2274,10 @@ class GBMRegressor(BaseEstimatorFunction):
         self._entity_type.db = db
         logger.info('db is ' + str(db))
         logger.info('model store is ' + str(db.model_store))
+        logger.info('entity type id ' + str(db.entity_type_id))
+        logger.info('entity type ' + str(db.entity_type))
+        logger.info('tenant id ' + str(db.tenant_id))
+        logger.info('schema ' + str(db.schema))
 
         # forecasting support
         if self.lags is not None:
