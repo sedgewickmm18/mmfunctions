@@ -40,6 +40,7 @@ from sklearn.covariance import MinCovDet
 from sklearn.neighbors import (KernelDensity, LocalOutlierFactor)
 from sklearn.pipeline import Pipeline, TransformerMixin
 from sklearn.model_selection import train_test_split
+from sklearn.ensemble import GradientBoostingRegressor
 from sklearn.mixture import BayesianGaussianMixture
 from sklearn.preprocessing import (StandardScaler, RobustScaler, MinMaxScaler,
                                    minmax_scale, PolynomialFeatures)
@@ -2305,9 +2306,11 @@ class GBMRegressor(BaseEstimatorFunction):
 
         try:
             df_train, df_test = self.execute_train_test_split(df)
+            #steps = [('scaler', StandardScaler()), ('gbm',
+            #    lightgbm.LGBMRegressor(num_leaves=self.num_leaves, n_estimators=self.n_estimators,
+            #                           learning_rate=self.learning_rate, reg_lambda=0.2))]
             steps = [('scaler', StandardScaler()), ('gbm',
-                lightgbm.LGBMRegressor(num_leaves=self.num_leaves, n_estimators=self.n_estimators,
-                                       learning_rate=self.learning_rate, reg_lambda=0.2))]
+                GradientBoostingRegressor(learning_rate=self.learning_rate))]
 
             features = self.features
             target = self.targets[0]
