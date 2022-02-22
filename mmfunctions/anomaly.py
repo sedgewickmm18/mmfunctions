@@ -697,6 +697,8 @@ class AnomalyScorer(BaseTransformer):
             return temperature
 
         db = self._entity_type.db
+        if db is None:
+            db = self.dms.db
 
         scaler_model = None
         # per entity - copy for later inplace operations
@@ -1829,6 +1831,8 @@ class RobustThreshold(SupervisedLearningTransformer):
     def _calc(self, df):
         # per entity - copy for later inplace operations
         db = self._entity_type.db
+        if db is None:
+            db = self.dms.db
         #entity = df.index.levels[0][0]
         entity = df.index[0][0]
 
@@ -1943,6 +1947,8 @@ class BayesRidgeRegressor(BaseEstimatorFunction):
     def _calc(self, df):
 
         db = self._entity_type.db
+        if db is None:
+            db = self.dms.db
         #entity = df.index.levels[0][0]
         entity = df.index[0][0]
 
@@ -2051,6 +2057,8 @@ class BayesRidgeRegressorExt(BaseEstimatorFunction):
     def _calc(self, df):
 
         db = self._entity_type.db
+        if db is None:
+            db = self.dms.db
         #entity = df.index.levels[0][0]
         entity = df.index[0][0]
 
@@ -2241,6 +2249,11 @@ class GBMRegressor(BaseEstimatorFunction):
 
         logger.debug('Execute ' + self.whoami)
 
+        db = self._entity_type.db
+        if db is None:
+            db = self.dms.db
+            self._entity_type.db = db
+
         # forecasting support
         if self.lags is not None:
             _, df_copy = self.lag_features(df=df, Train=True)
@@ -2288,6 +2301,8 @@ class GBMRegressor(BaseEstimatorFunction):
     def _calc(self, df):
 
         db = self._entity_type.db
+        if db is None:
+            db = self.dms.db
         #entity = df.index.levels[0][0]
         entity = df.index[0][0]
 
@@ -2621,6 +2636,8 @@ class ARIMAForecaster(SupervisedLearningTransformer):
     def _calc(self, df):
         # per entity - copy for later inplace operations
         db = self._entity_type.db
+        if db is None:
+            db = self.dms.db
         entity = df.index.levels[0][0]
 
         df = df.droplevel(0)
@@ -2706,6 +2723,8 @@ class GMMAnomalyScore(SupervisedLearningTransformer):
     def _calc(self, df):
 
         db = self._entity_type.db
+        if db is None:
+            db = self.dms.db
         #entity = df.index.levels[0][0]
         entity = df.index[0][0]
 
@@ -2808,6 +2827,8 @@ class KDEAnomalyScore1d(SupervisedLearningTransformer):
     def _calc(self, df):
 
         db = self._entity_type.db
+        if db is None:
+            db = self.dms.db
         #entity = df.index.levels[0][0]
         entity = df.index[0][0]
 
@@ -2905,6 +2926,8 @@ class KDEAnomalyScore(SupervisedLearningTransformer):
     def _calc(self, df):
 
         db = self._entity_type.db
+        if db is None:
+            db = self.dms.db
         #entity = df.index.levels[0][0]
         entity = df.index[0][0]
 
@@ -3158,6 +3181,8 @@ class VIAnomalyScore(SupervisedLearningTransformer):
     def _calc(self, df):
 
         db = self._entity_type.db
+        if db is None:
+            db = self.dms.db
         #entity = df.index.levels[0][0]
         entity = df.index[0][0]
 
