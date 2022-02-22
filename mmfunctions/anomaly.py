@@ -2314,8 +2314,8 @@ class GBMRegressor(BaseEstimatorFunction):
 
             pipe = Pipeline(steps)
 
-            logger.info(str(df_train[features][0:200]))
-            logger.info(str(df_train[target][0:200]))
+            logger.info('Features ' + str(self.features) + ' , ' + str(df_train[features][0:200]))
+            logger.info('Targets ' + str(self.targets) + ' , ' + str(df_train[target][0:200]))
 
             pipe.fit(X=df_train[features], y=df_train[target])
 
