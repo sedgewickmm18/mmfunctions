@@ -2271,7 +2271,9 @@ class GBMRegressor(BaseEstimatorFunction):
         method_names = [attr for attr in dir(obj) if inspect.ismethod(getattr(obj,attr))]
         logger.info('List of self methods ' + str(method_names))
 
-        db = self._get_dms().db
+        if db is None:
+            db = self._get_dms().db
+
         self._entity_type.db = db
         logger.info('db is ' + str(db))
         logger.info('model store is ' + str(db.model_store))
@@ -2301,7 +2303,7 @@ class GBMRegressor(BaseEstimatorFunction):
                 logger.error('Regression on non-numeric feature:' + str(feature))
                 return (df_copy)
             # make sure it's a floater
-            df_copy[feature] = pd.to_numeric(df_copy[feature], downcast='float')
+            #df_copy[feature] = pd.to_numeric(df_copy[feature], downcast='float')
 
         # delegate to _calc
         logger.debug('Execute ' + self.whoami + ' enter per entity execution')
