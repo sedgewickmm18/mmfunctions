@@ -2307,12 +2307,15 @@ class GBMRegressor(BaseEstimatorFunction):
             df_train, df_test = self.execute_train_test_split(df)
             steps = [('scaler', StandardScaler()), ('gbm',
                 lightgbm.LGBMRegressor(num_leaves=self.num_leaves, n_estimators=self.n_estimators,
-                                       learning_rate=self.learning_rate,reg_lambda=0.2))]
+                                       learning_rate=self.learning_rate, reg_lambda=0.2))]
 
             features = self.features
             target = self.targets[0]
 
             pipe = Pipeline(steps)
+
+            logger.info(str(df_train[features][0:200]))
+            logger.info(str(df_train[target][0:200]))
 
             pipe.fit(X=df_train[features], y=df_train[target])
 
