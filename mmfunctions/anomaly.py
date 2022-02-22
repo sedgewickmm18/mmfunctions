@@ -2308,6 +2308,10 @@ class GBMRegressor(BaseEstimatorFunction):
             steps = [('scaler', StandardScaler()), ('gbm',
                 lightgbm.LGBMRegressor(num_leaves=self.num_leaves, n_estimators=self.n_estimators,
                                        learning_rate=self.learning_rate,reg_lambda=0.2))]
+
+            features = self.features
+            target = self.targets[0]
+
             pipe = Pipeline(steps)
 
             pipe.fit(X=df_train[features], y=df_train[target])
