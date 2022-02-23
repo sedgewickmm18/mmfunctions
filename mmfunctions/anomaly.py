@@ -567,6 +567,12 @@ class AnomalyScorer(BaseTransformer):
     def execute(self, df):
 
         logger.debug('Execute ' + self.whoami)
+
+        db = self._entity_type.db
+        logger.info('db is ' + str(db))
+        if db is None:
+            db = self._get_dms().db
+
         df_copy = df # no copy
 
         # check data type
@@ -2265,12 +2271,6 @@ class GBMRegressor(BaseEstimatorFunction):
 
         db = self._entity_type.db
         logger.info('db is ' + str(db))
-        #if db is None:
-
-        obj = self
-        method_names = [attr for attr in dir(obj) if inspect.ismethod(getattr(obj,attr))]
-        logger.info('List of self methods ' + str(method_names))
-
         if db is None:
             db = self._get_dms().db
 
