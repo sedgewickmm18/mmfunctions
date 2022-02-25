@@ -2195,7 +2195,7 @@ class GBMRegressor(BaseEstimatorFunction):
             my_name = 'Test'
         if prefix is not None:
             name.append(prefix)
-        feature_target_hash = hash_feature_names(self.features, target)
+        feature_target_hash = hash_feature_names(self.features, target_name)
         #name.extend([my_name, self.name, target_name])
         name.extend([my_name, self.name, feature_target_hash])
         if suffix is not None:
