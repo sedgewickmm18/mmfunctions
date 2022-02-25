@@ -90,7 +90,7 @@ Saliency_normalizer = 1
 Generalized_normalizer = 1 / 300
 
 # treat names like a password and target like a salt
-def hash_feature_names(features, targets):
+def hash_feature_names(features, target):
     names = ','.join(list(filter(None, features)))
     return hashlib.sha256(target.encode() + names.encode()).hexdigest() + ':' + target
 
