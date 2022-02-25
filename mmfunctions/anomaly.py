@@ -18,6 +18,7 @@ import importlib
 import logging
 import time
 import inspect
+import hashlib # encode feature names
 
 # for gradient boosting
 import lightgbm
@@ -87,6 +88,15 @@ Spectral_normalizer = 100 / 2.8
 FFT_normalizer = 1
 Saliency_normalizer = 1
 Generalized_normalizer = 1 / 300
+
+# treat names like a password and target like a salt
+def hash_feature_names(features, targets):
+    names = ','.join(list(filter(None, features)))
+    return hashlib.sha256(target.encode() + names.encode()).hexdigest() + ':' + target
+
+#def check_password(hashed_password, user_password):
+#    password, salt = hashed_password.split(':')
+#    return password == hashlib.sha256(salt.encode() + user_password.encode()).hexdigest()
 
 
 # from
@@ -2185,7 +2195,9 @@ class GBMRegressor(BaseEstimatorFunction):
             my_name = 'Test'
         if prefix is not None:
             name.append(prefix)
-        name.extend([my_name, self.name, target_name])
+        feature_target_hash = hash_feature_names(self.features, target)
+        #name.extend([my_name, self.name, target_name])
+        name.extend([my_name, self.name, feature_target_hash])
         if suffix is not None:
             name.append(suffix)
         name = '.'.join(name)
