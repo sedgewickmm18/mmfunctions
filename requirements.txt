@@ -9,3 +9,5 @@ wiotp-sdk>=0.11.0
 #scikit-learn>=1.0.2
 scikit-image>=0.16.1
 numpy>=1.20.0
+telemanom @ git+https://github.com/sedgewickmm18/telemanom@Keras
+
