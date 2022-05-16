@@ -17,7 +17,6 @@ import datetime as dt
 import importlib
 import logging
 import time
-import inspect
 import hashlib # encode feature names
 
 # for gradient boosting
@@ -50,11 +49,9 @@ from sklearn.utils import check_array
 
 # for Matrix Profile
 import iotfunctions
-if iotfunctions.__version__ != '8.2.1':
-    import stumpy
+import stumpy
 
 import statsmodels.api as sm
-#from statsmodels.nonparametric.kde import KDEUnivariate
 from statsmodels.nonparametric.kernel_density import KDEMultivariate
 from statsmodels.tsa.arima.model import ARIMA
 # EXCLUDED until we upgrade to statsmodels 0.12
@@ -93,11 +90,6 @@ Generalized_normalizer = 1 / 300
 def hash_feature_names(features, target):
     names = ','.join(list(filter(None, features)))
     return hashlib.sha256(target.encode() + names.encode()).hexdigest() + ':' + target
-
-#def check_password(hashed_password, user_password):
-#    password, salt = hashed_password.split(':')
-#    return password == hashlib.sha256(salt.encode() + user_password.encode()).hexdigest()
-
 
 # from
 # https://stackoverflow.com/questions/44790072/sliding-window-on-time-series-data
@@ -577,13 +569,12 @@ class AnomalyScorer(BaseTransformer):
     def execute(self, df):
 
         logger.debug('Execute ' + self.whoami)
+        df_copy = df # no copy
 
         db = self._entity_type.db
         logger.info('db is ' + str(db))
         if db is None:
             db = self._get_dms().db
-
-        df_copy = df # no copy
 
         # check data type
         if not pd.api.types.is_numeric_dtype(df_copy[self.input_item].dtype):
@@ -722,7 +713,7 @@ class AnomalyScorer(BaseTransformer):
 
         db = self._entity_type.db
         if db is None:
-            db = self.dms.db
+            db = self._get_dms().db
 
         scaler_model = None
         # per entity - copy for later inplace operations
@@ -1726,11 +1717,11 @@ class SupervisedLearningTransformer(BaseTransformer):
         return name
 
 
-    def load_model(self, suffix=None):
+    def load_model(self, suffix=None, deserialize=True):
         model_name = self.get_model_name(targets=self.targets, suffix=suffix)
         my_model = None
         try:
-            my_model = self._entity_type.db.model_store.retrieve_model(model_name)
+            my_model = self._entity_type.db.model_store.retrieve_model(model_name, deserialize=deserialize)
             logger.info('load model %s' % str(my_model))
         except Exception as e:
             logger.error('Model retrieval failed with ' + str(e))
@@ -1854,11 +1845,13 @@ class RobustThreshold(SupervisedLearningTransformer):
 
     def _calc(self, df):
         # per entity - copy for later inplace operations
-        db = self._entity_type.db
-        if db is None:
-            db = self.dms.db
         #entity = df.index.levels[0][0]
         entity = df.index[0][0]
+
+        # obtain db handler
+        db = self._entity_type.db
+        if db is None:
+            db = self._get_dms().db
 
         model_name, robust_model, version = self.load_model(suffix=entity)
 
@@ -1969,12 +1962,13 @@ class BayesRidgeRegressor(BaseEstimatorFunction):
 
 
     def _calc(self, df):
-
-        db = self._entity_type.db
-        if db is None:
-            db = self.dms.db
         #entity = df.index.levels[0][0]
         entity = df.index[0][0]
+
+        # obtain db handle
+        db = self._entity_type.db
+        if db is None:
+            db = self._get_dms().db
 
         logger.debug('BayesRidgeRegressor execute: ' + str(type(df)) + ' for entity ' + str(entity) +
                      ' predicting ' + str(self.targets) + ' from ' + str(self.features) +
@@ -2080,11 +2074,13 @@ class BayesRidgeRegressorExt(BaseEstimatorFunction):
 
     def _calc(self, df):
 
-        db = self._entity_type.db
-        if db is None:
-            db = self.dms.db
         #entity = df.index.levels[0][0]
         entity = df.index[0][0]
+
+        # obtain db handler
+        db = self._entity_type.db
+        if db is None:
+            db = self._get_dms().db
 
         logger.debug('BayesRidgeRegressor execute: ' + str(type(df)) + ' for entity ' + str(entity) +
                      ' predicting ' + str(self.targets) + ' from ' + str(self.features) +
@@ -2343,11 +2339,13 @@ class GBMRegressor(BaseEstimatorFunction):
 
     def _calc(self, df):
 
-        db = self._entity_type.db
-        if db is None:
-            db = self.dms.db
         #entity = df.index.levels[0][0]
         entity = df.index[0][0]
+
+        # obtain db handler
+        db = self._entity_type.db
+        if db is None:
+            db = self._get_dms().db
 
         logger.debug('GBMRegressor execute: ' + str(type(df)) + ' for entity ' + str(entity) +
                      ' predicting ' + str(self.targets) + ' from ' + str(self.features) +
@@ -2678,10 +2676,12 @@ class ARIMAForecaster(SupervisedLearningTransformer):
     '''
     def _calc(self, df):
         # per entity - copy for later inplace operations
+        entity = df.index[0][0]
+
+        # obtain db handler
         db = self._entity_type.db
         if db is None:
-            db = self.dms.db
-        entity = df.index.levels[0][0]
+            db = self._get_dms().db
 
         df = df.droplevel(0)
 
@@ -2765,11 +2765,12 @@ class GMMAnomalyScore(SupervisedLearningTransformer):
 
     def _calc(self, df):
 
+        entity = df.index[0][0]
+
+        # obtain db handler
         db = self._entity_type.db
         if db is None:
-            db = self.dms.db
-        #entity = df.index.levels[0][0]
-        entity = df.index[0][0]
+            db = self._get_dms().db
 
         logger.debug('GMMAnomalyScore execute: ' + str(type(df)) + ' for entity ' + str(entity))
 
@@ -2869,11 +2870,12 @@ class KDEAnomalyScore1d(SupervisedLearningTransformer):
 
     def _calc(self, df):
 
+        entity = df.index[0][0]
+
+        # obtain db handler
         db = self._entity_type.db
         if db is None:
-            db = self.dms.db
-        #entity = df.index.levels[0][0]
-        entity = df.index[0][0]
+            db = self._get_dms().db
 
         logger.debug('KDEAnomalyScore execute: ' + str(type(df)) + ' for entity ' + str(entity))
 
@@ -2968,11 +2970,12 @@ class KDEAnomalyScore(SupervisedLearningTransformer):
 
     def _calc(self, df):
 
+        entity = df.index[0][0]
+
+        # obtain db handler
         db = self._entity_type.db
         if db is None:
-            db = self.dms.db
-        #entity = df.index.levels[0][0]
-        entity = df.index[0][0]
+            db = self._get_dms().db
 
         logger.debug('KDEAnomalyScore execute: ' + str(type(df)) + ' for entity ' + str(entity))
 
@@ -3186,7 +3189,7 @@ class VIAnomalyScore(SupervisedLearningTransformer):
         self.whoami = "VIAnomalyScore"
         super().__init__(features, targets)
 
-        self.epochs = 1500
+        self.epochs = 80  # turns out to be sufficient for IWAE
         self.learning_rate = 0.005
         self.quantile = 0.99
 
@@ -3223,11 +3226,12 @@ class VIAnomalyScore(SupervisedLearningTransformer):
 
     def _calc(self, df):
 
+        entity = df.index[0][0]
+
+        # obtain db handler
         db = self._entity_type.db
         if db is None:
-            db = self.dms.db
-        #entity = df.index.levels[0][0]
-        entity = df.index[0][0]
+            db = self._get_dms().db
 
         logger.debug('VIAnomalyScore execute: ' + str(type(df)) + ' for entity ' + str(entity))
 
@@ -3335,6 +3339,124 @@ class VIAnomalyScore(SupervisedLearningTransformer):
         # define arguments that behave as function outputs
         outputs = []
         return inputs, outputs
+
+import telemanom
+from telemanom.helpers import Config
+from telemanom.errors import Errors
+import telemanom.helpers as helpers
+from telemanom.channel import Channel
+from telemanom.modeling import Model
+
+class TelemanomScorer(SupervisedLearningTransformer):
+
+    def __init__(self, input_items, output_items):
+
+        features = input_items
+        if not isinstance(input_items, list):
+            features = [input_items]
+        targets = output_items
+        if not isinstance(output_items, list):
+            targets = [output_items]
+        super().__init__(features=features, targets=targets)
+
+        self.auto_train = True
+        #self.config = Config("./telemanom/config.yaml")
+
+        self.whoami = 'TelemanomScorer'
+
+        logger.info(self.whoami + ' features: ' + str(self.features) + ' targets: ' +  str(self.targets))
+
+    def execute(self, df):
+        # set output columns to zero
+        logger.debug('Called ' + self.whoami + ' with columns: ' + str(df.columns))
+        return super().execute(df)
+
+    def _calc(self, df):
+        # per entity - copy for later inplace operations
+        #entity = df.index.levels[0][0]
+        entity = df.index[0][0]
+
+        # obtain db handler
+        db = self._entity_type.db
+        if db is None:
+            db = self._get_dms().db
+
+        df[self.targets[0]] = 0
+        df[self.targets[1]] = np.nan
+
+        telemanom_model = None
+        model_name, telemanom_model, version = self.load_model(suffix=entity)
+
+        print("Load", model_name)
+        conf = telemanom_model.config
+
+        # setup data channel
+        chan = Channel(conf, entity)
+        helpers.make_dirs(conf.use_id, conf, '/tmp')
+
+        # prepare data
+        if hasattr(telemanom_model,'scaler'):
+            chan.test = telemanom_model.scaler.transform(df[self.features].values)
+            # delete this after pip
+            #chan.train = telemanom_model.scaler1.transform(df[self.features].values)
+        else:
+            chan.test = df[self.features].values
+        chan.shape_data(chan.test, train=False)
+        # delete this after pip
+        #chan.shape_data(chan.train, train=True)
+
+        # predict
+        telemanom_model.y_hat = []
+        telemanom_model.batch_predict(chan, Path="/tmp", Train=False)
+
+        # compute anomalies
+        errors = Errors(chan, conf, conf.use_id, "/tmp")
+        errors.process_batches(chan)
+
+        print('Shapes', df[self.features].values.shape, chan.test.shape, chan.y_test.shape, chan.y_hat.shape)
+
+        print('Configs ', telemanom_model.config.l_s, telemanom_model.config.n_predictions)
+
+
+        #df[self.targets[0]] = np.pad(chan.y_hat,
+        arr = np.pad(chan.y_hat.flatten(),
+                                     (telemanom_model.config.l_s, telemanom_model.config.n_predictions),
+                                     'constant', constant_values=(0, 0))
+
+
+        print('Shape 2', arr.shape, df[self.targets[0]].values.shape)
+        df[self.targets[0]] = arr
+
+        # Transform back
+        arr2 = telemanom_model.scaler.inverse_transform(df[[self.targets[0]] + self.features[1:]].values)
+
+        print('Shape 3', arr2.shape)
+
+        df[self.targets[0]] = arr2[:,0]
+
+        for el in errors.anom_scores:
+            # [{'start_idx': 1373, 'end_idx': 1665, 'score': 1.4822806300019133}]
+            print(el['start_idx'], el['end_idx'], el['score'])
+            df[self.targets[1]][el['start_idx']:el['end_idx']] = el['score']
+
+        return df
+
+    @classmethod
+    def build_ui(cls):
+        # define arguments that behave as function inputs
+        inputs = []
+        inputs.append(UISingleItem(name="input_item", datatype=float, description="Data item to analyze"))
+
+        inputs.append(UISingle(name="threshold", datatype=int,
+                               description="Threshold to determine outliers by quantile. Typically set to 0.95", ))
+
+        # define arguments that behave as function outputs
+        outputs = []
+        outputs.append(UIFunctionOutSingle(name="output_item", datatype=bool,
+                                           description="Boolean outlier condition"))
+        return (inputs, outputs)
+
+
 
 #######################################################################################
 # Crude change point detection
