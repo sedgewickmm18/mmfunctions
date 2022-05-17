@@ -3349,17 +3349,15 @@ from telemanom.modeling import Model
 
 class TelemanomScorer(SupervisedLearningTransformer):
 
-    def __init__(self, input_items, output_items):
+    def __init__(self, features, threshold, output_item, anomaly_score):
 
-        features = input_items
-        if not isinstance(input_items, list):
-            features = [input_items]
-        targets = output_items
-        if not isinstance(output_items, list):
-            targets = [output_items]
+        if not isinstance(features, list):
+            features = [features]
+        targets = [output_item, anomaly_score]
         super().__init__(features=features, targets=targets)
 
         self.auto_train = True
+        self.threshold = threshold
         #self.config = Config("./telemanom/config.yaml")
 
         self.whoami = 'TelemanomScorer'
@@ -3369,7 +3367,12 @@ class TelemanomScorer(SupervisedLearningTransformer):
     def execute(self, df):
         # set output columns to zero
         logger.debug('Called ' + self.whoami + ' with columns: ' + str(df.columns))
-        return super().execute(df)
+
+        df_copy = df.copy()
+        df_copy[self.targets[0]] = 0       # init prediction
+        df_copy[self.targets[1]] = np.nan  # init anomaly score
+
+        return super().execute(df_copy)
 
     def _calc(self, df):
         # per entity - copy for later inplace operations
@@ -3381,9 +3384,6 @@ class TelemanomScorer(SupervisedLearningTransformer):
         if db is None:
             db = self._get_dms().db
 
-        df[self.targets[0]] = 0
-        df[self.targets[1]] = np.nan
-
         telemanom_model = None
         model_name, telemanom_model, version = self.load_model(suffix=entity)
 
@@ -3394,16 +3394,15 @@ class TelemanomScorer(SupervisedLearningTransformer):
         chan = Channel(conf, entity)
         helpers.make_dirs(conf.use_id, conf, '/tmp')
 
+        # now extract daylight time
+        df_daylight = df.drop(df[df[self.features[0]] <= threshold].index)
+
         # prepare data
         if hasattr(telemanom_model,'scaler'):
-            chan.test = telemanom_model.scaler.transform(df[self.features].values)
-            # delete this after pip
-            #chan.train = telemanom_model.scaler1.transform(df[self.features].values)
+            chan.test = telemanom_model.scaler.transform(df_daylight[self.features].values)
         else:
-            chan.test = df[self.features].values
+            chan.test = df_daylight[self.features].values
         chan.shape_data(chan.test, train=False)
-        # delete this after pip
-        #chan.shape_data(chan.train, train=True)
 
         # predict
         telemanom_model.y_hat = []
@@ -3413,31 +3412,29 @@ class TelemanomScorer(SupervisedLearningTransformer):
         errors = Errors(chan, conf, conf.use_id, "/tmp")
         errors.process_batches(chan)
 
-        print('Shapes', df[self.features].values.shape, chan.test.shape, chan.y_test.shape, chan.y_hat.shape)
+        #print('Shapes', df_daylight[self.features].values.shape, chan.test.shape, chan.y_test.shape, chan.y_hat.shape)
+        #print('Configs ', telemanom_model.config.l_s, telemanom_model.config.n_predictions)
 
-        print('Configs ', telemanom_model.config.l_s, telemanom_model.config.n_predictions)
-
-
-        #df[self.targets[0]] = np.pad(chan.y_hat,
         arr = np.pad(chan.y_hat.flatten(),
                                      (telemanom_model.config.l_s, telemanom_model.config.n_predictions),
                                      'constant', constant_values=(0, 0))
 
 
-        print('Shape 2', arr.shape, df[self.targets[0]].values.shape)
-        df[self.targets[0]] = arr
+        #print('Shape 2', arr.shape, df[self.targets[0]].values.shape)
+        df_daylight[self.targets[0]] = arr
 
-        # Transform back
+        # Transform back - needs all dimensions so we simply use the dataframe
         arr2 = telemanom_model.scaler.inverse_transform(df[[self.targets[0]] + self.features[1:]].values)
 
-        print('Shape 3', arr2.shape)
-
-        df[self.targets[0]] = arr2[:,0]
+        df_daylight[self.targets[0]] = arr2[:,0]
 
         for el in errors.anom_scores:
             # [{'start_idx': 1373, 'end_idx': 1665, 'score': 1.4822806300019133}]
             print(el['start_idx'], el['end_idx'], el['score'])
             df[self.targets[1]][el['start_idx']:el['end_idx']] = el['score']
+
+        # extend df_daylight back to the original dataframe
+        df.loc[df[self.features[0]] >= threshold] = df_daylight
 
         return df
 
@@ -3445,17 +3442,23 @@ class TelemanomScorer(SupervisedLearningTransformer):
     def build_ui(cls):
         # define arguments that behave as function inputs
         inputs = []
-        inputs.append(UISingleItem(name="input_item", datatype=float, description="Data item to analyze"))
+        inputs.append(UIMultiItem(name='features', datatype=float, required=True,
+                                    description="Data item to analyze"))
 
         inputs.append(UISingle(name="threshold", datatype=int,
-                               description="Threshold to determine outliers by quantile. Typically set to 0.95", ))
+                               description="Threshold: Values below threshold are predicted as zero.", ))
 
         # define arguments that behave as function outputs
         outputs = []
-        outputs.append(UIFunctionOutSingle(name="output_item", datatype=bool,
-                                           description="Boolean outlier condition"))
+        outputs.append(UIFunctionOutSingle(name="target", datatype=float,
+                                           description="forecast for first feature"))
+        outputs.append(UIFunctionOutSingle(name="anomaly_score", datatype=float,
+                                           description="anomaly score for first feature"))
         return (inputs, outputs)
 
+        # define arguments that behave as function outputs
+        outputs = []
+        return inputs, outputs
 
 
 #######################################################################################
