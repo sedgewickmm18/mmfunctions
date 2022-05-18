@@ -35,7 +35,7 @@ setup(
     url='https://github.com/sedgewickmm18/mmfunctions',
     packages=['mmfunctions', 'telemanom'],
     package_dir={'mmfunctions':'mmfunctions',
-                 'telemanom':'telemanomPkg'},
+                 'telemanom':'telemanom'},
     #packages=find_packages(
     #    include=['mmfunctions', 'telemanom'],
     #    exclude=['custom', 'samples', 'runs', 'pipelines', 'tf-levenberg-marquardt']
