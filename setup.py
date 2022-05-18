@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import ast
+import subprocess
 
 from setuptools import setup, find_packages
 
@@ -14,6 +15,10 @@ with open('mmfunctions/__init__.py') as f:
 
 with open('README.md', encoding='utf-8') as f:
     long_description = f.read()
+
+
+output = subprocess.check_output([sys.executable, '-m', 'pip', 'install', '-i', 'https://test.pypi.org/simple/', 'telemanom'])
+print(output)
 
 setup(
     name='mmfunctions',
