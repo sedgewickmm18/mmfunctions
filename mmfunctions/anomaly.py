@@ -3388,6 +3388,10 @@ class TelemanomScorer(SupervisedLearningTransformer):
         model_name, telemanom_model, version = self.load_model(suffix=entity)
 
         print("Load", model_name)
+        if telemanom is None:
+            print("No model")
+            return df
+
         conf = telemanom_model.config
 
         # setup data channel
