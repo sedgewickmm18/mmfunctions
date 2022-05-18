@@ -1728,7 +1728,7 @@ class SupervisedLearningTransformer(BaseTransformer):
         my_model = None
         try:
             my_model = db.model_store.retrieve_model(model_name, deserialize=deserialize)
-            logger.info('load model %s' % str(my_model))
+            logger.debug('load model %s' % type(my_model))
         except Exception as e:
             logger.error('Model retrieval failed with ' + str(e))
             pass
@@ -3398,6 +3398,11 @@ class TelemanomScorer(SupervisedLearningTransformer):
             model = pickle.loads(telemanom_model)
         except Exception as e:
             print("Issue ", e, " with model ", model_name)
+            try:
+                model = telemanom_model.decode()
+                model = pickle.loads(model)
+            except Exception as ee:
+                print("Still issue ", e, " with model ", model_name)
 
         print("Load", model_name)
         if telemanom is None:
