@@ -1669,7 +1669,7 @@ GeneralizedAnomalyScorev2 = GeneralizedAnomalyScoreV2
 # Base class to handle models
 #######################################################################################
 
-class SupervisedLearningTransformer(BaseTransformer):
+class SupervisedLearningTransformer2(BaseTransformer):
 
     name = 'SupervisedLearningTransformer'
 
@@ -3348,7 +3348,7 @@ import telemanom.helpers as helpers
 from telemanom.channel import Channel
 from telemanom.modeling import Model
 
-class TelemanomScorer(SupervisedLearningTransformer):
+class TelemanomScorer(SupervisedLearningTransformer2):
 
     def __init__(self, features, threshold, target , anomaly_score):
 
