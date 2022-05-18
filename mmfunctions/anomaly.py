@@ -1669,7 +1669,7 @@ GeneralizedAnomalyScorev2 = GeneralizedAnomalyScoreV2
 # Base class to handle models
 #######################################################################################
 
-class SupervisedLearningTransformer2(BaseTransformer):
+class SupervisedLearningTransformer(BaseTransformer):
 
     name = 'SupervisedLearningTransformer'
 
@@ -1718,10 +1718,16 @@ class SupervisedLearningTransformer2(BaseTransformer):
 
 
     def load_model(self, suffix=None, deserialize=True):
+
+        # obtain db handler
+        db = self._entity_type.db
+        if db is None:
+            db = self._get_dms().db
+
         model_name = self.get_model_name(targets=self.targets, suffix=suffix)
         my_model = None
         try:
-            my_model = self._entity_type.db.model_store.retrieve_model(model_name, deserialize=deserialize)
+            my_model = db.model_store.retrieve_model(model_name, deserialize=deserialize)
             logger.info('load model %s' % str(my_model))
         except Exception as e:
             logger.error('Model retrieval failed with ' + str(e))
@@ -3348,7 +3354,7 @@ import telemanom.helpers as helpers
 from telemanom.channel import Channel
 from telemanom.modeling import Model
 
-class TelemanomScorer(SupervisedLearningTransformer2):
+class TelemanomScorer(SupervisedLearningTransformer):
 
     def __init__(self, features, threshold, target , anomaly_score):
 
@@ -3386,7 +3392,7 @@ class TelemanomScorer(SupervisedLearningTransformer2):
             db = self._get_dms().db
 
         telemanom_model = None
-        model_name, telemanom_model, version = self.load_model(suffix=entity,deserialize=False)
+        model_name, telemanom_model, version = self.load_model(suffix=entity, deserialize=False)
 
         try:
             model = pickle.loads(telemanom_model)
