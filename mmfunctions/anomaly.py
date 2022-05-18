@@ -3349,11 +3349,11 @@ from telemanom.modeling import Model
 
 class TelemanomScorer(SupervisedLearningTransformer):
 
-    def __init__(self, features, threshold, output_item, anomaly_score):
+    def __init__(self, features, threshold, target , anomaly_score):
 
         if not isinstance(features, list):
             features = [features]
-        targets = [output_item, anomaly_score]
+        targets = [target, anomaly_score]
         super().__init__(features=features, targets=targets)
 
         self.auto_train = True
