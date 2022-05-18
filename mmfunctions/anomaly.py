@@ -3396,13 +3396,11 @@ class TelemanomScorer(SupervisedLearningTransformer):
 
         try:
             model = pickle.loads(telemanom_model)
+            if type(model) is bytes:
+                model = pickle.loads(telemanom_model.decode())
+            telemanom_model = model
         except Exception as e:
             print("Issue ", e, " with model ", model_name)
-            try:
-                model = telemanom_model.decode()
-                model = pickle.loads(model)
-            except Exception as ee:
-                print("Still issue ", e, " with model ", model_name)
 
         print("Load", model_name)
         if telemanom is None:
