@@ -3340,6 +3340,7 @@ class VIAnomalyScore(SupervisedLearningTransformer):
         outputs = []
         return inputs, outputs
 
+import dill as pickle
 import telemanom
 from telemanom.helpers import Config
 from telemanom.errors import Errors
@@ -3385,7 +3386,12 @@ class TelemanomScorer(SupervisedLearningTransformer):
             db = self._get_dms().db
 
         telemanom_model = None
-        model_name, telemanom_model, version = self.load_model(suffix=entity)
+        model_name, telemanom_model, version = self.load_model(suffix=entity,deserialize=False)
+
+        try:
+            model = pickle.loads(telemanom_model)
+        except Exception as e:
+            print("Issue ", e, " with model ", model_name)
 
         print("Load", model_name)
         if telemanom is None:
