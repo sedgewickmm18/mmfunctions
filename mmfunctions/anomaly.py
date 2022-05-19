@@ -3465,7 +3465,9 @@ class TelemanomScorer(SupervisedLearningTransformer):
         df_daylight[self.targets[0]] = arr
 
         # Transform back - needs all dimensions so we simply use the dataframe
-        arr2 = telemanom_model.scaler.inverse_transform(df[[self.targets[0]] + self.features[1:]].values)
+        arr2 = telemanom_model.scaler.inverse_transform(df_daylight[[self.targets[0]] + self.features[1:]].values)
+
+        logger.info('Shape 3 ' + str(arr2.shape))
 
         df_daylight[self.targets[0]] = arr2[:,0]
 
