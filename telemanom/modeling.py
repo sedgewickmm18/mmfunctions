@@ -74,7 +74,7 @@ class Model:
         out = '\n%s:%s' % (self.__class__.__name__, self.name) + "\n" + str(self.model.summary())
         return out
 
-    def load(self, Path=None):
+    def load(self, Path=None, directLoad=False):
         """
         Load model for channel.
         """
@@ -85,7 +85,7 @@ class Model:
         logger.info('Loading pre-trained model')
 
         try:
-            if Path.startswith('/tmp'):
+            if directLoad:
                 self.model = load_model(Path, compile=False)
             else:
                 self.model = load_model(os.path.join(Path, 'data', self.config.use_id,

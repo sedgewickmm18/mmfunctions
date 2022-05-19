@@ -3408,12 +3408,12 @@ class TelemanomScorer(SupervisedLearningTransformer):
 
             # save h5 model to reload it
             logger.info('preparing h5 model')
-            f1 = open('/tmp/model.h5', "wb")
+            f1 = open('model.h5', "wb")
             write(model_tuple[0])
             f1.close()
 
             logger.info('Loading model')
-            model.load('/tmp/model.h5')
+            model.load('model.h5', directLoad=True)
             logger.info('model loaded')
 
             telemanom_model = model
