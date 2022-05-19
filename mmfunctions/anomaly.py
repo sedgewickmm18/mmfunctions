@@ -3435,6 +3435,10 @@ class TelemanomScorer(SupervisedLearningTransformer):
         df_daylight = df.drop(df[df[self.features[0]] <= self.threshold].index)
 
         # prepare data
+        if df_daylight[self.features].values.shape[0] < 1:
+            logger.info("Definitively not enough data to predict")
+            return df
+
         if hasattr(telemanom_model,'scaler'):
             chan.test = telemanom_model.scaler.transform(df_daylight[self.features].values)
         else:
@@ -3445,7 +3449,7 @@ class TelemanomScorer(SupervisedLearningTransformer):
                 ", " + str(chan.y_test.shape))
 
         if chan.y_test.shape[0] <= telemanom_model.config.l_s:
-            logger.info("Not enough data to predict")
+            logger.info("Not enough data to predict for this model with lookback of " + str(telemanom_model.config.l_s))
             return df
 
         # predict
