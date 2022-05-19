@@ -3380,7 +3380,7 @@ class TelemanomScorer(SupervisedLearningTransformer):
 
         df_copy = df.copy()
         df_copy[self.targets[0]] = 0       # init prediction
-        df_copy[self.targets[1]] = np.nan  # init anomaly score
+        df_copy[self.targets[1]] = 0       # init anomaly score
 
         return super().execute(df_copy)
 
