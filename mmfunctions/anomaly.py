@@ -3452,15 +3452,16 @@ class TelemanomScorer(SupervisedLearningTransformer):
         errors = Errors(chan, conf, conf.use_id, "/tmp")
         errors.process_batches(chan)
 
-        #print('Shapes', df_daylight[self.features].values.shape, chan.test.shape, chan.y_test.shape, chan.y_hat.shape)
-        #print('Configs ', telemanom_model.config.l_s, telemanom_model.config.n_predictions)
+        logger.info('Shapes ' + str(df_daylight[self.features].values.shape) + ', ' +\
+                        str(chan.test.shape) + ', ' + str(chan.y_test.shape) + ', ' + str(chan.y_hat.shape))
+        logger.info('Configs ' + str(telemanom_model.config.l_s) + ', ' +  str(telemanom_model.config.n_predictions))
 
         arr = np.pad(chan.y_hat.flatten(),
                                      (telemanom_model.config.l_s, telemanom_model.config.n_predictions),
                                      'constant', constant_values=(0, 0))
 
 
-        #print('Shape 2', arr.shape, df[self.targets[0]].values.shape)
+        logger.info('Shape 2 ' + str(arr.shape) + ', ' + str(df[self.targets[0]].values.shape))
         df_daylight[self.targets[0]] = arr
 
         # Transform back - needs all dimensions so we simply use the dataframe
