@@ -3441,6 +3441,9 @@ class TelemanomScorer(SupervisedLearningTransformer):
             chan.test = df_daylight[self.features].values
         chan.shape_data(chan.test, train=False)
 
+        logger.info("Shapes " + str(df[self.features[0]].values.shape) + ", " + str(df_daylight[self.features[0]].values.shape) +\
+                ", " + str(chan.y_test.shape))
+
         # predict
         telemanom_model.y_hat = []
         telemanom_model.batch_predict(chan, Path="/tmp", Train=False)
