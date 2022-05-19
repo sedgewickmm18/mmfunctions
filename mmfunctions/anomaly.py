@@ -3444,11 +3444,16 @@ class TelemanomScorer(SupervisedLearningTransformer):
         logger.info("Shapes " + str(df[self.features[0]].values.shape) + ", " + str(df_daylight[self.features[0]].values.shape) +\
                 ", " + str(chan.y_test.shape))
 
+        if chan.y_test.shape[0] <= telemanom_model.config.l_s:
+            logger.info("Not enough data to predict")
+            return df
+
         # predict
         telemanom_model.y_hat = []
         telemanom_model.batch_predict(chan, Path="/tmp", Train=False)
 
         # compute anomalies
+        errors = None
         errors = Errors(chan, conf, conf.use_id, "/tmp")
         errors.process_batches(chan)
 
