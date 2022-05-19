@@ -54,7 +54,8 @@ class Model:
 
         # bypass default training in constructor
         if not Train:
-            self.new_model((None, Channel.X_train.shape[2]))
+            if Channel is not None:
+                self.new_model((None, Channel.X_train.shape[2]))
         elif not self.config.train:
             try:
                 self.load(Path)
@@ -84,7 +85,10 @@ class Model:
         logger.info('Loading pre-trained model')
 
         try:
-            self.model = load_model(os.path.join(Path, 'data', self.config.use_id,
+            if Path.startswith('/tmp'):
+                self.model = load_model(Path, compile=False)
+            else:
+                self.model = load_model(os.path.join(Path, 'data', self.config.use_id,
                                              'models', self.chan_id + '.h5'), compile=False)
         except Exception as e:
             return False

@@ -3392,12 +3392,23 @@ class TelemanomScorer(SupervisedLearningTransformer):
             db = self._get_dms().db
 
         telemanom_model = None
+        # Expect model as quadruple: (h5, scaler, config, history)
         model_name, telemanom_model, version = self.load_model(suffix=entity, deserialize=False)
 
         try:
-            model = pickle.loads(telemanom_model)
-            #if type(model) is bytes:
-            model = pickle.loads(telemanom_model.decode())
+            model_tuple = pickle.loads(telemanom_model)
+            model = Model(model_tuple[2], model_tuple[2].use_id, Path='/tmp', Train=False)
+
+            model.chan_id = model_tuple[2].use_id
+            model.scaler = model_tuple[1]
+
+            # save h5 model to reload it
+            f1 = open('/tmp/model.h5', "wb")
+            write(model_tuple[0])
+            f1.close()
+
+            model.load('/tmp/model.h5')
+
             telemanom_model = model
         except Exception as e:
             print("Issue ", e, " with model ", model_name)
