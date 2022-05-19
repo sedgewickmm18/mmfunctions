@@ -3347,6 +3347,9 @@ class VIAnomalyScore(SupervisedLearningTransformer):
         return inputs, outputs
 
 import dill as pickle
+import sys
+import os
+sys.path.append( '.' )
 import telemanom
 from telemanom.helpers import Config
 from telemanom.errors import Errors
@@ -3397,29 +3400,29 @@ class TelemanomScorer(SupervisedLearningTransformer):
 
         try:
             model_tuple = pickle.loads(telemanom_model)
-            print('construct model')
+            logger.info('construct model')
             model = Model(model_tuple[2], model_tuple[2].use_id, Path='/tmp', Train=False)
 
             model.chan_id = model_tuple[2].use_id
             model.scaler = model_tuple[1]
 
             # save h5 model to reload it
-            print('preparing h5 model')
+            logger.info('preparing h5 model')
             f1 = open('/tmp/model.h5', "wb")
             write(model_tuple[0])
             f1.close()
 
-            print('Loading model')
+            logger.info('Loading model')
             model.load('/tmp/model.h5')
-            print('model loaded')
+            logger.info('model loaded')
 
             telemanom_model = model
         except Exception as e:
-            print("Issue ", e, " with model ", model_name)
+            logger.error("Issue " + str(e) + " with model " + str(model_name))
 
-        print("Load", model_name)
+        logger.info("Load" + str(model_name))
         if telemanom is None:
-            print("No model")
+            logger.error("No model")
             return df
 
         conf = telemanom_model.config
