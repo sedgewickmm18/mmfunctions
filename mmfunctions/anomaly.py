@@ -3432,7 +3432,7 @@ class TelemanomScorer(SupervisedLearningTransformer):
         helpers.make_dirs(conf.use_id, conf, '/tmp')
 
         # now extract daylight time
-        df_daylight = df.drop(df[df[self.features[0]] <= threshold].index)
+        df_daylight = df.drop(df[df[self.features[0]] <= self.threshold].index)
 
         # prepare data
         if hasattr(telemanom_model,'scaler'):
@@ -3471,7 +3471,7 @@ class TelemanomScorer(SupervisedLearningTransformer):
             df[self.targets[1]][el['start_idx']:el['end_idx']] = el['score']
 
         # extend df_daylight back to the original dataframe
-        df.loc[df[self.features[0]] >= threshold] = df_daylight
+        df.loc[df[self.features[0]] >= self.threshold] = df_daylight
 
         return df
 
