@@ -3397,17 +3397,21 @@ class TelemanomScorer(SupervisedLearningTransformer):
 
         try:
             model_tuple = pickle.loads(telemanom_model)
+            print('construct model')
             model = Model(model_tuple[2], model_tuple[2].use_id, Path='/tmp', Train=False)
 
             model.chan_id = model_tuple[2].use_id
             model.scaler = model_tuple[1]
 
             # save h5 model to reload it
+            print('preparing h5 model')
             f1 = open('/tmp/model.h5', "wb")
             write(model_tuple[0])
             f1.close()
 
+            print('Loading model')
             model.load('/tmp/model.h5')
+            print('model loaded')
 
             telemanom_model = model
         except Exception as e:
