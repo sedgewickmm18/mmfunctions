@@ -3474,12 +3474,14 @@ class TelemanomScorer(SupervisedLearningTransformer):
 
         logger.info('Shape 3 ' + str(arr2.shape))
 
+        max_arr2 = max(arr2[:,0])
+
         df_daylight[self.targets[0]] = arr2[:,0]
 
         for el in errors.anom_scores:
             # [{'start_idx': 1373, 'end_idx': 1665, 'score': 1.4822806300019133}]
             print(el['start_idx'], el['end_idx'], el['score'])
-            df[self.targets[1]][el['start_idx']:el['end_idx']] = el['score']
+            df[self.targets[1]][el['start_idx']:el['end_idx']] = el['score'] * max_arr2 / 2
 
         # extend df_daylight back to the original dataframe
         df.loc[df[self.features[0]] >= self.threshold] = df_daylight
