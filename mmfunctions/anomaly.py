@@ -3372,6 +3372,12 @@ class TelemanomScorer(SupervisedLearningTransformer):
 
         self.whoami = 'TelemanomScorer'
 
+        # basic parameters for trainin
+        self.l_s = 80
+        self.epochs = 80
+        self.dropout = 0.2
+        self.lstm_batch_size=80
+
         logger.info(self.whoami + ' features: ' + str(self.features) + ' targets: ' +  str(self.targets))
 
     def execute(self, df):
@@ -3489,6 +3495,97 @@ class TelemanomScorer(SupervisedLearningTransformer):
 
         # extend df_daylight back to the original dataframe
         df.loc[df[self.features[0]] >= self.threshold] = df_daylight
+
+        return df
+
+    def train(self, df):
+        # set output columns to zero
+        logger.debug('Train ' + self.whoami + ' with columns: ' + str(df.columns))
+
+        group_base = []
+        for s in self.execute_by:
+            if s in df.columns:
+                group_base.append(s)
+            else:
+                try:
+                    df.index.get_level_values(s)
+                except KeyError:
+                    raise ValueError(
+                        'This function executes by column %s. This column was not found in columns or index' % s)
+                else:
+                    group_base.append(pd.Grouper(axis=0, level=df.index.names.index(s)))
+
+        print(group_base)
+
+        if len(group_base) > 0:
+            df = df.groupby(group_base).apply(self._train)
+        else:
+            df = self._train(df)
+
+        return df
+
+    def _train(self, df):
+        entity = df.index[0][0]
+
+        # obtain db handler
+        db = self._entity_type.db
+        if db is None:
+            db = self._get_dms().db
+
+        # need model name
+        model_name, arima_model, version = self.load_model(suffix=entity)
+
+        # setting up config
+        conf = Config("./telemanom/config.yaml")
+
+        conf.dictionary['l_s'] = self.l_s
+        conf.dictionary['epochs'] = self.epochs
+        conf.dictionary['dropout'] = self.dropout
+        conf.l_s = self.l_s
+        conf.epochs = self.epochs
+        conf.dropout = self.dropout
+        conf.lstm_batch_size = self.lstm_batch_size
+
+        # Setup data channel
+        device="Armstarknew"
+        chan = Channel(conf, entity)
+        helpers.make_dirs(conf.use_id, conf, "/tmp")
+        print(chan)
+        print(conf.l_s)
+
+
+        # now extract daylight time
+        df_daylight = df.drop(df[df[self.features[0]] <= self.threshold].index)
+
+        # prepare data
+        if df_daylight[self.features].values.shape[0] < 1:
+            logger.info("Definitively not enough data to train")
+            return df
+
+        chan.train = df_daylight[self.features].values
+
+        # scale data and form overlapping windows for LSTM
+        chan.shape_data(chan.train, train=True)
+
+        # init the Keras double stacked LSTM model
+        model = Model(conf, conf.use_id, Channel=chan, Path="/tmp", Train=False)
+
+        # train
+        model.train_new(chan)
+
+        # save Keras model and load it as binary
+        model.model.save('/tmp/solar_' + entity + '.h5')
+        f1 = open('/tmp/solar_' + entity + '.h5', "rb")
+        model_h5 = f1.read()
+        f1.close()
+
+        full_model = (model_h5, model.scaler, model.config, model.history.history)
+
+        try:
+            db.model_store.store_model(model_name, full_model)
+        except Exception as e:
+            logger.error('Model store failed with ' + str(e))
+            pass
 
         return df
 
