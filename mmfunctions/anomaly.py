@@ -1739,7 +1739,7 @@ class SupervisedLearningTransformer(BaseTransformer):
             if my_model is not None:
                 if hasattr(my_model, 'version'):
                     version = my_model.version + 1
-                logger.debug('Deleting robust model ' + str(version-1) + ' for entity: ' + str(suffix))
+                logger.debug('Deleting model ' + str(version-1) + ' for entity: ' + str(suffix))
                 my_model = None
 
         return model_name, my_model, version
@@ -3366,7 +3366,6 @@ class TelemanomScorer(SupervisedLearningTransformer):
         targets = [target, anomaly_score]
         super().__init__(features=features, targets=targets)
 
-        self.auto_train = True
         self.threshold = threshold
         #self.config = Config("./telemanom/config.yaml")
 
@@ -3449,6 +3448,7 @@ class TelemanomScorer(SupervisedLearningTransformer):
             chan.test = telemanom_model.scaler.transform(df_daylight[self.features].values)
         else:
             chan.test = df_daylight[self.features].values
+        logger.info("Shapes   " + str(chan.test.shapes))
         chan.shape_data(chan.test, train=False)
 
         logger.info("Shapes " + str(df[self.features[0]].values.shape) + ", " + str(df_daylight[self.features[0]].values.shape) +\
@@ -3533,7 +3533,12 @@ class TelemanomScorer(SupervisedLearningTransformer):
             db = self._get_dms().db
 
         # need model name
-        model_name, arima_model, version = self.load_model(suffix=entity)
+        model_name, telemanom_model, version = self.load_model(suffix=entity)
+
+        if not self.delete_model:
+            if telemanom_model is not None:
+                logger.info("Found model " + model_name + " and delete_model is not set");
+                return df
 
         # setting up config
         conf = Config("./telemanom/config.yaml")

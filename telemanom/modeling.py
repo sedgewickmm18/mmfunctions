@@ -1,7 +1,8 @@
 from tensorflow import keras
 from keras.models import Sequential, load_model
 from keras.callbacks import History, EarlyStopping
-from keras.layers.recurrent import LSTM
+from tensorflow.keras import layers
+from keras.layers import LSTM
 from keras.layers.core import Dense, Activation, Dropout
 from keras.metrics import MeanSquaredError,MeanAbsoluteError
 
