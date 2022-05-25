@@ -3448,7 +3448,7 @@ class TelemanomScorer(SupervisedLearningTransformer):
             chan.test = telemanom_model.scaler.transform(df_daylight[self.features].values)
         else:
             chan.test = df_daylight[self.features].values
-        logger.info("Shapes   " + str(chan.test.shapes))
+        logger.info("Shapes   " + str(chan.test.shape))
         chan.shape_data(chan.test, train=False)
 
         logger.info("Shapes " + str(df[self.features[0]].values.shape) + ", " + str(df_daylight[self.features[0]].values.shape) +\
