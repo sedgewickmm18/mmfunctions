@@ -3449,13 +3449,19 @@ class TelemanomScorer(SupervisedLearningTransformer):
         else:
             chan.test = df_daylight[self.features].values
         logger.info("Shapes   " + str(chan.test.shape))
-        chan.shape_data(chan.test, train=False)
+
+        # do we have enough data to pass to the LSTM - l(ength)_s(sequence) + n_predictions
+        if conf.l_s + conf.n_predictions <= chan.test.shape[0]:
+            chan.shape_data(chan.test, train=False)
+        else:
+            logger.info("Not enough data to predict, less than " + str(conf.l_s + conf.n_predictions) + " events")
+            return df
 
         logger.info("Shapes " + str(df[self.features[0]].values.shape) + ", " + str(df_daylight[self.features[0]].values.shape) +\
                 ", " + str(chan.y_test.shape))
 
         if chan.y_test.shape[0] <= telemanom_model.config.l_s:
-            logger.info("Not enough data to predict for this model with lookback of " + str(telemanom_model.config.l_s))
+            logger.info("Not enough data to predict for this model with sequence length of " + str(telemanom_model.config.l_s))
             return df
 
         # predict
