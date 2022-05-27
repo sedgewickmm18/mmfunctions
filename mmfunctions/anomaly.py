@@ -3373,6 +3373,7 @@ class TelemanomScorer(SupervisedLearningTransformer):
 
         # basic parameters for trainin
         self.l_s = 80
+        self.n_predictions = 24
         self.epochs = 80
         self.dropout = 0.2
         self.lstm_batch_size=80
@@ -3550,9 +3551,11 @@ class TelemanomScorer(SupervisedLearningTransformer):
         conf = Config("./telemanom/config.yaml")
 
         conf.dictionary['l_s'] = self.l_s
+        conf.dictionary['n_predictions'] = self.n_predictions
         conf.dictionary['epochs'] = self.epochs
         conf.dictionary['dropout'] = self.dropout
         conf.l_s = self.l_s
+        conf.n_predictions = self.n_predictions
         conf.epochs = self.epochs
         conf.dropout = self.dropout
         conf.lstm_batch_size = self.lstm_batch_size
