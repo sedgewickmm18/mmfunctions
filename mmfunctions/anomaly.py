@@ -2827,7 +2827,7 @@ class GMMAnomalyScore(SupervisedLearningTransformer):
 
         predictions = gmm_model.score_samples(xy).reshape(-1,1)   # log likelihood
         print(predictions.shape, df[self.predictions].values.shape)
-        df[self.predictions] = -max(predictions,0)   # ignore positive loglik
+        df[self.predictions] = np.maximum(predictions,0)   # ignore positive loglik
 
         return df
 
