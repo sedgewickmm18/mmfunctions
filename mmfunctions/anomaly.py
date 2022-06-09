@@ -2852,13 +2852,13 @@ class KDEAnomalyScore1d(SupervisedLearningTransformer):
     A supervised anomaly detection function.
      Uses kernel density estimate to assign an anomaly score
     """
-    def __init__(self, input_item, threshold, output_item):
+    def __init__(self, input_item, bandwidth, output_item):
         logger.debug("init KDE1d Estimator")
         self.name = 'KDEAnomalyScore1d'
         self.whoami= 'KDEAnomalyScore1d'
         super().__init__([input_item], [output_item])
 
-        self.threshold = threshold
+        self.bandwidth = bandwidth
         self.active_models = dict()
         self.predictions = [output_item]
 
@@ -2904,9 +2904,7 @@ class KDEAnomalyScore1d(SupervisedLearningTransformer):
             logger.debug('Running KDE with ' + str(xy.shape))
             # all variables should be continuous
 
-            kde_model = KernelDensity(kernel='gaussian', bandwidth=0.2).fit(xy)
-            #kde_model = KDEUnivariate(xy) #, var_type="c" * (len(self.features) + len(self.targets)))
-            #kde_model.fit()
+            kde_model = KernelDensity(kernel='gaussian', bandwidth=self.bandwidth).fit(xy)
             logger.debug('Created KDE ' + str(kde_model))
 
             try:
@@ -2916,10 +2914,8 @@ class KDEAnomalyScore1d(SupervisedLearningTransformer):
 
         self.active_models[entity] = kde_model
 
-        #predictions = kde_model.score_samples(xy.reshape(-1,)) #.reshape(-1,1)
-        predictions = kde_model.score_samples(xy).reshape(-1,1)
+        predictions = -kde_model.score_samples(xy).reshape(-1,1)
 
-        print(xy.shape, predictions.shape, df[self.predictions].values.shape)
         df[self.predictions] = predictions
 
         return df
@@ -2930,11 +2926,11 @@ class KDEAnomalyScore1d(SupervisedLearningTransformer):
         # define arguments that behave as function inputs
         inputs = []
         inputs.append(UISingleItem(name='input_item', datatype=float, required=True))
-        inputs.append(UISingle(name="threshold", datatype=float,
-                               description="Probability threshold for outliers. Typically set to 10e-6.", required=True))
+        inputs.append(UISingle(name="bandwidth", datatype=float,
+                               description="Bandwidth for kernel density estimate. Typically set to 0.2.", required=True))
         outputs = []
         outputs.append(UISingleItem(name='output_item', datatype=float,
-            description="Anomaly score", required=True))
+            description="Anomaly score as negative log-likelihood", required=True))
         # define arguments that behave as function outputs
         return inputs, outputs
 
