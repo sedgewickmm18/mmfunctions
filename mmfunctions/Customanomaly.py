@@ -69,7 +69,7 @@ class AnomalyThreshold(SupervisedLearningTransformer):
 
         if very_simple_model is None and self.auto_train:
             # we don't do that now, the model *has* to be there
-            very_simple_model = VerySimpleModel(-8.07, 7.2, 0)
+            very_simple_model = VerySimpleModel(-9.2, 6, 0)
 
         if very_simple_model is not None:
             #self.Min[entity] = very_simple_model.Min
