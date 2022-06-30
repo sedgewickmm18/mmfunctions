@@ -34,7 +34,7 @@ class VerySimpleModel:
 
 class AnomalyThreshold(SupervisedLearningTransformer):
 
-    def __init__(self, input_item, Min, Max, std_cycle, outlier):
+    def __init__(self, input_item, threshold, Min, Max, std_cycle, outlier):
         super().__init__(features=[input_item], targets=[Min, Max, std_cycle,outlier])
 
         self.input_item = input_item
@@ -45,8 +45,6 @@ class AnomalyThreshold(SupervisedLearningTransformer):
 
         self.whoami = 'AnomalyThreshold'
 
-#         logger.info(self.whoami + ' from ' + self.input_item + ' quantile threshold ' +  str(self.threshold) +
-#                     ' exceeding boolean ' + self.output_item)
 
     def execute(self, df):
         # set output columns to zero
