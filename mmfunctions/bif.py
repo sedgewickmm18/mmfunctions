@@ -672,6 +672,9 @@ class InvokeWMLModel(BaseTransformer):
                 c = self._entity_type.get_attributes_dict()
             except Exception:
                 c = None
+
+            logger.info("Constants " + str(c))
+
             try:
                 wml_credentials = c[self.wml_auth]
             except Exception as ae:
