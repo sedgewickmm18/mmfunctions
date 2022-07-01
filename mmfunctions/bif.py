@@ -26,6 +26,7 @@ from sklearn.neighbors import KernelDensity
 from scipy.stats.mstats import mquantiles
 
 #from sqlalchemy import String
+from ibm_watson_machine_learning import APIClient
 
 from iotfunctions.base import (BaseTransformer, BaseEvent, BaseSCDLookup, BaseSCDLookupWithDefault, BaseMetadataProvider,
                                BasePreload, BaseDatabaseLookup, BaseDataSource, BaseDBActivityMerge, BaseSimpleAggregator)
