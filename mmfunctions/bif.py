@@ -743,7 +743,8 @@ class InvokeWMLModel(BaseTransformer):
 
         if len(self.input_items) >= 1:
             index_nans = df[df[self.input_items].isna().any(axis=1)].index
-            rows = df.loc[~df.index.isin(index_nans), self.input_items].values.tolist()
+            df_ = df.replace(r'^\s*$', 0.0, regex=True)
+            rows = df_.loc[~df.index.isin(index_nans), self.input_items].values.tolist()
             scoring_payload = {
                 'input_data': [{
                     'fields': self.input_items,
