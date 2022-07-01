@@ -709,6 +709,7 @@ class InvokeWMLModel(BaseTransformer):
 
         # set space
         if self.space_id is not None:
+            logger.error('Setting space id to ' + str(self.space_id))
             self.client.set.default_space(self.space_id)
 
         # check deployment
