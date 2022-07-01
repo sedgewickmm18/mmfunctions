@@ -692,6 +692,7 @@ class InvokeWMLModel(BaseTransformer):
                 self.space_id = wml_credentials['space_id']
             if hasattr(wml_credentials, 'wml_deployment_space_name'):
                 self.space_id = wml_credentials['wml_deployment_space_name']
+
             logger.info('Found credentials for WML')
         except Exception as ae:
             logger.info('No deployment or space id, but we\'ll try anyway')
@@ -708,7 +709,7 @@ class InvokeWMLModel(BaseTransformer):
 
         # set space
         if self.space_id is not None:
-            self.client.set.default_space(wml_credentials['space_id'])
+            self.client.set.default_space(self.space_id)
 
         # check deployment
         deployment_details = None
