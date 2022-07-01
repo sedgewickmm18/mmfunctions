@@ -679,6 +679,8 @@ class InvokeWMLModel(BaseTransformer):
         else:
             wml_credentials = {'apikey': self.apikey , 'url': self.wml_endpoint, 'space_id': self.space_id}
 
+        logger.info("Creds " + str(wml_credentials))
+
         try:
             self.deployment_id = wml_credentials['deployment_id']
             self.space_id = wml_credentials['space_id']
