@@ -690,8 +690,8 @@ class InvokeWMLModel(BaseTransformer):
                 self.deployment_id = wml_credentials['deployment_id']
             if hasattr(wml_credentials, 'space_id'):
                 self.space_id = wml_credentials['space_id']
-            if hasattr(wml_credentials, 'wml_deployment_space_name'):
-                self.space_id = wml_credentials['wml_deployment_space_name']
+            #if hasattr(wml_credentials, 'wml_deployment_space_name'):
+            self.space_id = wml_credentials['wml_deployment_space_name']
 
             logger.info('Found credentials for WML')
         except Exception as ae:
