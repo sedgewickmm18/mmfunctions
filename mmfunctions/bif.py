@@ -690,7 +690,11 @@ class InvokeWMLModel(BaseTransformer):
             self.space_id = wml_credentials['space_id']
             logger.info('Found credentials for WML')
         except Exception as ae:
+            logger.info('No deployment or space id, but we\'ll try anyway')
+            pass
+        '''
             raise RuntimeError("No valid WML credentials specified")
+        '''
 
         # get client and check credentials
         self.client = APIClient(wml_credentials)
@@ -699,12 +703,17 @@ class InvokeWMLModel(BaseTransformer):
             raise RuntimeError("WML API Key invalid")
 
         # set space
-        self.client.set.default_space(wml_credentials['space_id'])
+        if self.space_id is not None:
+            self.client.set.default_space(wml_credentials['space_id'])
 
         # check deployment
-        deployment_details = self.client.deployments.get_details(self.deployment_id, 1)
+        deployment_details = None
+        if self.deployment_id is not None:
+            deployment_details = self.client.deployments.get_details(self.deployment_id, 1)
+
         # ToDo - test return and error msg
-        logger.debug('Deployment Details check results in ' + str(deployment_details))
+        if deployment_details is not None:
+            logger.debug('Deployment Details check results in ' + str(deployment_details))
 
         self.logged_on = True
 
