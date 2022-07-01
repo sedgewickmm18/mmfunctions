@@ -686,8 +686,8 @@ class InvokeWMLModel(BaseTransformer):
         logger.info("Creds " + str(wml_credentials))
 
         try:
-            if hasattr(wml_credentials, 'deployment_id'):
-                self.deployment_id = wml_credentials['deployment_id']
+            #if hasattr(wml_credentials, 'deployment_id'):
+            self.deployment_id = wml_credentials['deployment_id']
             if hasattr(wml_credentials, 'space_id'):
                 self.space_id = wml_credentials['space_id']
             #if hasattr(wml_credentials, 'wml_deployment_space_name'):
