@@ -627,6 +627,7 @@ class InvokeWMLModel(BaseTransformer):
         else:
             self.output_items = output_items      # classification
 
+        self.db = None
         self.wml_auth = wml_auth
 
         self.deployment_id = None
@@ -728,10 +729,10 @@ class InvokeWMLModel(BaseTransformer):
 
         logger.info('InvokeWML exec')
 
-        db = self._entity_type.db
-        logger.info('db is ' + str(db))
-        if db is None:
-            db = self._get_dms().db
+        self.db = self._entity_type.db
+        logger.info('db is ' + str(self.db))
+        if self.db is None:
+            self.db = self._get_dms().db
 
         # Create missing columns before doing group-apply
         df = df.copy().fillna('')
@@ -751,7 +752,7 @@ class InvokeWMLModel(BaseTransformer):
             df_ = df.replace(r'^\s*$', 0.0, regex=True)
 
             arr = df_.loc[~df.index.isin(index_nans), self.input_items].values
-            db.model_store.store_model('Invoker', arr)
+            self.db.model_store.store_model('Invoker', arr)
 
             rows = df_.loc[~df.index.isin(index_nans), self.input_items].values.tolist()
             scoring_payload = {
