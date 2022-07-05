@@ -728,6 +728,11 @@ class InvokeWMLModel(BaseTransformer):
 
         logger.info('InvokeWML exec')
 
+        db = self._entity_type.db
+        logger.info('db is ' + str(db))
+        if db is None:
+            db = self._get_dms().db
+
         # Create missing columns before doing group-apply
         df = df.copy().fillna('')
         missing_cols = [x for x in (self.output_items) if x not in df.columns]
