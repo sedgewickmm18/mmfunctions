@@ -6,6 +6,8 @@ import logging
 import numpy as np
 import pandas as pd
 import scipy as sp
+import logging
+
 
 import iotfunctions
 from iotfunctions.base import (BaseTransformer, BaseRegressor, BaseEstimatorFunction, BaseSimpleAggregator)
@@ -60,15 +62,16 @@ class AnomalyThreshold(SupervisedLearningTransformer):
 
         # obtain db handler
         db = self.get_db()
-
+        test_model_name=self.get_model_name(suffix=entity)
+        logger.error('**********************************Name of the model:' + str(test_model_name))
         model_name, very_simple_model, version = self.load_model(suffix=entity)
-
+        
         feature = df[self.input_item].values
 
         if very_simple_model is None and self.auto_train:
             # we don't do that now, the model *has* to be there
             very_simple_model = VerySimpleModel(-9.2, 6, 0)
-
+        
         if very_simple_model is not None:
             #self.Min[entity] = very_simple_model.Min
             df[self.Min] = very_simple_model.Min       # set the min threshold column
