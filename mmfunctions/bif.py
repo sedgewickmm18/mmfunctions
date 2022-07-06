@@ -37,7 +37,6 @@ logger = logging.getLogger(__name__)
 PACKAGE_URL = 'git+https://github.com/sedgewickmm18/mmfunctions.git'
 _IS_PREINSTALLED = False
 
-
 class AggregateWithExpression(BaseSimpleAggregator):
     """
     Create aggregation using expression. The calculation is evaluated for
@@ -771,7 +770,7 @@ class InvokeWMLModel(BaseTransformer):
             # Regression
             if len(self.output_items) == 1:
                 logger.info(results['predictions'][0]['values'][1])
-                logger.info(self.output_items.size())
+                #logger.info(self.output_items.size())
 
                 df.loc[~df.index.isin(index_nans), self.output_items] = \
                     np.array(results['predictions'][0]['values'][29:]).flatten()
