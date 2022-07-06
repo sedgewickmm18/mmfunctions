@@ -27,6 +27,8 @@ from scipy.stats.mstats import mquantiles
 
 #from sqlalchemy import String
 from ibm_watson_machine_learning import APIClient
+from sklearn.covariance import GraphicalLasso
+from sklearn.covariance import empirical_covariance, shrunk_covariance, graphical_lasso
 
 from iotfunctions.base import (BaseTransformer, BaseEvent, BaseSCDLookup, BaseSCDLookupWithDefault, BaseMetadataProvider,
                                BasePreload, BaseDatabaseLookup, BaseDataSource, BaseDBActivityMerge, BaseSimpleAggregator)
@@ -36,6 +38,17 @@ from iotfunctions.ui import (UISingle, UIMultiItem, UIFunctionOutSingle, UISingl
 logger = logging.getLogger(__name__)
 PACKAGE_URL = 'git+https://github.com/sedgewickmm18/mmfunctions.git'
 _IS_PREINSTALLED = False
+
+'''
+class KLByWindow:
+    __init__(self, alpha):
+        self.alpha = alpha
+
+    fit(self, X):
+        emp_cov = empirical_covariance(X)
+        result = graphical_lasso(emp_cov, alpha=self.alpha, return_n_iter=True)
+'''
+
 
 class AggregateWithExpression(BaseSimpleAggregator):
     """
@@ -623,6 +636,7 @@ class InvokeWMLModel(BaseTransformer):
 
         if isinstance(output_items, str):
             self.output_items = [output_items]    # regression
+            self.output_items = [f'{output_items}{i}' for i in range(0, 28)]
         else:
             self.output_items = output_items      # classification
 
