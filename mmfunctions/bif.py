@@ -760,7 +760,7 @@ class InvokeWMLModel(BaseTransformer):
                     'fields': self.input_items,
                     'values': rows}]
             }
-            #logger.info('Payload: ' + str(scoring_payload))
+            logger.info('Field: ' + str(self.input_items) + ', Payload length: ' + str(len(rows)))
         else:
             logging.error("no input columns provided, forwarding all")
             return df
