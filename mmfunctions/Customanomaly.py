@@ -59,19 +59,22 @@ class AnomalyThreshold(SupervisedLearningTransformer):
 
     def _calc(self, df):
         entity = df.index[0][0]
-        
+
         # obtain db handler
         db = self.get_db()
         test_model_name=self.get_model_name(suffix=entity)
-        logger.error('**********************************Name of the model:' + str(test_model_name) + ' Entitiy Value: ' + str(entity))
+
+        log_stuff = 'Name of the model:' + str(test_model_name) + ', Entity Value: ' + str(entity) + ', Entity Type ' + str(self.get_entity_type())
+        logger.info(log_stuff)
+        raise Exception(log_stuff)
         model_name, very_simple_model, version = self.load_model(suffix=entity)
-        
+
         feature = df[self.input_item].values
 
         if very_simple_model is None and self.auto_train:
             # we don't do that now, the model *has* to be there
             very_simple_model = VerySimpleModel(-9.2, 6, 0)
-        
+
         if very_simple_model is not None:
             #self.Min[entity] = very_simple_model.Min
             df[self.Min] = very_simple_model.Min       # set the min threshold column
