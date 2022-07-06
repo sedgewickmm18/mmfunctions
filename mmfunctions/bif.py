@@ -636,7 +636,7 @@ class InvokeWMLModel(BaseTransformer):
 
         if isinstance(output_items, str):
             self.output_items = [output_items]    # regression
-            self.output_items = [f'{output_items}{i}' for i in range(0, 28)]
+            self.output_items = [f'{output_items}{i}' for i in range(0, 34)]
         else:
             self.output_items = output_items      # classification
 
