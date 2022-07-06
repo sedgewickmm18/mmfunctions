@@ -771,8 +771,10 @@ class InvokeWMLModel(BaseTransformer):
             # Regression
             if len(self.output_items) == 1:
                 logger.info(results['predictions'][0]['values'][1])
+                logger.info(self.output_items.size())
+
                 df.loc[~df.index.isin(index_nans), self.output_items] = \
-                    np.array(results['predictions'][0]['values'][1]).flatten()
+                    np.array(results['predictions'][0]['values'][29:]).flatten()
             # Classification
             else:
                 arr = np.array(results['predictions'][0]['values'])
