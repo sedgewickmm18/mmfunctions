@@ -59,11 +59,11 @@ class AnomalyThreshold(SupervisedLearningTransformer):
 
     def _calc(self, df):
         entity = df.index[0][0]
-
+        
         # obtain db handler
         db = self.get_db()
         test_model_name=self.get_model_name(suffix=entity)
-        logger.error('**********************************Name of the model:' + str(test_model_name))
+        logger.error('**********************************Name of the model:' + str(test_model_name) + ' Entitiy Value: ' + str(entity))
         model_name, very_simple_model, version = self.load_model(suffix=entity)
         
         feature = df[self.input_item].values
