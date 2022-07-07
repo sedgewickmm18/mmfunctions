@@ -815,7 +815,7 @@ class InvokeWMLModel(BaseTransformer):
         outputs.append(UISingle(name='output_items', datatype=float))
         return (inputs, outputs)
 
-LASTROWS = 5000
+LASTROWS = 500
 
 class InvokeWMLModelMulti(BaseTransformer):
     '''
