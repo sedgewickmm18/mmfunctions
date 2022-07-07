@@ -815,6 +815,8 @@ class InvokeWMLModel(BaseTransformer):
         outputs.append(UISingle(name='output_items', datatype=float))
         return (inputs, outputs)
 
+LASTROWS = 10000
+
 class InvokeWMLModelMulti(BaseTransformer):
     '''
     Pass multivariate data in input_items to a regression function deployed to
@@ -975,8 +977,8 @@ class InvokeWMLModelMulti(BaseTransformer):
 
             shape = df_.loc[~df.index.isin(index_nans), self.input_items].values.shape
             arr = df_.loc[~df.index.isin(index_nans), self.input_items].values
-            if shape[0] > 10000:
-                arr = arr[-10000,:]
+            if shape[0] > LASTROWS:
+                arr = arr[-LASTROWS:,:]
             self.db.model_store.store_model('Invoker', arr)
 
             rows = df_.loc[~df.index.isin(index_nans), self.input_items].values.tolist()
@@ -1000,7 +1002,7 @@ class InvokeWMLModelMulti(BaseTransformer):
                 arr = np.array(results['predictions'][0]['values'][self.ignore_output:]).flatten()
                 if shape[0] > 10000:
                     full_arr = np.zeros(shape)
-                    full_arr[-10000,:] = arr
+                    full_arr[-10000:,:] = arr
                 else:
                     full_arr = arr
                 df.loc[~df.index.isin(index_nans), self.output_items] = full_arr
