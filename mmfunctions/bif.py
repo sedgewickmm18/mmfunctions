@@ -834,7 +834,8 @@ class InvokeWMLModelMulti(BaseTransformer):
     def __init__(self, input_items, wml_auth, ignore_output, output_items):
         super().__init__()
 
-        logger.debug(input_items, output_items)
+        logger.debug(str(input_items))
+        logger.debug(str(output_items))
 
         self.whoami = 'InvokeWMLModel'
 
