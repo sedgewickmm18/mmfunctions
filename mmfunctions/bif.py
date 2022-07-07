@@ -973,7 +973,7 @@ class InvokeWMLModelMulti(BaseTransformer):
             index_nans = df[df[self.input_items].isna().any(axis=1)].index
             df_ = df.replace(r'^\s*$', 0.0, regex=True)
 
-            arr = df_.loc[~df.index.isin(index_nans), self.input_items].values
+            arr = df_.loc[~df.index.isin(index_nans), self.input_items].tail(10000).values
             self.db.model_store.store_model('Invoker', arr)
 
             rows = df_.loc[~df.index.isin(index_nans), self.input_items].values.tolist()
