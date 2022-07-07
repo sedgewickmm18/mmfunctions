@@ -998,8 +998,9 @@ class InvokeWMLModelMulti(BaseTransformer):
             # Regression
             #if len(self.output_items) == 1:
             if True:
-                logger.info(results['predictions'][0]['values'][1])
+                #logger.info(results['predictions'][0]['values'][1])
                 arr = np.array(results['predictions'][0]['values'][self.ignore_output:])[:,0,:]
+                logger.info('Result shape: ' + str(arr.shape))
                 if shape[0] > LASTROWS or shape[0] > arr.shape[0]:
                     full_arr = np.zeros(shape)
                     full_arr[-arr.shape[0]:,:] = arr
