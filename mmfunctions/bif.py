@@ -981,7 +981,7 @@ class InvokeWMLModelMulti(BaseTransformer):
                 arr = arr[-LASTROWS:,:]
             self.db.model_store.store_model('Invoker', arr)
 
-            rows = df_.loc[~df.index.isin(index_nans), self.input_items].values.tolist()
+            rows = arr.tolist()
             scoring_payload = {
                 'input_data': [{
                     'fields': self.input_items,
