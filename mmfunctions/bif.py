@@ -973,6 +973,7 @@ class InvokeWMLModelMulti(BaseTransformer):
             index_nans = df[df[self.input_items].isna().any(axis=1)].index
             df_ = df.replace(r'^\s*$', 0.0, regex=True)
 
+            shape = df_.loc[~df.index.isin(index_nans), self.input_items].values.shape
             arr = df_.loc[~df.index.isin(index_nans), self.input_items].tail(10000).values
             self.db.model_store.store_model('Invoker', arr)
 
@@ -982,7 +983,7 @@ class InvokeWMLModelMulti(BaseTransformer):
                     'fields': self.input_items,
                     'values': rows}]
             }
-            logger.info('Field: ' + str(self.input_items) + ', Payload length: ' + str(len(rows)))
+            logger.info('Field: ' + str(self.input_items) + ', Payload length: ' + str(len(rows)) + ', Shape: ' + str(shape))
         else:
             logging.error("no input columns provided, forwarding all")
             return df
@@ -994,11 +995,17 @@ class InvokeWMLModelMulti(BaseTransformer):
             #if len(self.output_items) == 1:
             if True:
                 logger.info(results['predictions'][0]['values'][1])
+                arr = np.array(results['predictions'][0]['values'][self.ignore_output:]).flatten()
+                if shape[0] > 10000:
+                    full_arr = np.zeros(shape)
+                    full_arr[-10000,:] = arr
+                else:
+                    full_arr = arr
+                df.loc[~df.index.isin(index_nans), self.output_items] = full_arr
 
-                df.loc[~df.index.isin(index_nans), self.output_items] = \
-                    np.array(results['predictions'][0]['values'][self.ignore_output:]).flatten()
             # Classification
             else:
+
                 arr = np.array(results['predictions'][0]['values'])
                 df.loc[~df.index.isin(index_nans), self.output_items[0]] = arr[:,0].astype(int)
                 arr2 = np.array(arr[:,1].tolist())
