@@ -1019,7 +1019,7 @@ class InvokeWMLModelMulti(BaseTransformer):
                                   description = "Data items adjust", is_output_datatype_derived = True))
         inputs.append(UISingle(name='wml_auth', datatype=str,
                                description='Endpoint to WML service where model is hosted', tags=['TEXT'], required=True))
-        inputs.append(UISingle(name='ignore_output', datatype=int, description="Disregard the first output columns from the model")
+        inputs.append(UISingle(name='ignore_output', datatype=int, description="Disregard the first output columns from the model"))
 
         # define arguments that behave as function outputs
         return (inputs, outputs)
