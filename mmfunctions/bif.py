@@ -1015,7 +1015,7 @@ class InvokeWMLModelMulti(BaseTransformer):
         outputs=[]
 
         #define arguments that behave as function inputs
-        inputs.append(UIMultiItem(name = 'input_items', datatype=float, required=True, output_items='output_items',
+        inputs.append(UIMultiItem(name = 'input_items', datatype=float, required=True, output_item='output_items',
                                   description = "Data items adjust", is_output_datatype_derived = True))
         inputs.append(UISingle(name='wml_auth', datatype=str,
                                description='Endpoint to WML service where model is hosted', tags=['TEXT'], required=True))
