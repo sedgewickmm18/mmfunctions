@@ -64,9 +64,9 @@ class AnomalyThreshold(SupervisedLearningTransformer):
         db = self.get_db()
         test_model_name=self.get_model_name(suffix=entity)
 
-        log_stuff = 'Name of the model:' + str(test_model_name) + ', Entity Value: ' + str(entity) + ', Entity Type ' + str(self.get_entity_type())
-        logger.info(log_stuff)
-        raise Exception(log_stuff)
+#         log_stuff = 'Name of the model:' + str(test_model_name) + ', Entity Value: ' + str(entity) + ', Entity Type ' + str(self.get_entity_type())
+#         logger.info(log_stuff)
+#         raise Exception(log_stuff)
         model_name, very_simple_model, version = self.load_model(suffix=entity)
 
         feature = df[self.input_item].values
@@ -79,8 +79,8 @@ class AnomalyThreshold(SupervisedLearningTransformer):
             #self.Min[entity] = very_simple_model.Min
             df[self.Min] = very_simple_model.Min       # set the min threshold column
             #self.Max[entity] = very_simple_model.Max
-            df[self.Max] = very_simple_model.Min       # set the max threshold column
-            df[self.outlier] = np.logical_and(feature < very_simple_model.Max, feature < very_simple_model.Min)
+            df[self.Max] = very_simple_model.Mix       # set the max threshold column
+            df[self.outlier] = np.logical_and(feature < very_simple_model.Max, feature > very_simple_model.Min)
 
         return df.droplevel(0)
 
