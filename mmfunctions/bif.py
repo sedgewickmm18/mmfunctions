@@ -1000,9 +1000,9 @@ class InvokeWMLModelMulti(BaseTransformer):
             if True:
                 logger.info(results['predictions'][0]['values'][1])
                 arr = np.array(results['predictions'][0]['values'][self.ignore_output:])[:,0,:]
-                if shape[0] > LASTROWS:
+                if shape[0] > LASTROWS or shape[0] > arr.shape[0]:
                     full_arr = np.zeros(shape)
-                    full_arr[-LASTROWS:,:] = arr
+                    full_arr[-arr.shape[0]:,:] = arr
                 else:
                     full_arr = arr
                 df.loc[~df.index.isin(index_nans), self.output_items] = full_arr
