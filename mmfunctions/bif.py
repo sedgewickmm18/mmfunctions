@@ -974,7 +974,9 @@ class InvokeWMLModelMulti(BaseTransformer):
             df_ = df.replace(r'^\s*$', 0.0, regex=True)
 
             shape = df_.loc[~df.index.isin(index_nans), self.input_items].values.shape
-            arr = df_.loc[~df.index.isin(index_nans), self.input_items].tail(10000).values
+            arr = df_.loc[~df.index.isin(index_nans), self.input_items].values
+            if shape[0] > 10000:
+                arr = arr[-10000,:]
             self.db.model_store.store_model('Invoker', arr)
 
             rows = df_.loc[~df.index.isin(index_nans), self.input_items].values.tolist()
