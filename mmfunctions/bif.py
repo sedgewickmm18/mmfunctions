@@ -962,7 +962,7 @@ class InvokeWMLModelMulti(BaseTransformer):
         df = df.copy().fillna('')
         missing_cols = [x for x in (self.output_items) if x not in df.columns]
         for m in missing_cols:
-            df[m] = None
+            df[m] = 0.0
 
         self.login()
 
@@ -1000,6 +1000,8 @@ class InvokeWMLModelMulti(BaseTransformer):
             if True:
                 #logger.info(results['predictions'][0]['values'][1])
                 arr = np.array(results['predictions'][0]['values'][self.ignore_output:])[:,0,:]
+                self.db.model_store.store_model('Result', arr)
+
                 logger.info('Result shape: ' + str(arr.shape))
                 if shape[0] > LASTROWS or shape[0] > arr.shape[0]:
                     full_arr = np.zeros(shape)
