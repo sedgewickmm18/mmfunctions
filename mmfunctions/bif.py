@@ -998,8 +998,8 @@ class InvokeWMLModelMulti(BaseTransformer):
                     'fields': self.input_items,
                     'values': rows}]
             }
-            logger.info('Field: ' + str(self.input_items) + ', Payload length: ' + str(len(rows)) + \
-                        ', Start: ' + start + ', SegSize: ' + segment_size + ', Shape: ' + str(shape))
+            logger.info('Field: ' + str(self.input_items) + ', Payload length: ' + str(len(rows)) +
+                         ', Start: ' + str(start) + ', SegSize: ' + str(segment_size) + ', Shape: ' + str(shape))
 
             results = self.client.deployments.score(self.deployment_id, scoring_payload)
 
