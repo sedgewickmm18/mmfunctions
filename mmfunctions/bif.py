@@ -1015,7 +1015,7 @@ class InvokeWMLModelMulti(BaseTransformer):
                     current_x_axis = np.linspace(0, arr.shape[0], arr.shape[0])
                     linear_interpolate = sp.interpolate.interp1d(current_x_axis, arr[:,i], kind='linear', fill_value='extrapolate')
 
-                    full_arr[start:segment_size,i] = linear_interpolate(np.arange(0, segment_size, 1))
+                    full_arr[start:start+segment_size,i] = linear_interpolate(np.arange(0, segment_size, 1))
 
                 logger.info('Assigning ' + str(full_arr.shape) + ' to ' + str(self.output_items))
 
