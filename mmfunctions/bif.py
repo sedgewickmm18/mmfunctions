@@ -973,15 +973,24 @@ class InvokeWMLModelMulti(BaseTransformer):
 
     def _calc(self, df):
 
-        if len(self.input_items) >= 1:
-            index_nans = df[df[self.input_items].isna().any(axis=1)].index
-            df_ = df.replace(r'^\s*$', 0.0, regex=True)
+        index_nans = df[df[self.input_items].isna().any(axis=1)].index
+        df_ = df.replace(r'^\s*$', 0.0, regex=True)
 
-            shape = df_.loc[~df.index.isin(index_nans), self.input_items].values.shape
-            arr = df_.loc[~df.index.isin(index_nans), self.input_items].values
-            if shape[0] > LASTROWS:
-                arr = arr[-LASTROWS:,:]
-            self.db.model_store.store_model('Invoker', arr)
+        shape = df_.loc[~df.index.isin(index_nans), self.input_items].values.shape
+        arr = df_.loc[~df.index.isin(index_nans), self.input_items].values
+
+        full_arr = np.zeros(shape)
+
+        ranges = range(0, shape[0], LASTROWS-100)
+        for start in ranges:
+
+            segment_size = start + LASTROWS
+            if start + LASTROWS > shape[0]:
+                arr = arr[start:,:]
+                segment_size = shape[0] - start
+            else:
+                arr = arr[start:start+LASTROWS,:]
+            #self.db.model_store.store_model('Invoker', arr)
 
             rows = arr.tolist()
             scoring_payload = {
@@ -990,33 +999,23 @@ class InvokeWMLModelMulti(BaseTransformer):
                     'values': rows}]
             }
             logger.info('Field: ' + str(self.input_items) + ', Payload length: ' + str(len(rows)) + ', Shape: ' + str(shape))
-        else:
-            logging.error("no input columns provided, forwarding all")
-            return df
 
-        results = self.client.deployments.score(self.deployment_id, scoring_payload)
 
-        if results:
-            # Regression
-            #if len(self.output_items) == 1:
-            if True:
+            results = self.client.deployments.score(self.deployment_id, scoring_payload)
+
+            if results:
                 #logger.info(results['predictions'][0]['values'][1])
                 arr = np.array(results['predictions'][0]['values'][self.ignore_output:])[:,0,:]
-                self.db.model_store.store_model('Result', arr)
+                #self.db.model_store.store_model('Result', arr)
 
                 logger.info('Result shape: ' + str(arr.shape))
-                if shape[0] > LASTROWS or shape[0] > arr.shape[0]:
-                    stretch_size = min(LASTROWS, shape[0])
-                    full_arr = np.zeros(shape)
 
-                    logger.info('Stretch ' + str(arr.shape[1]) + ' columns')
-                    for i in range(arr.shape[1]):
-                        current_x_axis = np.linspace(0, arr.shape[0], arr.shape[0])
-                        linear_interpolate = sp.interpolate.interp1d(current_x_axis, arr[:,i], kind='linear', fill_value='extrapolate')
+                logger.info('Stretch ' + str(arr.shape[1]) + ' columns')
+                for i in range(arr.shape[1]):
+                    current_x_axis = np.linspace(0, arr.shape[0], arr.shape[0])
+                    linear_interpolate = sp.interpolate.interp1d(current_x_axis, arr[:,i], kind='linear', fill_value='extrapolate')
 
-                        full_arr[-stretch_size:,i] = linear_interpolate(np.arange(0, stretch_size, 1))
-                else:
-                    full_arr = arr
+                    full_arr[start:segment_size,i] = linear_interpolate(np.arange(0, segment_size, 1))
 
                 logger.info('Assigning ' + str(full_arr.shape) + ' to ' + str(self.output_items))
 
@@ -1024,18 +1023,10 @@ class InvokeWMLModelMulti(BaseTransformer):
                 logger.info('Frame columns are ' + str(df.columns))
                 df[self.output_items] = full_arr
                 logger.info('Now frame columns are ' + str(df.columns))
-
-            # Classification
             else:
+                logging.error('error invoking external model')
 
-                arr = np.array(results['predictions'][0]['values'])
-                df.loc[~df.index.isin(index_nans), self.output_items[0]] = arr[:,0].astype(int)
-                arr2 = np.array(arr[:,1].tolist())
-                df.loc[~df.index.isin(index_nans), self.output_items[1]] = arr2.T[0]
-
-        else:
-            logging.error('error invoking external model')
-
+        logging.info('Evaluation loop ended')
         return df
 
 
