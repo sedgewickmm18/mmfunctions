@@ -977,7 +977,7 @@ class InvokeWMLModelMulti(BaseTransformer):
         df_ = df.replace(r'^\s*$', 0.0, regex=True)
 
         shape = df_.loc[~df.index.isin(index_nans), self.input_items].values.shape
-        arr = df_.loc[~df.index.isin(index_nans), self.input_items].values
+        orig_arr = df_.loc[~df.index.isin(index_nans), self.input_items].values
 
         full_arr = np.zeros(shape)
 
@@ -986,10 +986,10 @@ class InvokeWMLModelMulti(BaseTransformer):
 
             segment_size = LASTROWS
             if start + LASTROWS > shape[0]:
-                arr = arr[start:,:]
+                arr = orig_arr[start:,:]
                 segment_size = shape[0] - start
             else:
-                arr = arr[start:start+segment_size,:]
+                arr = orig_arr[start:start+segment_size,:]
             #self.db.model_store.store_model('Invoker', arr)
 
             rows = arr.tolist()
