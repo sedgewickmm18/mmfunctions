@@ -989,7 +989,7 @@ class InvokeWMLModelMulti(BaseTransformer):
                 arr = arr[start:,:]
                 segment_size = shape[0] - start
             else:
-                arr = arr[start:start+LASTROWS,:]
+                arr = arr[start:start+segment_size,:]
             #self.db.model_store.store_model('Invoker', arr)
 
             rows = arr.tolist()
@@ -998,8 +998,8 @@ class InvokeWMLModelMulti(BaseTransformer):
                     'fields': self.input_items,
                     'values': rows}]
             }
-            logger.info('Field: ' + str(self.input_items) + ', Payload length: ' + str(len(rows)) + ', Shape: ' + str(shape))
-
+            logger.info('Field: ' + str(self.input_items) + ', Payload length: ' + str(len(rows)) + \
+                        ', Start: ' + start + ', SegSize: ' + segment_size + ', Shape: ' + str(shape))
 
             results = self.client.deployments.score(self.deployment_id, scoring_payload)
 
