@@ -1005,11 +1005,20 @@ class InvokeWMLModelMulti(BaseTransformer):
 
                 logger.info('Result shape: ' + str(arr.shape))
                 if shape[0] > LASTROWS or shape[0] > arr.shape[0]:
+                    stretch_size = min(LASTROWS, shape[0])
                     full_arr = np.zeros(shape)
-                    full_arr[-arr.shape[0]:,:] = arr.astype(float)
+
+                    logger.info('Stretch ' + str(arr.shape[1]) + ' columns')
+                    for i in range(arr.shape[1]):
+                        current_x_axis = np.linspace(0, arr.shape[0], arr.shape[0])
+                        linear_interpolate = sp.interpolate.interp1d(current_x_axis, arr[:,i], kind='linear', fill_value='extrapolate')
+
+                        full_arr[-stretch_size:,:] = linear_interpolate(np.arange(0, stretch_size, 1))
                 else:
                     full_arr = arr
+
                 logger.info('Assigning ' + str(full_arr.shape) + ' to ' + str(self.output_items))
+
                 #df.loc[~df.index.isin(index_nans), self.output_items] = full_arr
                 logger.info('Frame columns are ' + str(df.columns))
                 df[self.output_items] = full_arr
