@@ -1006,7 +1006,8 @@ class InvokeWMLModelMulti(BaseTransformer):
                     full_arr[-arr.shape[0]:,:] = arr
                 else:
                     full_arr = arr
-                df.loc[~df.index.isin(index_nans), self.output_items] = full_arr
+                #df.loc[~df.index.isin(index_nans), self.output_items] = full_arr[
+                df[self.output_items] = full_arr
 
             # Classification
             else:
