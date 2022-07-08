@@ -959,7 +959,8 @@ class InvokeWMLModelMulti(BaseTransformer):
             self.db = self._get_dms().db
 
         # Create missing columns before doing group-apply
-        df = df.copy().fillna('')
+        #df = df.copy().fillna('')
+        df = df.copy().fillna(value=0.0)
         missing_cols = [x for x in (self.output_items) if x not in df.columns]
         for m in missing_cols:
             df[m] = 0.0
