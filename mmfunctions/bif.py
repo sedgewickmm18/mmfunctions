@@ -984,7 +984,7 @@ class InvokeWMLModelMulti(BaseTransformer):
         ranges = range(0, shape[0], LASTROWS-100)
         for start in ranges:
 
-            segment_size = start + LASTROWS
+            segment_size = LASTROWS
             if start + LASTROWS > shape[0]:
                 arr = arr[start:,:]
                 segment_size = shape[0] - start
