@@ -1003,12 +1003,14 @@ class InvokeWMLModelMulti(BaseTransformer):
                 logger.info('Result shape: ' + str(arr.shape))
                 if shape[0] > LASTROWS or shape[0] > arr.shape[0]:
                     full_arr = np.zeros(shape)
-                    full_arr[-arr.shape[0]:,:] = arr
+                    full_arr[-arr.shape[0]:,:] = arr.astype(float)
                 else:
                     full_arr = arr
                 logger.info('Assigning ' + str(full_arr.shape) + ' to ' + str(self.output_items))
                 #df.loc[~df.index.isin(index_nans), self.output_items] = full_arr
+                logger.info('Frame columns are ' + str(df.columns))
                 df[self.output_items] = full_arr
+                logger.info('Now frame columns are ' + str(df.columns))
 
             # Classification
             else:
