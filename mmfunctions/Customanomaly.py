@@ -72,14 +72,29 @@ class AnomalyThreshold(SupervisedLearningTransformer):
         feature = df[self.input_item].values
 
         if very_simple_model is None and self.auto_train:
+            print('Here 1')
+
             # we don't do that now, the model *has* to be there
             very_simple_model = VerySimpleModel(-9.2, 6, 0)
+
+            try:
+                db.model_store.store_model(model_name, very_simple_model)
+            except Exception as e:
+                logger.error('Model store failed with ' + str(e))
+
+            print('Here')
+        else:
+            print('Here 5')
+
+
+        print(very_simple_model)
+
 
         if very_simple_model is not None:
             #self.Min[entity] = very_simple_model.Min
             df[self.Min] = very_simple_model.Min       # set the min threshold column
             #self.Max[entity] = very_simple_model.Max
-            df[self.Max] = very_simple_model.Mix       # set the max threshold column
+            df[self.Max] = very_simple_model.Max       # set the max threshold column
             df[self.outlier] = np.logical_and(feature < very_simple_model.Max, feature > very_simple_model.Min)
 
         return df.droplevel(0)
