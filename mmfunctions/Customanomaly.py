@@ -44,6 +44,7 @@ class AnomalyThreshold(SupervisedLearningTransformer):
         self.Max = Max
         self.std_cycle = std_cycle
         self.outlier = outlier
+        self.auto_train = True
 
         self.whoami = 'AnomalyThreshold'
 
