@@ -30,6 +30,7 @@ class VerySimpleModel:
         self.Max = max
         self.CycleList = cycle_list
 
+# In[ ]:
 
 class AnomalyThreshold(SupervisedLearningTransformer):
 
