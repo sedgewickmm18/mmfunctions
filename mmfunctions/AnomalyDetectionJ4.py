@@ -14,7 +14,7 @@ from .anomaly import SupervisedLearningTransformer
 logger = logging.getLogger(__name__)
 logger.info('IOT functions version ' + iotfunctions.__version__)
 
-PACKAGE_URL = 'git+https://github.com/sedgewickmm18/mmfunctions.git'
+PACKAGE_URL = 'git+https://github.ibm.com/IBM-India-CTO-ENG-Assets/MSCIL_Custom_Function.git'
 _IS_PREINSTALLED = False
 
 
@@ -24,7 +24,7 @@ class VerySimpleModel:
         self.Max = max
         self.CycleList = cycle_list
 
-class AnomalyDetectionJ4(SupervisedLearningTransformer):
+class AnomalyForJoint4(SupervisedLearningTransformer):
 
     def __init__(self, input_item, Min, Max, std_cycle, outlier):
         super().__init__(features=[input_item], targets=[Min, Max, std_cycle,outlier])
@@ -35,7 +35,7 @@ class AnomalyDetectionJ4(SupervisedLearningTransformer):
         self.std_cycle = std_cycle
         self.outlier = outlier
         self.auto_train = True
-        self.whoami = 'AnomalyDetectionJ4'
+        self.whoami = 'AnomalyForJoint4'
 
 
     def execute(self, df):
@@ -65,7 +65,7 @@ class AnomalyDetectionJ4(SupervisedLearningTransformer):
             print('Here 1')
 
             # we don't do that now, the model *has* to be there
-            very_simple_model = VerySimpleModel(-30.93, 6.41, 0)
+            very_simple_model = VerySimpleModel(-30.83, 5.59, 0)
 
             try:
                 db.model_store.store_model(model_name, very_simple_model)

@@ -14,7 +14,7 @@ from .anomaly import SupervisedLearningTransformer
 logger = logging.getLogger(__name__)
 logger.info('IOT functions version ' + iotfunctions.__version__)
 
-PACKAGE_URL = 'git+https://github.com/sedgewickmm18/mmfunctions.git'
+PACKAGE_URL = 'git+https://github.ibm.com/IBM-India-CTO-ENG-Assets/MSCIL_Custom_Function.git'
 _IS_PREINSTALLED = False
 
 class VerySimpleModel:
@@ -23,7 +23,7 @@ class VerySimpleModel:
         self.Max = max
         self.CycleList = cycle_list
 
-class AnomalyDetectionJ1(SupervisedLearningTransformer):
+class AnomalyForJoint1(SupervisedLearningTransformer):
 
     def __init__(self, input_item, Min, Max, std_cycle, outlier):
         super().__init__(features=[input_item], targets=[Min, Max, std_cycle,outlier])
@@ -34,7 +34,7 @@ class AnomalyDetectionJ1(SupervisedLearningTransformer):
         self.std_cycle = std_cycle
         self.outlier = outlier
         self.auto_train = True
-        self.whoami = 'AnomalyDetectionJ1'
+        self.whoami = 'AnomalyForJoint1'
 
 
     def execute(self, df):

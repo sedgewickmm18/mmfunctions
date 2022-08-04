@@ -3,8 +3,6 @@ import numpy as np
 import pandas as pd
 import scipy as sp
 import logging
-
-
 import iotfunctions
 from iotfunctions.base import (BaseTransformer, BaseRegressor, BaseEstimatorFunction, BaseSimpleAggregator)
 from iotfunctions.bif import (AlertHighValue)
@@ -16,7 +14,7 @@ from .anomaly import SupervisedLearningTransformer
 logger = logging.getLogger(__name__)
 logger.info('IOT functions version ' + iotfunctions.__version__)
 
-PACKAGE_URL = 'git+https://github.com/sedgewickmm18/mmfunctions.git'
+PACKAGE_URL = 'git+https://github.ibm.com/IBM-India-CTO-ENG-Assets/MSCIL_Custom_Function.git'
 _IS_PREINSTALLED = False
 
 
@@ -26,9 +24,7 @@ class VerySimpleModel:
         self.Max = max
         self.CycleList = cycle_list
 
-# In[ ]:
-
-class AnomalyDetectionJ5(SupervisedLearningTransformer):
+class AnomalyForJoint5(SupervisedLearningTransformer):
 
     def __init__(self, input_item, Min, Max, std_cycle, outlier):
         super().__init__(features=[input_item], targets=[Min, Max, std_cycle,outlier])
@@ -39,8 +35,7 @@ class AnomalyDetectionJ5(SupervisedLearningTransformer):
         self.std_cycle = std_cycle
         self.outlier = outlier
         self.auto_train = True
-
-        self.whoami = 'AnomalyDetectionJ5'
+        self.whoami = 'AnomalyForJoint5'
 
 
     def execute(self, df):
@@ -70,7 +65,7 @@ class AnomalyDetectionJ5(SupervisedLearningTransformer):
             print('Here 1')
 
             # we don't do that now, the model *has* to be there
-            very_simple_model = VerySimpleModel(-34.39, 15.23, 0)
+            very_simple_model = VerySimpleModel(-33.08, 14.61, 0)
 
             try:
                 db.model_store.store_model(model_name, very_simple_model)
@@ -80,8 +75,6 @@ class AnomalyDetectionJ5(SupervisedLearningTransformer):
             print('Here')
         else:
             print('Here 5')
-
-
         print(very_simple_model)
 
 

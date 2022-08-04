@@ -24,7 +24,7 @@ class VerySimpleModel:
         self.Max = max
         self.CycleList = cycle_list
 
-class AnomalyForJoint2(SupervisedLearningTransformer):
+class AggregatedAnomalyForJoint2(SupervisedLearningTransformer):
 
     def __init__(self, input_item, Min, Max, std_cycle, outlier):
         super().__init__(features=[input_item], targets=[Min, Max, std_cycle,outlier])
@@ -35,7 +35,7 @@ class AnomalyForJoint2(SupervisedLearningTransformer):
         self.std_cycle = std_cycle
         self.outlier = outlier
         self.auto_train = True
-        self.whoami = 'AnomalyForJoint2'
+        self.whoami = 'AggregatedAnomalyForJoint2'
 
 
     def execute(self, df):
@@ -65,7 +65,7 @@ class AnomalyForJoint2(SupervisedLearningTransformer):
             print('Here 1')
 
             # we don't do that now, the model *has* to be there
-            very_simple_model = VerySimpleModel(-12.39, 5.85, 0)
+            very_simple_model = VerySimpleModel(-12.89, 5.85, 0)
 
             try:
                 db.model_store.store_model(model_name, very_simple_model)

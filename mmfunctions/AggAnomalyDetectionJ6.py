@@ -24,7 +24,7 @@ class VerySimpleModel:
         self.Max = max
         self.CycleList = cycle_list
 
-class AnomalyForJoint2(SupervisedLearningTransformer):
+class AggregatedAnomalyForJoint6(SupervisedLearningTransformer):
 
     def __init__(self, input_item, Min, Max, std_cycle, outlier):
         super().__init__(features=[input_item], targets=[Min, Max, std_cycle,outlier])
@@ -35,8 +35,7 @@ class AnomalyForJoint2(SupervisedLearningTransformer):
         self.std_cycle = std_cycle
         self.outlier = outlier
         self.auto_train = True
-        self.whoami = 'AnomalyForJoint2'
-
+        self.whoami = 'AggregatedAnomalyForJoint6'
 
     def execute(self, df):
         # set output columns to zero
@@ -58,14 +57,13 @@ class AnomalyForJoint2(SupervisedLearningTransformer):
 #         logger.info(log_stuff)
 #         raise Exception(log_stuff)
         model_name, very_simple_model, version = self.load_model(suffix=entity)
-
         feature = df[self.input_item].values
 
         if very_simple_model is None and self.auto_train:
             print('Here 1')
 
             # we don't do that now, the model *has* to be there
-            very_simple_model = VerySimpleModel(-12.39, 5.85, 0)
+            very_simple_model = VerySimpleModel(-7.58, 3.89, 0)
 
             try:
                 db.model_store.store_model(model_name, very_simple_model)
@@ -76,6 +74,7 @@ class AnomalyForJoint2(SupervisedLearningTransformer):
         else:
             print('Here 5')
         print(very_simple_model)
+
 
         if very_simple_model is not None:
             #self.Min[entity] = very_simple_model.Min
@@ -91,7 +90,6 @@ class AnomalyForJoint2(SupervisedLearningTransformer):
         # define arguments that behave as function inputs
         inputs = []
         inputs.append(UISingleItem(name="input_item", datatype=float, description="Data item to analyze"))
-
         # define arguments that behave as function outputs
         outputs = []
         outputs.append(UIFunctionOutSingle(name="Min", datatype=float,
