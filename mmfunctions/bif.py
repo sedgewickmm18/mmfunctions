@@ -1051,12 +1051,10 @@ class AlertExpressionPulsed(BaseEvent):
     Create alerts that are triggered when data values the expression is True
     """
     def __init__(self, expression, alert_name, **kwargs):
-        super().__init__(expression, None, None, True, alert_name, **kwargs)
+        self.expression = expression
+        self.alert_name = alert_name
         self.pulse_trigger = True
-
-        #if alert_end is not None:
-        #    self.alert_end = alert_end
-
+        super().__init__()
         logger.info('AlertExpressionPulsed exp: ' + str(expression) + '  alert: ' + str(alert_name))
 
     # evaluate alerts by entity
