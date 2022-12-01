@@ -1045,3 +1045,83 @@ class InvokeWMLModelMulti(BaseTransformer):
         # define arguments that behave as function outputs
         return (inputs, outputs)
 
+
+class AlertExpressionPulsed(BaseEvent):
+    """
+    Create alerts that are triggered when data values the expression is True
+    """
+    def __init__(self, expression, alert_name, **kwargs):
+        super().__init__(expression, None, None, True, alert_name, **kwargs)
+        self.pulse_trigger = True
+
+        #if alert_end is not None:
+        #    self.alert_end = alert_end
+
+        logger.info('AlertExpressionPulsed exp: ' + str(expression) + '  alert: ' + str(alert_name))
+
+    # evaluate alerts by entity
+    def _calc(self, df):
+        try:
+            c = self._entity_type.get_attributes_dict()
+        except Exception:
+            c = None
+
+        df = df.copy()
+        logger.info('AlertExpressionPulsed exp: ' + self.expression + '  input: ' + str(df.columns))
+
+        expr = self.expression
+
+        if '${' in expr:
+            expr = re.sub(r"\$\{(\w+)\}", r"df['\1']", expr)
+            msg = 'Expression converted to %s. ' % expr
+        else:
+            msg = 'Expression (%s). ' % expr
+
+        self.trace_append(msg)
+
+        expr = str(expr)
+        logger.info('AlertExpressionWithFilter  - after regexp: ' + expr)
+
+        df[self.alert_name] = False
+        try:
+            evl = eval(expr)
+            np_res = np.where(evl, 1, 0)
+
+            # get time index
+            ts_ind = df.index.get_level_values(self._entity_type._timestamp)
+
+            if self.pulse_trigger:
+                # walk through all subsequences starting with the longest
+                # and replace all True with True, False, False, ...
+                for i in range(np_res.size, 2, -1):
+                    for j in range(0, i - 1):
+                        if np.all(np_res[j:i]):
+                            np_res[j + 1:i] = np.zeros(i - j - 1, dtype=int)
+                            np_res[j] = i - j  # keep track of sequence length
+
+            logger.info('AlertExpressionPulsed shapes ' + str(np_res.shape))
+            df[self.alert_name] = np_res
+
+        except Exception as e:
+            logger.info('AlertExpressionPulsed eval for ' + expr + ' failed with ' + str(e))
+            df[self.alert_name] = None
+            pass
+
+        return df
+
+    def execute(self, df):
+        df = super().execute(df)
+        logger.info('AlertExpressionPulsed generated columns: ' + str(df.columns))
+        return df
+
+    @classmethod
+    def build_ui(cls):
+        # define arguments that behave as function inputs
+        inputs = []
+        inputs.append(UIExpression(name='expression',
+                                   description="Define alert expression using pandas systax. Example: df['inlet_temperature']>50"))
+        # define arguments that behave as function outputs
+        outputs = []
+        outputs.append(UIFunctionOutSingle(name='alert_name', datatype=bool, description='Output of alert function'))
+        return (inputs, outputs)
+
