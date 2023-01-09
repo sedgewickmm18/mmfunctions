@@ -1184,7 +1184,13 @@ class CumulativeCount(BaseTransformer):
         """
         entity = df.index[0][0]
 
-        last_ts = 0
+        index_names = df.index.names
+
+        df_copy = df.reset_index()
+
+        entity_type = self.get_entity_type()
+
+        last_ts = df_copy[entity_type._timestamp].values[0]
         last_val = 0
         # get last timestamp and value for entity
         if self.right_db is not None:
@@ -1194,24 +1200,26 @@ class CumulativeCount(BaseTransformer):
                 last_ts = last_row['TIMESTAMP']
                 last_val = last_row['value_n']
 
-        df_copy = df.reset_index()
-
-        entity_type = self.get_entity_type()
 
         # condition and regular timestamp diff
         vstate = 1 - eval("df_copy[self.input_item] " + self.state_name).astype(int).values.astype(int)
         print(vstate, last_ts)
         try:
-            t_diff = np.insert(np.diff(df_copy[entity_type._timestamp].values), 0, last_ts)
+            t_diff = np.diff(np.insert(df_copy[entity_type._timestamp].values, 0, last_ts)). \
+                astype('timedelta64[s]').astype(np.int32)
         except Exception as ee:
             print(ee)
 
-        marr = np.ma.array(t_diff, mask=vstate)
-        c_sum = marr.cumsum().fill(np.nan)
-        df_copy[self.output_item] = c_sum
-        df_copy[self.output_item] = df_copy[self.output_item].fillna(method="bfill") + last_val
+        marr = np.ma.array(t_diff, mask=vstate).filled(0)
+        print(marr)
+        c_sum = marr.cumsum() #.filled(np.nan)
+        print(c_sum)
+        df_copy[self.output_item] = c_sum + last_val
+        #df_copy[self.output_item] = df_copy[self.output_item].fillna(method="bfill") + last_val
 
-        return df_copy
+        print(self.output_item, df_copy[self.output_item])
+
+        return df_copy.set_index(index_names)
 
     def execute(self, df):
         """
