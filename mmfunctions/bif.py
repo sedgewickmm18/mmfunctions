@@ -35,6 +35,7 @@ from iotfunctions.base import (BaseTransformer, BaseEvent, BaseSCDLookup, BaseSC
                                BasePreload, BaseDatabaseLookup, BaseDataSource, BaseDBActivityMerge, BaseSimpleAggregator)
 from iotfunctions.ui import (UISingle, UIMultiItem, UIFunctionOutSingle, UISingleItem, UIFunctionOutMulti, UIMulti, UIExpression,
                              UIText, UIParameters, UIStatusFlag)
+from iotfunctions.util import log_data_frame
 
 logger = logging.getLogger(__name__)
 PACKAGE_URL = 'git+https://github.com/sedgewickmm18/mmfunctions.git'
@@ -1065,6 +1066,7 @@ class AlertExpressionPulsed(BaseEvent):
             c = None
 
         df = df.copy()
+        print(df.index)
         logger.info('AlertExpressionPulsed exp: ' + self.expression + '  input: ' + str(df.columns))
 
         expr = self.expression
@@ -1085,6 +1087,12 @@ class AlertExpressionPulsed(BaseEvent):
             evl = eval(expr)
             np_res = np.where(evl, 1, 0)
 
+        except Exception as e:
+            logger.info('AlertExpressionPulsed eval for ' + expr + ' failed with ' + str(e))
+            df[self.alert_name] = False
+            return df
+
+        try:
             # get time index
             ts_ind = df.index.get_level_values(self._entity_type._timestamp)
 
@@ -1094,6 +1102,7 @@ class AlertExpressionPulsed(BaseEvent):
                 for i in range(np_res.size, 2, -1):
                     for j in range(0, i - 1):
                         if np.all(np_res[j:i]):
+                            logger.debug('Found subsequence ' + str(j) + ':' + str(i))
                             np_res[j + 1:i] = np.zeros(i - j - 1, dtype=int)
                             np_res[j] = i - j  # keep track of sequence length
 
@@ -1101,16 +1110,16 @@ class AlertExpressionPulsed(BaseEvent):
             df[self.alert_name] = np_res
 
         except Exception as e:
-            logger.info('AlertExpressionPulsed eval for ' + expr + ' failed with ' + str(e))
+            logger.info('AlertExpressionPulsed eval for ' + expr + ' failed with2 ' + str(e))
             df[self.alert_name] = None
             pass
 
         return df
 
-    def execute(self, df):
-        df = super().execute(df)
-        logger.info('AlertExpressionPulsed generated columns: ' + str(df.columns))
-        return df
+    #def execute(self, df):
+    #    df = super().execute(df)
+    #    logger.info('AlertExpressionPulsed generated columns: ' + str(df.columns))
+    #    return df
 
     @classmethod
     def build_ui(cls):
@@ -1121,5 +1130,146 @@ class AlertExpressionPulsed(BaseEvent):
         # define arguments that behave as function outputs
         outputs = []
         outputs.append(UIFunctionOutSingle(name='alert_name', datatype=bool, description='Output of alert function'))
+        return (inputs, outputs)
+
+class CumulativeCount(BaseTransformer):
+
+    def __init__(self, input_item, state_name, output_item):
+        """
+        We plan to report the anomaly only for the recent time points
+        """
+        # Do away with numba logs
+        numba_logger = logging.getLogger('numba')
+        numba_logger.setLevel(logging.INFO)
+
+        super().__init__()
+        self.input_item = input_item
+        self.state_name = state_name
+        self.output_item = output_item
+        logger.debug(f'Input item: {input_item}')
+        self.whoami = 'CumulativeCount'
+
+
+    def get_dm_from_db(self, start_ts):
+        """
+        """
+        self.db = self._entity_type.db
+        if self.db is None:
+            self.db = self._get_dms().db
+
+        entity_type = self.get_entity_type()
+        logger.info('Retrieving dm data from ' + str(start_ts) + ' to ')
+
+        schema = entity_type._db_schema
+        raw_dataframe = None
+
+        try:
+            source_metadata = self._get_dms().data_items.get(self.output_item)
+            derived_metric_table_name = source_metadata.get(md.DATA_ITEM_SOURCETABLE_KEY)
+            query, table = db.query(derived_metric_table_name, schema, column_names=['KEY', 'VALUE_N', entity_type._timestamp])
+            query = query.filter( db.get_column_object(table, 'KEY') == self.output_item)
+
+            raw_dataframe = db.read_sql_query(query.statement)
+            raw_dataframe.astype({'KEY':'string', 'TIMESTAMP': 'string'}, copy=False)
+            log_data_frame('Data frame after fetching from DB', raw_dataframe)
+        except Exception as e:
+            logger.info('Error when retrieving derived metrics. Error ' + str(e))
+            pass
+
+        return raw_dataframe
+
+    def _calc(self, df):
+        """
+        Entry point per entity cumsum
+        """
+        entity = df.index[0][0]
+
+        last_ts = 0
+        last_val = 0
+        # get last timestamp and value for entity
+        if self.right_db is not None:
+            last_row = self.right_db.loc[self.right_db['DEVICEID'] == entity , :].head(1)
+
+            if not last_row.empty:
+                last_ts = last_row['TIMESTAMP']
+                last_val = last_row['value_n']
+
+        df_copy = df.reset_index()
+
+        entity_type = self.get_entity_type()
+
+        # condition and regular timestamp diff
+        vstate = 1 - eval("df_copy[self.input_item] " + self.state_name).astype(int).values.astype(int)
+        print(vstate, last_ts)
+        try:
+            t_diff = np.insert(np.diff(df_copy[entity_type._timestamp].values), 0, last_ts)
+        except Exception as ee:
+            print(ee)
+
+        marr = np.ma.array(t_diff, mask=vstate)
+        c_sum = marr.cumsum().fill(np.nan)
+        df_copy[self.output_item] = c_sum
+        df_copy[self.output_item] = df_copy[self.output_item].fillna(method="bfill") + last_val
+
+        return df_copy
+
+    def execute(self, df):
+        """
+        Entry point
+        """
+
+        self.right_db = None
+        start_ts = df.index[0:][0][1]
+        last_ts = None
+        last_val = 0
+        try:
+            self.right_db = self.get_dm_from_db(start_ts)
+        except Exception as e:
+            logger.info('Could not get old score. ' + str(e))
+            pass
+
+        # delegate to _calc
+        logger.debug('Execute ' + self.whoami + ' enter per entity execution')
+
+        df[self.output_item] = 0
+
+        # group over entities
+        group_base = [pd.Grouper(axis=0, level=0)]
+
+        if not df.empty:
+            df = df.groupby(group_base).apply(self._calc)
+
+        logger.debug('Scoring done')
+
+        log_data_frame('Result after fetching from DB', df)
+
+        if self.right_db is None:
+            return df
+
+        try:
+            self.right_db = self.right_db.set_index('TIMESTAMP')
+            left_db = df.droplevel(0)
+            merged_df = left_db.join(self.right_db)
+            scores_ = merged_df[[self.output_item,'value_n']].values
+            result = scores_[:,1]
+            loc = [i for i in range(len(scores_[:,1])) if np.isnan(scores_[:,1][i]) or scores_[:,1][i] is None]
+            result[loc] = scores_[loc,0]
+            df[:][self.output_item] = result
+        except Exception as e:
+            logger.info('Merge of old and new score failed because of ' + str(e))
+            pass
+
+        return df
+
+    def build_ui(cls):
+        inputs = []
+        inputs.append(UISingleItem(name='input_item', datatype=float,
+                                  description='Data item to compute the state change array from'))
+        inputs.append(UISingle(name='state_name', datatype=str,
+                               description='Condition for the state change array computation'))
+        outputs = []
+        outputs.append(
+            UIFunctionOutSingle(name='output_item', datatype=float, description='State change array output'))
+
         return (inputs, outputs)
 
