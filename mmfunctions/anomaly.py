@@ -3346,6 +3346,8 @@ import dill as pickle
 import sys
 import os
 sys.path.append( '.' )
+
+'''
 import telemanom
 from telemanom.helpers import Config
 from telemanom.errors import Errors
@@ -3620,6 +3622,131 @@ class TelemanomScorer(SupervisedLearningTransformer):
         # define arguments that behave as function outputs
         outputs = []
         return inputs, outputs
+'''
+
+
+#######################################################################################
+# RANSAC regression + anomaly scoring
+#######################################################################################
+
+class RANSACRegressor(BaseEstimatorFunction):
+    """
+    Robust Linear Regression
+    """
+    eval_metric = staticmethod(metrics.r2_score)
+
+    # class variables
+    train_if_no_model = True
+
+    def set_estimators(self):
+        BRidge = linear_model.BayesianRidge(compute_score=True)
+        params = {'estimator': [BRidge], 'random_state':[42]}
+        self.estimators['ransac'] = (linear_model.RANSACRegressor, params)
+        logger.info('RANSAC Regressor initialized')
+
+    def __init__(self, features, targets, predictions=None, deviations=None, outliers=None):
+        super().__init__(features=features, targets=targets, predictions=predictions, stddev=False, keep_current_models=True)
+
+        self.outliers = outliers
+        self.pred_stddev2 = ['stddev_%s' % x for x in self.targets]
+
+        # do not run score and call transform instead of predict
+        if deviations is not None:
+            self.pred_stddev2 = deviations
+
+        self.experiments_per_execution = 1
+        self.auto_train = True
+        self.correlation_threshold = 0
+        self.stop_auto_improve_at = -2
+
+        self.whoami = 'RANSACRegressor'
+
+    def execute(self, df):
+
+        logger.debug('Execute ' + self.whoami)
+
+        df_copy = df.copy()
+        # Create missing columns before doing group-apply
+        missing_cols = [x for x in self.predictions + self.pred_stddev2 if x not in df_copy.columns]
+        for m in missing_cols:
+            df_copy[m] = None
+
+        # check data type
+        #if df[self.input_item].dtype != np.float64:
+        for feature in self.features:
+            if not pd.api.types.is_numeric_dtype(df_copy[feature].dtype):
+                logger.error('Regression on non-numeric feature:' + str(feature))
+                return (df_copy)
+
+        # delegate to _calc
+        logger.debug('Execute ' + self.whoami + ' enter per entity execution')
+
+        # group over entities
+        group_base = [pd.Grouper(axis=0, level=0)]
+
+        df_copy = df_copy.groupby(group_base).apply(self._calc)
+
+        logger.debug('Scoring done')
+        return df_copy
+
+    def _calc(self, df):
+        entity = df.index[0][0]
+
+        # obtain db handle
+        db = self._entity_type.db
+        if db is None:
+            db = self._get_dms().db
+
+        logger.debug('RANSACRegressor execute: ' + str(type(df)) + ' for entity ' + str(entity) +
+                     ' predicting ' + str(self.targets) + ' from ' + str(self.features) +
+                     ' to appear in ' + str(self.predictions) + ' with confidence interval ' + str(self.pred_stddev2))
+
+        try:
+            dfe = super()._execute(df, entity)
+
+            logger.debug('RANSAC: Entity ' + str(entity) + ' Type of pred, stddev arrays ' +
+                         str(type(dfe[self.predictions])) + str(type(dfe[self.pred_stddev2].values)))
+
+            dfe.fillna(0, inplace=True)
+
+            model_name = self.get_model_name(self.features, self.targets[0], suffix=entity)
+            #print(model_name, self.active_models[model_name][0].estimator)
+
+            df[self.predictions] = dfe[self.predictions]
+            mean, stddev = self.active_models[model_name][0].estimator.estimator_.predict(df[self.features], return_std=True)
+            df[self.pred_stddev2] = stddev.values.reshape(-1, 1)
+            #df[self.outliers] = np.logical_not(self.active_models[model_name][0].estimator.inlier_mask_)
+            outlier_index = np.logical_not(self.active_models[model_name][0].estimator.inlier_mask_)
+            full_index = np.arange(stddev.shape[0])
+            outliers = np.isin(full_index, outlier_index).astype(int)
+            df[self.outliers] = outliers.reshape(-1, 1)
+            logger.info('RANSAC: ' + str(stddev.shape) + ', ' + str(outliers.shape) + ', ' + str(df[self.pred_stddev2].values.shape))
+            logger.info('RANSAC: ' + str(outlier_index[0:10]))
+
+        except Exception as e:
+            logger.info('Bayesian Ridge regressor for entity ' + str(entity) + ' failed with: ' + str(e))
+            logger.info('Type ' + str(type(stddev)) + ', ' + str(stddev))
+            #print(self.estimators, self.active_models[model_name].estimator)
+            df[self.predictions] = 0
+            df[self.pred_stddev2] = 0
+            df[self.outliers] = 0
+
+        return df
+
+
+    @classmethod
+    def build_ui(cls):
+        # define arguments that behave as function inputs
+        inputs = []
+        inputs.append(UIMultiItem(name='features', datatype=float, required=True, output_item='deviations',
+                                  is_output_datatype_derived=True))
+        inputs.append(UIMultiItem(name='targets', datatype=float, required=True, output_item='predictions',
+                                  is_output_datatype_derived=True))
+
+        # define arguments that behave as function outputs
+        outputs = []
+        inputs.append(UISingleItem(name='outliers', datatype=int, required=True))
+        return inputs, outputs
 
 
 #######################################################################################
@@ -3643,6 +3770,7 @@ def make_histogram(t, bins):
     except Exception as e:
         logger.warning('make_histogram np.hist failed with ' + str(e))
     return rv
+
 
 
 class HistogramAggregator(BaseSimpleAggregator):
