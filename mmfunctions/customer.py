@@ -49,7 +49,7 @@ class ONNXRegressor(SupervisedLearningTransformer):
 
         if targets is None:
             targets = ['output_item']
-        elif not instance(targets, list):
+        elif not isinstance(targets, list):
             targets = [targets]
 
         if prediction_prefix is None:
@@ -86,13 +86,14 @@ class ONNXRegressor(SupervisedLearningTransformer):
         # obtain db handler
         db = self.get_db()
 
-        model_name, onnx_model = self.load_model(suffix=entity)
+        model_name, onnx_model = self.load_model(suffix=entity + '.onnx')
 
         features = df[self.features].values.astype(np.float32)
 
         if onnx_model is None:
             logger.error('ONNX model not available')
-            df[self.output_item] = -0.000001
+            df[self.predictions] = -0.000001
+            df[self.confidences] = -0.000001
 
         else:
             # pass data to the model
@@ -106,7 +107,10 @@ class ONNXRegressor(SupervisedLearningTransformer):
             outputs = session.run(output_names, {input_names[0]: features})
 
             df[self.predictions] = outputs[0]
-            df[self.confidences] = outputs[1]
+            if len(outputs) > 1:
+                df[self.confidences] = outputs[1]
+            else:
+                df[self.confidences] = 0
 
         return df.droplevel(0)
 

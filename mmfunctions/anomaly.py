@@ -3748,6 +3748,89 @@ class RANSACRegressor(BaseEstimatorFunction):
         inputs.append(UISingleItem(name='outliers', datatype=int, required=True))
         return inputs, outputs
 
+#######################################################################################
+# RANSAC line fit + anomaly scoring
+#######################################################################################
+
+class RANSACScorer(BaseTransformer):
+    """
+    Try to find a line and detect outliers
+    """
+
+    def __init__(self, features, outliers):
+        super().__init__()
+        self.features = features
+        self.outliers = outliers
+        self.model = None
+
+        self.whoami = 'RANSACScorer'
+
+    def execute(self, df):
+
+        logger.debug('Execute ' + self.whoami)
+
+        df_copy = df.copy()
+        # Create missing columns before doing group-apply
+        df_copy[self.outliers] = None
+
+        # check data type
+        for feature in self.features:
+            if not pd.api.types.is_numeric_dtype(df_copy[feature].dtype):
+                logger.error('Regression on non-numeric feature:' + str(feature))
+                return (df_copy)
+
+        # delegate to _calc
+        logger.debug('Execute ' + self.whoami + ' enter per entity execution')
+
+        # group over entities
+        group_base = [pd.Grouper(axis=0, level=0)]
+
+        df_copy = df_copy.groupby(group_base).apply(self._calc)
+
+        logger.debug('Scoring done')
+        return df_copy
+
+    def _calc(self, df):
+        entity = df.index[0][0]
+
+        # obtain db handle
+        db = self._entity_type.db
+        if db is None:
+            db = self._get_dms().db
+
+        logger.debug('RANSACScorer execute: ' + str(type(df)) + ' for entity ' + str(entity) +
+                     ' trying to find a line for ' + str(self.features))
+
+        try:
+            self.model, inliers = ski.measure.ransac(df[self.features].values, ski.measure.LineModelND,
+                                            min_samples=5, residual_threshold=1, max_trials=1000)
+
+            outlier_index = inliers == False
+
+            full_index = np.arange(df[self.outliers].values.shape[0])
+            outliers = np.isin(full_index, outlier_index).astype(int)
+
+            df[self.outliers] = outliers.reshape(-1, 1)
+            logger.info('RANSAC: ' + str(outliers.shape))
+
+        except Exception as e:
+            logger.info('RANSAC: ' + str(outliers.shape))
+            df[self.outliers] = 0
+
+        return df
+
+
+    @classmethod
+    def build_ui(cls):
+        # define arguments that behave as function inputs
+        inputs = []
+        inputs.append(UIMultiItem(name='features', datatype=float, required=True))
+        # define arguments that behave as function outputs
+        outputs = []
+        inputs.append(UISingleItem(name='outliers', datatype=int, required=True))
+        return inputs, outputs
+
+
 
 #######################################################################################
 # Crude change point detection
