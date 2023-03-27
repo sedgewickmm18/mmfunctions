@@ -52,10 +52,9 @@ class ONNXRegressor(SupervisedLearningTransformer):
         elif not isinstance(targets, list):
             targets = [targets]
 
+        prediction_prefix = 'pred_'
         if predictions is None:
-            prediction_prefix = 'pred_'
-        if prediction_prefix is None:
-            prediction_prefix = 'pred_'
+            predictions = [prediction_prefix + x for x in targets]
         if confidence_band_prefix is None:
             confidence_band_prefix = 'conf_'
 
