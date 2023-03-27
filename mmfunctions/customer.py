@@ -45,13 +45,15 @@ class ONNXRegressor(SupervisedLearningTransformer):
     Return first non-null value from a list of data items.
     """
 
-    def __init__(self, features, targets, prediction_prefix, confidence_band_prefix):
+    def __init__(self, features, targets, predictions, confidence_band_prefix):
 
         if targets is None:
             targets = ['output_item']
         elif not isinstance(targets, list):
             targets = [targets]
 
+        if predictions is None:
+            prediction_prefix = 'pred_'
         if prediction_prefix is None:
             prediction_prefix = 'pred_'
         if confidence_band_prefix is None:
@@ -155,7 +157,8 @@ class ONNXRegressor(SupervisedLearningTransformer):
         inputs = []
         inputs.append(UIMultiItem(name='features', datatype=float, required=True))
         inputs.append(UIMultiItem(name='targets', datatype=float, required=True))
-        inputs.append(UISingle(name='prediction_prefix', datatype=str, description='Prefix for predicted targets (default: pred_)'))
+        inputs.append(UIMultiItem(name='targets', datatype=float, required=True, output_item='predictions',
+                                  is_output_datatype_derived=True))
         inputs.append(UISingle(name='confidence_band_prefix', datatype=str, description='Prefix for confidence band (default: conf_)'))
 
         # define arguments that behave as function outputs
