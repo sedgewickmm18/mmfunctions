@@ -101,18 +101,21 @@ class ONNXRegressor(SupervisedLearningTransformer):
             # pass data to the model
             options = rt.SessionOptions()
             options.enable_profiling = True
-            rt.InferenceSession(onnx_model, sess_options=options)
+            session = rt.InferenceSession(onnx_model, sess_options=options)
             ortvalue = rt.OrtValue.ortvalue_from_numpy(features)
 
             input_names = [x.name for x in session.get_inputs()]
             output_names = [x.name for x in session.get_outputs()]
-            outputs = session.run(output_names, {input_names[0]: features})
-
-            df[self.predictions] = outputs[0]
-            if len(outputs) > 1:
-                df[self.confidences] = outputs[1]
-            else:
-                df[self.confidences] = 0
+            logger.info("Apply model: features " + str(input_names) + ", predictions: " + str(output_names))
+            try:
+                outputs = session.run(output_names, {input_names[0]: features})
+                df[self.predictions] = outputs[0]
+                if len(outputs) > 1:
+                    df[self.confidences] = outputs[1]
+                else:
+                    df[self.confidences] = 0
+            except Exception as e:
+                logger.error("ONNX evaluation failed with " + str(e))
 
         return df.droplevel(0)
 
