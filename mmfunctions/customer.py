@@ -155,7 +155,7 @@ class ONNXRegressor(SupervisedLearningTransformer):
 
         df_copy = df_copy.fillna(0)
 
-        logger.info("Predictions: " + str(df_copy[self.predictions].values))
+        logger.info("Predictions: Column " + str(self.predictions) + " Content " + str(df_copy[self.predictions].values))
 
         logger.debug('Scoring done')
 
