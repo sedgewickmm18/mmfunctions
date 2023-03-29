@@ -136,7 +136,7 @@ class ONNXRegressor(SupervisedLearningTransformer):
                 logger.error('Regression on non-numeric feature:' + str(feature))
                 return (df)
 
-        df_copy = df.copy()
+        df_copy = df.fillna(0)
         logger.info(self.whoami + ' Inference, Features: ' + str(self.features) + ' Targets: ' + str(self.targets) +
             ' Predictions: ' + str(self.predictions) + ' Confidences: ' + str(self.confidences))
 
