@@ -91,6 +91,8 @@ class ONNXRegressor(SupervisedLearningTransformer):
         model_name, onnx_model = self.load_model(suffix=entity + '.onnx')
 
         features = df[self.features].values.astype(np.float32)
+        logger.info("Get features " + str(self.features))
+        logger.info("First features " + str(features[0,0]) + ", " + str(features[1,1]))
 
         if onnx_model is None:
             logger.error('ONNX model not available')
@@ -111,7 +113,7 @@ class ONNXRegressor(SupervisedLearningTransformer):
             try:
                 logger.info("Feature first " + str(features[0][0]))
                 outputs = session.run(output_names, {input_names[0]: features})
-                logger.info("Output[0] shape " + str(outputs[0].shape) + ", first value " + str(outputs[0][0]))
+                logger.info("Output[0] shape " + str(outputs[0].shape) + ", first value " + str(outputs[0,0]))
                 df[self.predictions] = outputs[0]
                 if len(outputs) > 1:
                     df[self.confidences] = outputs[1]
