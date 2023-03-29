@@ -153,6 +153,8 @@ class ONNXRegressor(SupervisedLearningTransformer):
 
         df_copy = df_copy.groupby(group_base).apply(self._calc)
 
+        logger.info("Predictions: " + str(df_copy[self.predictions].values))
+
         logger.debug('Scoring done')
 
         return df_copy
