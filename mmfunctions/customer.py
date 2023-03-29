@@ -137,7 +137,10 @@ class ONNXRegressor(SupervisedLearningTransformer):
                 return (df)
 
         df_copy = df.copy()
-        logger.info(self.whoami + ' Inference, Features: ' + str(self.features) + ' Targets: ' + str(self.targets))
+        logger.info(self.whoami + ' Inference, Features: ' + str(self.features) + ' Targets: ' + str(self.targets) +
+            ' Predictions: ' + str(self.predictions) + ' Confidences: ' + str(self.confidences))
+
+        logger.info('DF(' + str(self.features) + "): " + str(df_copy[self.features].values))
 
         missing_cols = [x for x in self.targets + self.predictions + self.confidences if x not in df_copy.columns]
         for m in missing_cols:
@@ -154,9 +157,6 @@ class ONNXRegressor(SupervisedLearningTransformer):
         logger.debug('Scoring done')
 
         return df_copy
-
-        df[self.output_item] = df[self.data_items].bfill(axis=1).iloc[:, 0]
-        return df
 
     @classmethod
     def build_ui(cls):
