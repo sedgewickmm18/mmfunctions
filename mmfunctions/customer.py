@@ -90,7 +90,7 @@ class ONNXRegressor(SupervisedLearningTransformer):
 
         model_name, onnx_model = self.load_model(suffix=entity + '.onnx')
 
-        features = df[self.features].values #.astype(np.float32)
+        features = df[self.features].values.astype(np.float32)
         logger.info("Get features " + str(self.features) + ":" + str(features))
 
         if onnx_model is None:
