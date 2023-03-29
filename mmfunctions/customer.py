@@ -59,7 +59,6 @@ class ONNXRegressor(SupervisedLearningTransformer):
         if confidence_band_prefix is None:
             confidence_band_prefix = 'conf_'
 
-        predictions = [prediction_prefix + x for x in targets]
         confidences = [confidence_band_prefix + x for x in targets]
 
         super().__init__(features, targets, predictions)
