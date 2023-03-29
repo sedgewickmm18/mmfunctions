@@ -91,7 +91,7 @@ class ONNXRegressor(SupervisedLearningTransformer):
         model_name, onnx_model = self.load_model(suffix=entity + '.onnx')
 
         features = df[self.features].values.astype(np.float32)
-        logger.info("Get features " + str(self.features) + ":" + str(features))
+        #logger.info("Get features " + str(self.features) + ":" + str(features))
 
         if onnx_model is None:
             logger.error('ONNX model not available')
@@ -110,9 +110,8 @@ class ONNXRegressor(SupervisedLearningTransformer):
             logger.info("Apply model: features " + str(input_names) +
                 "  feature shape " + str(features.shape) + ", predictions: " + str(output_names))
             try:
-                logger.info("Feature first " + str(features[0][0]))
                 outputs = session.run(output_names, {input_names[0]: features})
-                logger.info("Output[0] shape " + str(outputs[0].shape) + ", first value " + str(outputs[0,0]))
+                #logger.info("Output[0] shape " + str(outputs[0].shape) + ", first value " + str(outputs[0,0]))
                 df[self.predictions] = outputs[0]
                 if len(outputs) > 1:
                     df[self.confidences] = outputs[1]
@@ -140,7 +139,7 @@ class ONNXRegressor(SupervisedLearningTransformer):
         logger.info(self.whoami + ' Inference, Features: ' + str(self.features) + ' Targets: ' + str(self.targets) +
             ' Predictions: ' + str(self.predictions) + ' Confidences: ' + str(self.confidences))
 
-        logger.info('DF(' + str(self.features) + "): " + str(df_copy[self.features].values))
+        #logger.info('DF(' + str(self.features) + "): " + str(df_copy[self.features].values))
 
         missing_cols = [x for x in self.targets + self.predictions + self.confidences if x not in df_copy.columns]
         for m in missing_cols:
