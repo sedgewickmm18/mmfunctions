@@ -90,9 +90,8 @@ class ONNXRegressor(SupervisedLearningTransformer):
 
         model_name, onnx_model = self.load_model(suffix=entity + '.onnx')
 
-        features = df[self.features].values.astype(np.float32)
-        logger.info("Get features " + str(self.features))
-        logger.info("First features " + str(features[0,0]) + ", " + str(features[1,1]))
+        features = df[self.features].values #.astype(np.float32)
+        logger.info("Get features " + str(self.features) + ":" + str(features))
 
         if onnx_model is None:
             logger.error('ONNX model not available')
