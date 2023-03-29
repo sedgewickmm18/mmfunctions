@@ -109,6 +109,7 @@ class ONNXRegressor(SupervisedLearningTransformer):
             logger.info("Apply model: features " + str(input_names) + ", predictions: " + str(output_names))
             try:
                 outputs = session.run(output_names, {input_names[0]: features})
+                logger.info("Output shape " + str(outputs.shape))
                 df[self.predictions] = outputs[0]
                 if len(outputs) > 1:
                     df[self.confidences] = outputs[1]
