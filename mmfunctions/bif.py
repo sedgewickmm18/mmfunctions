@@ -89,7 +89,7 @@ class AggregateWithExpression(BaseSimpleAggregator):
         return y
 
 
-class AggregateTimeInState(BaseSimpleAggregator):
+class AggregateTimeInStateX(BaseSimpleAggregator):
     """
     Creates aggregation from the output of StateTimePreparation, a string
     encoded pair of a state change variable (-1 for leaving the state,
@@ -288,7 +288,7 @@ class AggregateTimeInState(BaseSimpleAggregator):
         logger.info('AggregateTimeInState returns ' + str(y) + ' seconds, computed from ' + str(gchange.size))
         return y
 
-class StateTimePreparation(BaseTransformer):
+class StateTimePreparationX(BaseTransformer):
     '''
     Together with AggregateTimeInState StateTimePreparation
     calculates the amount of time a selected metric has been in a
