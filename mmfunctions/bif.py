@@ -123,8 +123,9 @@ class AggregateTimeInState(BaseSimpleAggregator):
         logger.info('Execute AggregateTimeInState')
 
         lg = group.size
-        if lg == 0:
-            logger.info('AggregateTimeInState no elements - returns 0 seconds, from 0')
+        if lg < 2:
+            # We need at least two data points for function sp.interpolate.interp1d()
+            logger.info(f'AggregateTimeInState no elements - returns 0 seconds, from {lg}')
             return 0.0
 
         # debug stuff
@@ -138,12 +139,23 @@ class AggregateTimeInState(BaseSimpleAggregator):
         gstate = None
         gtime = None
         try:
-            gchange = df_group_exp[0].values.astype(int).copy()
-            gstate = df_group_exp[1].values.astype(int).copy()
-            gtime = df_group_exp[2].values.astype(int).copy()
+            gchange = np.append(df_group_exp[0].values.astype(int), 0)
+            gstate = np.append(df_group_exp[1].values.astype(int), 0)
+            gtime = df_group_exp[2].values.astype(int)
+
         except Exception as esplit:
             logger.info('AggregateTimeInState elements with NaN- returns 0 seconds, from ' + str(gchange.size))
             return 0.0
+
+        linear_interpolate = sp.interpolate.interp1d(np.arange(0, len(gtime)), gtime,
+                                     kind='linear', fill_value='extrapolate')
+        gtime = np.append(gtime, linear_interpolate(len(gtime)))
+
+        # no statechange at all
+        if not np.any(gchange):
+            logger.debug('AggregateTimeInState: no state change at all in this aggregation, inject it')
+            gchange[0] = gstate[0]
+            gchange[-1] = -gstate[0]
 
         # look for state change 2 - start interval for StateTimePrep
         #
@@ -311,23 +323,40 @@ class StateTimePreparation(BaseTransformer):
 
         return (inputs, outputs)
 
+    def execute(self, df):
+
+        logger.debug('Execute StateTimePrep')
+        df_copy = df # no copy
+
+        # set output columns to zero
+        df_copy[self.state_name] = 0
+
+        # group over entities
+        group_base = [pd.Grouper(axis=0, level=0)]
+
+        if not df_copy.empty:
+            df_copy = df_copy.groupby(group_base).apply(self._calc)
+
+        logger.debug('StateTimePrep done')
+        return df_copy
+
     def _calc(self, df):
         logger.info('Execute StateTimePrep per entity')
 
         index_names = df.index.names
         ts_name = df.index.names[1]  # TODO: deal with non-standard dataframes (no timestamp)
 
-        logger.info('Source: ' + self.source +  ', state_name ' +  self.state_name +  ', Name: ' + self.name +
-                    ', Entity: ' + df.index[0][0])
+        logger.info('Source: ' + self.source +  ', ts_name ' + ts_name + ', state_name ' +  self.state_name +  ', Name: ' + self.name +
+                     ', Entity: ' + df.index[0][0])
 
         df_copy = df.reset_index()
 
         # pair of +- seconds and regular timestamp
         vstate = eval("df_copy[self.source] " + self.state_name).astype(int).values.astype(int)
-        vchange = eval("df_copy[self.source] " + self.state_name).astype(int).diff().values.astype(int)
+        vchange = np.diff(vstate, prepend=2)
 
-        logger.info(str(vstate))
-        logger.info(str(vchange))
+        logger.info("vstate: " + str(vstate))
+        logger.info("vchange: " + str(vchange))
 
         #v1 = np.roll(v1_, -1)  # push the first element, NaN, to the end
         # v1[-1] = 0
