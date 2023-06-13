@@ -643,7 +643,7 @@ class DBPreload(BaseTransformer):
         return (inputs, outputs)
 
 
-class InvokeWMLModel(BaseTransformer):
+class InvokeWMLModelX(BaseTransformer):
     '''
     Pass multivariate data in input_items to a regression function deployed to
     Watson Machine Learning. The results are passed back to the univariate
@@ -670,11 +670,9 @@ class InvokeWMLModel(BaseTransformer):
 
         if isinstance(output_items, str):
             self.output_items = [output_items]    # regression
-            self.output_items = [f'{output_items}{i}' for i in range(0, 34)]
         else:
             self.output_items = output_items      # classification
 
-        self.db = None
         self.wml_auth = wml_auth
 
         self.deployment_id = None
@@ -721,9 +719,6 @@ class InvokeWMLModel(BaseTransformer):
                 c = self._entity_type.get_attributes_dict()
             except Exception:
                 c = None
-
-            logger.info("Constants " + str(c))
-
             try:
                 wml_credentials = c[self.wml_auth]
             except Exception as ae:
@@ -731,23 +726,12 @@ class InvokeWMLModel(BaseTransformer):
         else:
             wml_credentials = {'apikey': self.apikey , 'url': self.wml_endpoint, 'space_id': self.space_id}
 
-        logger.info("Creds " + str(wml_credentials))
-
         try:
-            #if hasattr(wml_credentials, 'deployment_id'):
             self.deployment_id = wml_credentials['deployment_id']
-            if hasattr(wml_credentials, 'space_id'):
-                self.space_id = wml_credentials['space_id']
-            #if hasattr(wml_credentials, 'wml_deployment_space_name'):
-            self.space_id = wml_credentials['wml_deployment_space_name']
-
+            self.space_id = wml_credentials['space_id']
             logger.info('Found credentials for WML')
         except Exception as ae:
-            logger.info('No deployment or space id, but we\'ll try anyway')
-            pass
-        '''
             raise RuntimeError("No valid WML credentials specified")
-        '''
 
         # get client and check credentials
         self.client = APIClient(wml_credentials)
@@ -756,18 +740,12 @@ class InvokeWMLModel(BaseTransformer):
             raise RuntimeError("WML API Key invalid")
 
         # set space
-        if self.space_id is not None:
-            logger.error('Setting space id to ' + str(self.space_id))
-            self.client.set.default_space(self.space_id)
+        self.client.set.default_space(wml_credentials['space_id'])
 
         # check deployment
-        deployment_details = None
-        if self.deployment_id is not None:
-            deployment_details = self.client.deployments.get_details(self.deployment_id, 1)
-
+        deployment_details = self.client.deployments.get_details(self.deployment_id, 1)
         # ToDo - test return and error msg
-        if deployment_details is not None:
-            logger.debug('Deployment Details check results in ' + str(deployment_details))
+        logger.debug('Deployment Details check results in ' + str(deployment_details))
 
         self.logged_on = True
 
@@ -775,11 +753,6 @@ class InvokeWMLModel(BaseTransformer):
     def execute(self, df):
 
         logger.info('InvokeWML exec')
-
-        self.db = self._entity_type.db
-        logger.info('db is ' + str(self.db))
-        if self.db is None:
-            self.db = self._get_dms().db
 
         # Create missing columns before doing group-apply
         df = df.copy().fillna('')
@@ -796,18 +769,12 @@ class InvokeWMLModel(BaseTransformer):
 
         if len(self.input_items) >= 1:
             index_nans = df[df[self.input_items].isna().any(axis=1)].index
-            df_ = df.replace(r'^\s*$', 0.0, regex=True)
-
-            arr = df_.loc[~df.index.isin(index_nans), self.input_items].values
-            self.db.model_store.store_model('Invoker', arr)
-
-            rows = df_.loc[~df.index.isin(index_nans), self.input_items].values.tolist()
+            rows = df.loc[~df.index.isin(index_nans), self.input_items].values.tolist()
             scoring_payload = {
                 'input_data': [{
                     'fields': self.input_items,
                     'values': rows}]
             }
-            logger.info('Field: ' + str(self.input_items) + ', Payload length: ' + str(len(rows)))
         else:
             logging.error("no input columns provided, forwarding all")
             return df
@@ -817,11 +784,8 @@ class InvokeWMLModel(BaseTransformer):
         if results:
             # Regression
             if len(self.output_items) == 1:
-                logger.info(results['predictions'][0]['values'][1])
-                #logger.info(self.output_items.size())
-
                 df.loc[~df.index.isin(index_nans), self.output_items] = \
-                    np.array(results['predictions'][0]['values'][29:]).flatten()
+                    np.array(results['predictions'][0]['values']).flatten()
             # Classification
             else:
                 arr = np.array(results['predictions'][0]['values'])
@@ -848,6 +812,10 @@ class InvokeWMLModel(BaseTransformer):
         outputs=[]
         outputs.append(UISingle(name='output_items', datatype=float))
         return (inputs, outputs)
+
+
+
+
 
 LASTROWS = 500
 
