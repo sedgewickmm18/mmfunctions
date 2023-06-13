@@ -17,6 +17,7 @@ import logging
 import re
 import time
 import warnings
+import json
 from collections import OrderedDict
 
 import numpy as np
@@ -798,6 +799,10 @@ class InvokeWMLModelX(BaseTransformer):
                 c = self._entity_type.get_attributes_dict()
             except Exception:
                 c = None
+
+            if c is None:
+                logger.info('Pipeline constant does not exist')
+                wml_credentials = json.loads(self.wml_auth)
             try:
                 wml_credentials = c[self.wml_auth]
             except Exception as ae:
