@@ -830,7 +830,7 @@ class InvokeWMLModelX(BaseTransformer):
             raise RuntimeError("WML API Key invalid")
 
         # set space
-        self.client.set.default_space(wml_credentials['space_id'])
+        #self.client.set.default_space(wml_credentials['space_id'])
 
         # check deployment
         deployment_details = self.client.deployments.get_details(self.deployment_id, 1)
