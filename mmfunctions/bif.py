@@ -816,12 +816,12 @@ class InvokeWMLModelX(BaseTransformer):
         else:
             wml_credentials = {'apikey': self.apikey , 'url': self.wml_endpoint, 'space_id': self.space_id}
 
-        try:
-            self.deployment_id = wml_credentials['deployment_id']
-            self.space_id = wml_credentials['space_id']
-            logger.info('Found credentials for WML')
-        except Exception as ae:
-            raise RuntimeError("No valid WML credentials specified")
+        #try:
+        #    self.deployment_id = wml_credentials['deployment_id']
+        #    self.space_id = wml_credentials['space_id']
+        #    logger.info('Found credentials for WML')
+        #except Exception as ae:
+        #    raise RuntimeError("No valid WML credentials specified")
 
         # get client and check credentials
         self.client = APIClient(wml_credentials)
