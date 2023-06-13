@@ -713,8 +713,10 @@ class InvokeWMLModelX(BaseTransformer):
         #    {"apikey": api_key, "url": 'https://' + location + '.ml.cloud.ibm.com'}
         c = None
         if isinstance(self.wml_auth, dict):
+            logger.info('WML AUTH ' + str(self.wml_auth) + '  is dict')
             wml_credentials = self.wml_auth
         elif self.wml_auth is not None:
+            logger.info('WML AUTH - get from pipeline')
             try:
                 c = self._entity_type.get_attributes_dict()
             except Exception:
