@@ -147,8 +147,8 @@ class AggregateTimeInStateX(BaseSimpleAggregator):
             logger.info('AggregateTimeInState elements with NaN- returns 0 seconds, from ' + str(gchange.size))
             return 0.0
 
-        logger.info('AggregateTimeInState: gchange ' + gchange)
-        logger.info('AggregateTimeInState: gstate ' + gstate)
+        logger.info('AggregateTimeInState: gchange ' + str(gchange))
+        logger.info('AggregateTimeInState: gstate ' + str(gstate))
 
         linear_interpolate = sp.interpolate.interp1d(np.arange(0, len(gtime)), gtime,
                                      kind='linear', fill_value='extrapolate')
@@ -288,6 +288,7 @@ class AggregateTimeInStateX(BaseSimpleAggregator):
         if y < 0:
             y = 0.0
         logger.info('AggregateTimeInState returns ' + str(y) + ' seconds, computed from ' + str(gchange.size))
+        trigger_error
         return y
 
 class StateTimePreparationX(BaseTransformer):
