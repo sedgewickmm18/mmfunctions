@@ -716,7 +716,7 @@ class InvokeWMLModelX(BaseTransformer):
             logger.info('WML AUTH ' + str(self.wml_auth) + '  is dict')
             wml_credentials = self.wml_auth
         elif self.wml_auth is not None:
-            logger.info('WML AUTH - get from pipeline')
+            logger.info('WML AUTH ' + str(self.wml_auth) + ' - get from pipeline')
             try:
                 c = self._entity_type.get_attributes_dict()
             except Exception:
