@@ -800,13 +800,19 @@ class InvokeWMLModelX(BaseTransformer):
             except Exception:
                 c = None
 
-            if c is None:
-                logger.info('Pipeline constant does not exist')
-                wml_credentials = json.loads(self.wml_auth)
             try:
                 wml_credentials = c[self.wml_auth]
             except Exception as ae:
-                raise RuntimeError("No WML credentials specified")
+                wml_credentials = None
+
+            if wml_credentials is None:
+                logger.info('Pipeline constant does not exist')
+                wml_credentials = json.loads(self.wml_auth)
+
+            logger.info("WE GOT " + str(wml_credentials))
+
+            #except Exception as ae:
+            #    raise RuntimeError("No WML credentials specified")
         else:
             wml_credentials = {'apikey': self.apikey , 'url': self.wml_endpoint, 'space_id': self.space_id}
 
