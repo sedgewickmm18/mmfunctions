@@ -147,6 +147,9 @@ class AggregateTimeInStateX(BaseSimpleAggregator):
             logger.info('AggregateTimeInState elements with NaN- returns 0 seconds, from ' + str(gchange.size))
             return 0.0
 
+        logger.info('AggregateTimeInState: gchange ' + gchange)
+        logger.info('AggregateTimeInState: gstate ' + gstate)
+
         linear_interpolate = sp.interpolate.interp1d(np.arange(0, len(gtime)), gtime,
                                      kind='linear', fill_value='extrapolate')
         gtime = np.append(gtime, linear_interpolate(len(gtime)))
@@ -164,7 +167,6 @@ class AggregateTimeInStateX(BaseSimpleAggregator):
         index = 0
         with np.nditer(gchange, op_flags=['readwrite']) as it:
             for x in it:
-                # apparently a StateTimePrep interval start, adjust
                 # apparently a StateTimePrep interval start, adjust
                 if x == 2:
                     # we haven't seen a statechange yet, so state == statechange
@@ -227,16 +229,16 @@ class AggregateTimeInStateX(BaseSimpleAggregator):
             pass
 
         if nonzeroMin > 0:
-            #logger.info('YES1 ' + str(nonzeroMin) + ' ' + str(gchange[nonzeroMin]))
+            logger.info('YES1 ' + str(nonzeroMin) + ' ' + str(gchange[nonzeroMin]))
             if gchange[nonzeroMin] < 0:
                 gchange[0] = 1
         else:
-            #logger.info('NO 1 ' + str(nonzeroMin) + ' ' + str(gchange[nonzeroMin]))
+            logger.info('NO 1 ' + str(nonzeroMin) + ' ' + str(gchange[nonzeroMin]))
             if gchange[0] < 0:
                 gchange[0] = 0
 
         if nonzeroMax > 0:
-            #logger.info('YES2 ' + str(nonzeroMax) + ' ' + str(gchange[nonzeroMax]))
+            logger.info('YES2 ' + str(nonzeroMax) + ' ' + str(gchange[nonzeroMax]))
             if gchange[nonzeroMax] > 0:
                 gchange[-1] = -1
                 # if nonzeroMax is last, ignore
@@ -277,7 +279,7 @@ class AggregateTimeInStateX(BaseSimpleAggregator):
             pass
 
         #logger.debug('HERE2: ' + str(gchange[0:400]))
-        logger.debug('AggregateTimeInState:  state changes ' + str(np.count_nonzero(gchange == 1)) +\
+        logger.info('AggregateTimeInState:  state changes ' + str(np.count_nonzero(gchange == 1)) +\
                      ' ' + str(np.count_nonzero(gchange == -1)))
 
         y = -(gchange * gtime).sum()
