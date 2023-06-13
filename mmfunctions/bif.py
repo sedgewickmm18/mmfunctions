@@ -154,6 +154,83 @@ class AggregateTimeInStateX(BaseSimpleAggregator):
                                      kind='linear', fill_value='extrapolate')
         gtime = np.append(gtime, linear_interpolate(len(gtime)))
 
+        sum = 0
+        old_state = None
+        old_time = None
+        for state, time in zip(gstate, gtime):
+            if old_time is not None:
+                sum += time - old_time
+            old_state = state
+            old_time = time
+
+        logger.info('AggregateTimeInState returns ' + str(sum) + ' seconds, computed from ' + str(gtime.size))
+        return sum
+
+class AggregateTimeInStateXOrig(BaseSimpleAggregator):
+    """
+    Creates aggregation from the output of StateTimePreparation, a string
+    encoded pair of a state change variable (-1 for leaving the state,
+    0 for no change, 1 for entering the state) together with a unix epoch
+    timestamp.
+    It computes the overall number of seconds spent in a particular state.
+    """
+
+    def __init__(self, source=None, name=None):
+        super().__init__()
+        logger.info('AggregateTimeInState _init')
+
+        self.source = source
+        self.name = name
+        print(dir(self))
+
+    @classmethod
+    def build_ui(cls):
+        inputs = []
+        inputs.append(UISingleItem(name='source', datatype=None,
+                                  description='Output of StateTimePreparation to aggregate over'))
+
+        outputs = []
+        outputs.append(
+            UIFunctionOutSingle(name='name', datatype=float,
+                                description='Overall amount of seconds spent in a particular state'))
+
+        return (inputs, outputs)
+
+    def execute(self, group):
+        logger.info('Execute AggregateTimeInState')
+
+        lg = group.size
+        if lg < 2:
+            # We need at least two data points for function sp.interpolate.interp1d()
+            logger.info(f'AggregateTimeInState no elements - returns 0 seconds, from {lg}')
+            return 0.0
+
+        # debug stuff
+        #pd.set_option("display.max_rows", 50)
+        #logger.info(str(group))
+
+        df_group_exp = group.str.split(pat=',', n=3, expand=True)
+        #logger.info(str(df_group_exp))
+
+        gchange = None
+        gstate = None
+        gtime = None
+        try:
+            gchange = np.append(df_group_exp[0].values.astype(int), 0)
+            gstate = np.append(df_group_exp[1].values.astype(int), 0)
+            gtime = df_group_exp[2].values.astype(int)
+
+        except Exception as esplit:
+            logger.info('AggregateTimeInState elements with NaN- returns 0 seconds, from ' + str(gchange.size))
+            return 0.0
+
+        logger.info('AggregateTimeInState: gchange ' + str(gchange))
+        logger.info('AggregateTimeInState: gstate ' + str(gstate))
+
+        linear_interpolate = sp.interpolate.interp1d(np.arange(0, len(gtime)), gtime,
+                                     kind='linear', fill_value='extrapolate')
+        gtime = np.append(gtime, linear_interpolate(len(gtime)))
+
         # no statechange at all
         if not np.any(gchange):
             logger.debug('AggregateTimeInState: no state change at all in this aggregation, inject it')
