@@ -866,7 +866,7 @@ class InvokeWMLModelX(BaseTransformer):
             idx_names = df.index.names
 
             df = df.reset_index()
-            df['__timestamp__'] = df[idx_names[1]]
+            df['__timestamp__'] = str(df[idx_names[1]])
             df = df.set_index(idx_names)
             input_items = ['__timestamp__']
             input_items.extend(self.input_items)
