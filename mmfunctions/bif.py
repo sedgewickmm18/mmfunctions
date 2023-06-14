@@ -871,7 +871,7 @@ class InvokeWMLModelX(BaseTransformer):
             df = df.drop_duplicates(subset=['__timestamp__'])
             df = df.set_index(idx_names)
             input_items = ['__timestamp__']
-            field_names = ['DeviceTimeStamp']
+            field_names = ['TIMESTAMP']
             input_items.extend(self.input_items)
             field_names.extend(self.input_items)
 
