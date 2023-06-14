@@ -864,7 +864,7 @@ class InvokeWMLModelX(BaseTransformer):
         if len(self.input_items) >= 1:
             index_nans = df[df[self.input_items].isna().any(axis=1)].index
             rows = df.loc[~df.index.isin(index_nans), self.input_items].values.tolist()
-            scoring_payload = {wml_client.deployments.ScoringMetaNames.INPUT_DATA:
+            scoring_payload = {self.client.deployments.ScoringMetaNames.INPUT_DATA:
                 [{'fields': self.input_items,
                   'values': rows}]
             }
