@@ -871,13 +871,15 @@ class InvokeWMLModelX(BaseTransformer):
             df = df.drop_duplicates(subset=['__timestamp__'])
             df = df.set_index(idx_names)
             input_items = ['__timestamp__']
+            field_names = ['DeviceTimeStamp']
             input_items.extend(self.input_items)
+            field_names.extend(self.input_items)
 
             index_nans = df[df[input_items].isna().any(axis=1)].index
             rows = df.loc[~df.index.isin(index_nans), input_items].values.tolist()
 
             scoring_payload = {self.client.deployments.ScoringMetaNames.INPUT_DATA:
-                [{'fields': input_items,
+                [{'fields': field_names,
                   'values': rows}]
             }
             print('SCORING PAYLOAD', scoring_payload)
