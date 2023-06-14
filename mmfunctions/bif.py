@@ -818,8 +818,6 @@ class InvokeWMLModelX(BaseTransformer):
 
         try:
             self.deployment_id = wml_credentials['deployment_id']
-            json_d = client.spaces._get_resources(wml_credentials['url'] +"/v2/spaces",'spaces',{'limit':1})
-            self.space_id = json_d['resources'][0]['metadata']['id']
             #self.space_id = wml_credentials['space_id']
             logger.info('Found credentials for WML')
         except Exception as ae:
@@ -831,8 +829,12 @@ class InvokeWMLModelX(BaseTransformer):
             #logger.error('WML API Key invalid')
             raise RuntimeError("WML API Key invalid")
 
+        # get space
+        json_d = self.client.spaces._get_resources(wml_credentials['url'] +"/v2/spaces",'spaces',{'limit':1})
+        self.space_id = json_d['resources'][0]['metadata']['id']
+
         # set space
-        self.client.set.default_space(wml_credentials['space_id'])
+        self.client.set.default_space(self.space_id)
 
         # check deployment
         deployment_details = self.client.deployments.get_details(self.deployment_id, 1)
