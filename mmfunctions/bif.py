@@ -1067,12 +1067,19 @@ class InvokeWMLModelMulti(BaseTransformer):
 
 
     def _calc(self, df):
+        df_orig = df
 
-        index_nans = df[df[self.input_items].isna().any(axis=1)].index
+        idx_names = df.index.names
+        df = df.reset_index()
+
+        input_items = [idx_names[1]]
+        input_items.extend(self.input_items)
+
+        index_nans = df[df[input_items].isna().any(axis=1)].index
         df_ = df.replace(r'^\s*$', 0.0, regex=True)
 
-        shape = df_.loc[~df.index.isin(index_nans), self.input_items].values.shape
-        orig_arr = df_.loc[~df.index.isin(index_nans), self.input_items].values
+        shape = df_.loc[~df.index.isin(index_nans), input_items].values.shape
+        orig_arr = df_.loc[~df.index.isin(index_nans), input_items].values
 
         full_arr = np.zeros(shape)
 
@@ -1086,6 +1093,7 @@ class InvokeWMLModelMulti(BaseTransformer):
             else:
                 arr = orig_arr[start:start+segment_size,:]
             #self.db.model_store.store_model('Invoker', arr)
+
 
             rows = arr.tolist()
             scoring_payload = {
@@ -1121,6 +1129,7 @@ class InvokeWMLModelMulti(BaseTransformer):
             else:
                 logging.error('error invoking external model')
 
+        df = df.set_index(idx_names)
         logging.info('Evaluation loop ended')
         return df
 
