@@ -862,10 +862,20 @@ class InvokeWMLModelX(BaseTransformer):
     def _calc(self, df):
 
         if len(self.input_items) >= 1:
-            index_nans = df[df[self.input_items].isna().any(axis=1)].index
-            rows = df.loc[~df.index.isin(index_nans), self.input_items].values.tolist()
+
+            idx_names = df.index.names
+
+            df= df.reset_index()
+            df['__timestamp__'] = df_copy[idx_names[1]]
+            df = df.set_index(idx_names)
+            input_items = ['__timestamp__']
+            input_items.extend(self.input_items)
+
+            index_nans = df[df[input_items].isna().any(axis=1)].index
+            rows = df.loc[~df.index.isin(index_nans), input_items].values.tolist()
+
             scoring_payload = {self.client.deployments.ScoringMetaNames.INPUT_DATA:
-                [{'fields': self.input_items,
+                [{'fields': input_items,
                   'values': rows}]
             }
             print('SCORING PAYLOAD', scoring_payload)
