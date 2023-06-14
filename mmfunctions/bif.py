@@ -818,8 +818,8 @@ class InvokeWMLModelX(BaseTransformer):
 
         try:
             self.deployment_id = wml_credentials['deployment_id']
-            json = client.spaces._get_resources(wml_credentials['url'] +"/v2/spaces",'spaces',{'limit':1})
-            self.space_id = json['resources'][0]['metadata']['id']
+            json_d = client.spaces._get_resources(wml_credentials['url'] +"/v2/spaces",'spaces',{'limit':1})
+            self.space_id = json_d['resources'][0]['metadata']['id']
             #self.space_id = wml_credentials['space_id']
             logger.info('Found credentials for WML')
         except Exception as ae:
