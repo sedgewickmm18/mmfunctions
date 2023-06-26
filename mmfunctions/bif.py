@@ -721,7 +721,7 @@ class DBPreload(BaseTransformer):
         return (inputs, outputs)
 
 
-class InvokeWMLModelX(BaseTransformer):
+class InvokeWMLModelBase(BaseTransformer):
     '''
     Pass multivariate data in input_items to a regression function deployed to
     Watson Machine Learning. The results are passed back to the univariate
@@ -759,6 +759,8 @@ class InvokeWMLModelX(BaseTransformer):
         self.space_id = None
 
         self.client = None
+
+        self.timecolumn = None
 
         self.logged_on = False
 
@@ -865,15 +867,19 @@ class InvokeWMLModelX(BaseTransformer):
 
             idx_names = df.index.names
 
-            df = df.reset_index()
-            df['__timestamp__'] = df[idx_names[1]].dt.strftime("%Y-%m-%dT%H:%M")
+            if self.timecolumn is not None:
+                df = df.reset_index()
+                df['__timestamp__'] = df[idx_names[1]].dt.strftime("%Y-%m-%dT%H:%M")
             #df[idx_names[1]].values.astype(str)
-            df = df.drop_duplicates(subset=['__timestamp__'])
-            df = df.set_index(idx_names)
-            input_items = ['__timestamp__']
-            field_names = ['TIMESTAMP']
-            input_items.extend(self.input_items)
-            field_names.extend(self.input_items)
+                df = df.drop_duplicates(subset=['__timestamp__'])
+                df = df.set_index(idx_names)
+                input_items = ['__timestamp__']
+                field_names = [self.timecolumn]
+                input_items.extend(self.input_items)
+                field_names.extend(self.input_items)
+            else:
+                input_items = self.input_items
+                field_names = self.input_items
 
             index_nans = df[df[input_items].isna().any(axis=1)].index
             rows = df.loc[~df.index.isin(index_nans), input_items].values.tolist()
@@ -906,6 +912,46 @@ class InvokeWMLModelX(BaseTransformer):
 
         return df
 
+
+    @classmethod
+    def build_ui(cls):
+        #define arguments that behave as function inputs
+        inputs = []
+        inputs.append(UIMultiItem(name = 'input_items', datatype=float,
+                                  description = "Data items adjust", is_output_datatype_derived = True))
+        inputs.append(UISingle(name='wml_auth', datatype=str,
+                               description='Endpoint to WML service where model is hosted', tags=['TEXT'], required=True))
+
+        # define arguments that behave as function outputs
+        outputs=[]
+        outputs.append(UISingle(name='output_items', datatype=float))
+        return (inputs, outputs)
+
+
+class InvokeWMLModelX(InvokeWMLModelBase):
+    '''
+    Pass multivariate data in input_items to a regression function deployed to
+    Watson Machine Learning. The results are passed back to the univariate
+    output_items column.
+    Credentials for the WML endpoint representing the deployed function are stored
+    as pipeline constants, a name to lookup the WML credentials as JSON document.
+    Example: 'my_deployed_endpoint_wml_credentials' referring to
+    {
+	    "apikey": "<my api key",
+	    "url": "https://us-south.ml.cloud.ibm.com",
+	    "space_id": "<my space id>",
+	    "deployment_id": "<my deployment id">
+    }
+    This name is passed to InvokeWMLModel in wml_auth.
+    '''
+    def __init__(self, input_items, wml_auth, output_items):
+        super().__init__(input_items, wml_auth, output_items)
+
+        logger.debug(input_items)
+
+        self.whoami = 'InvokeWMLModelX'
+
+        self.timecolumn = 'TIMESTAMP'
 
     @classmethod
     def build_ui(cls):
