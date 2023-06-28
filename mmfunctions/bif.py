@@ -760,7 +760,7 @@ class InvokeWMLModelBase(BaseTransformer):
 
         self.client = None
 
-        self.timecolumn = None
+        self.time_column = None
 
         self.logged_on = False
 
@@ -867,14 +867,14 @@ class InvokeWMLModelBase(BaseTransformer):
 
             idx_names = df.index.names
 
-            if self.timecolumn is not None:
+            if self.time_column is not None:
                 df = df.reset_index()
                 df['__timestamp__'] = df[idx_names[1]].dt.strftime("%Y-%m-%dT%H:%M")
             #df[idx_names[1]].values.astype(str)
                 df = df.drop_duplicates(subset=['__timestamp__'])
                 df = df.set_index(idx_names)
                 input_items = ['__timestamp__']
-                field_names = [self.timecolumn]
+                field_names = [self.time_column]
                 input_items.extend(self.input_items)
                 field_names.extend(self.input_items)
             else:
@@ -896,8 +896,30 @@ class InvokeWMLModelBase(BaseTransformer):
         results = self.client.deployments.score(self.deployment_id, scoring_payload)
 
         if results:
+            # check for JSON
+            result_json = None
+            try:
+                result_json = json.loads(results)
+            except JSONDecodeError as jse:
+                logger.info('Apparently no json')
+
+            if result_json is not None:
+                keys = list(result_json['values'][0][0])
+                # simple, just assume first key refers to timestamp,
+                #    second key for prediction
+                my_range = range(0, len(result_json['values']))
+                timelist = [result_json['values'][i][0][keys[0]] for i in my_range]
+                timedata = pd.to_datetime(np.array(timelist))
+                predlist = [result_json['values'][i][0][keys[1]] for i in my_range]
+                preddata = np.array(predlist)
+                #new_df = pd.DataFrame(data=preddata, index=timedata, columns=[keys[1]])
+                new_df = pd.DataFrame(data=preddata, index=timedata, columns=self.output_items)
+
+                df = df.drop(columns=self.output_items.extend(self.time_column))
+                pd.merge_asof(df, new_df, left_index=True, right_index=True, direction='nearest')
+
             # Regression
-            if len(self.output_items) == 1:
+            elif len(self.output_items) == 1:
                 df.loc[~df.index.isin(index_nans), self.output_items] = \
                     np.array(results['predictions'][0]['values']).flatten()
             # Classification
@@ -951,7 +973,7 @@ class InvokeWMLModelX(InvokeWMLModelBase):
 
         self.whoami = 'InvokeWMLModelX'
 
-        self.timecolumn = 'TIMESTAMP'
+        self.time_column = 'TIMESTAMP'
 
     @classmethod
     def build_ui(cls):
@@ -967,6 +989,46 @@ class InvokeWMLModelX(InvokeWMLModelBase):
         outputs.append(UISingle(name='output_items', datatype=float))
         return (inputs, outputs)
 
+
+class InvokeWMLModelWithTime(InvokeWMLModelBase):
+    '''
+    Pass multivariate data in input_items to a regression function deployed to
+    Watson Machine Learning. The results are passed back to the univariate
+    output_items column.
+    Credentials for the WML endpoint representing the deployed function are stored
+    as pipeline constants, a name to lookup the WML credentials as JSON document.
+    Example: 'my_deployed_endpoint_wml_credentials' referring to
+    {
+	    "apikey": "<my api key",
+	    "url": "https://us-south.ml.cloud.ibm.com",
+	    "space_id": "<my space id>",
+	    "deployment_id": "<my deployment id">
+    }
+    This name is passed to InvokeWMLModel in wml_auth.
+    '''
+    def __init__(self, input_items, wml_auth, output_items, time_column):
+        super().__init__(input_items, wml_auth, output_items)
+
+        logger.debug(input_items)
+
+        self.whoami = 'InvokeWMLModelWithTime'
+
+        self.time_column = time_column
+
+    @classmethod
+    def build_ui(cls):
+        #define arguments that behave as function inputs
+        inputs = []
+        inputs.append(UIMultiItem(name = 'input_items', datatype=float,
+                                  description = "Data items adjust", is_output_datatype_derived = True))
+        inputs.append(UISingle(name='wml_auth', datatype=str,
+                               description='Endpoint to WML service where model is hosted', tags=['TEXT'], required=True))
+
+        # define arguments that behave as function outputs
+        outputs=[]
+        outputs.append(UISingle(name='output_items', datatype=float))
+        outputs.append(UISingle(name='time_column', datatype=dt.datetime))
+        return (inputs, outputs)
 
 
 
