@@ -1006,14 +1006,14 @@ class InvokeWMLModelWithTime(InvokeWMLModelBase):
     }
     This name is passed to InvokeWMLModel in wml_auth.
     '''
-    def __init__(self, input_items, wml_auth, output_items, time_column):
+    def __init__(self, input_items, wml_auth, output_items):
         super().__init__(input_items, wml_auth, output_items)
 
         logger.debug(input_items)
 
         self.whoami = 'InvokeWMLModelWithTime'
 
-        self.time_column = time_column
+        self.time_column = "TIMESTAMP"
 
     @classmethod
     def build_ui(cls):
