@@ -1,0 +1,50 @@
+
+As you can see the overarching theme of Maximo Asset Monitor is to make sense of sensor data that is collected from - 
+no surprise here - from industrial assets.
+The upper parts figure shows assets representing existing customers, starting from a
+mining company with truck as main assets, to a winery with wine cellars and barrels.
+
+The middle part of the figure focuses on the infrastructure needed to make sense of sensor data,
+infrastructure
+- to collect sensor data and merge the individual sensor data streams -> Turn univariate into multivariate data
+- to persist it into a data lake
+- to process the persisted data in a data pipeline with configurable steps.
+- to finally show it on an equally configurable dashboard (some similarity to grafana, no programming, only json config)
+
+
+At the bottom we show the results, i.e. Why do we do it:
+- Some customers like the mining company example want to understand the Overall Equipment Efficiency, i.e. the utilization
+  of their mining equipment
+- Other like the winery example set up anomaly detectors - configurable steps of the data pipeline - to their sensor
+  data stream. They want to be alerted on sudden temperature changes as wine fermentation needs stable temperatures.
+
+
+What's the wow:
+ 
+- Everything is integrated: after hooking up sensors to the IoT platform, data is received and persisted and ready for the
+  data pipeline. You get a consolidated view of operations. Furthermore with the SCADA integration, MAM can also deal with
+  non IoT data.
+- Configuring the data pipeline doesn't require programming. Out of the box aggregator functions - for the OEE case - and
+  transformers - for the anomaly detection case - are available and can be chained with a couple of mouse clicks.
+
+<show dashboard>
+
+
+Let's circle back to the personas targeted:
+Our primary persona is Marcia, the asset manager, typically she's an engineer with good grasp on the technical aspects
+of assets, the processes around it, and - of course - things that could go wrong.
+She can select the right chain of MAM functions and right layout of the dashboards to get an understanding how assets are doing
+Secondary persona is Ryan, the data scientist. Caveat: Most of our customers don't employ a Ryan persona ..
+
+
+What's the AI part
+
+- We support a couple of anomaly detector methods that don't need training, proximity based (KMeans) or linear model (FastMCD)
+- We also support anomaly detection via gradient boosting based prediction, trained model are stored in DB2 and
+     retrieved for prediction
+- Typical data pipeline capabilities like data imputation and scaling/normalizing are available as out-of-the-box functions to
+
+
+What's next:
+- Change point detection: Change points turn out to be good anomaly indicators in various customer scenarios
+- Integration with WML to allow customers to integrate their own models as MAM function

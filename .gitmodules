@@ -1,0 +1,6 @@
+[submodule "agots"]
+	path = agots
+	url = https://github.com/sedgewickmm18/agots
+[submodule "tf-levenberg-marquardt"]
+	path = tf-levenberg-marquardt
+	url = https://github.com/sedgewickmm18/tf-levenberg-marquardt

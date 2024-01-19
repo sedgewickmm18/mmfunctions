@@ -1,0 +1,18 @@
+digraph "classes" {
+charset="utf-8"
+rankdir=BT
+"0" [label="{ActivityTable|activity : Column\lend_date : Column\lid_col : Column\lstart_date : Column\l|}", shape="record"];
+"1" [label="{BaseTable|database\lid_col : Column\lis_table : bool\lname\ltable : Table\l|create()\lget_column_names()\linsert()\lquery()\lset_params()\l}", shape="record"];
+"2" [label="{Database|Session : sessionmaker\lbif_sql : str\lconn_string : str, NoneType\lconnection\lcos_client : NoneType\lcredentials : dict\lentity_type_metadata : dict\lfunction_catalog : dict\lhttp : PoolManager\lmetadata : MetaData\lsession : Session, NoneType\lsystem_package_url : str\ltenant_id\lurl : dict\lwrite_chunk_size : int\l|build_aggregate_query()\lcalc_time_interval()\lcommit()\lcos_create_bucket()\lcos_delete()\lcos_load()\lcos_save()\lcreate()\ldelete_data()\ldrop_table()\lexecute_job()\lget_as_datatype()\lget_catalog_module()\lget_column_lists_by_type()\lget_column_names()\lget_column_object()\lget_entity_type()\lget_query_data()\lget_table()\lhttp_request()\lif_exists()\limport_target()\linstall_package()\lload_catalog()\lmake_function()\lmissing_columns()\lprepare_aggregate_query()\lprocess_special_agg()\lquery()\lquery_agg()\lquery_column_aggregate()\lquery_time_agg()\lread_agg()\lread_dimension()\lread_table()\lregister_constants()\lregister_functions()\lregister_module()\lset_isolation_level()\lspecial_query_agg()\lstart_session()\lsubquery_join()\lsubquery_join_with_filters()\ltruncate()\lunregister_constants()\lunregister_functions()\lwrite_frame()\l}", shape="record"];
+"3" [label="{Dimension|id_col : Column\l|}", shape="record"];
+"4" [label="{ResourceCalendarTable|end_date : Column\lid_col : Column\lresource_id : Column\lstart_date : Column\l|}", shape="record"];
+"5" [label="{SlowlyChangingDimension|end_date : Column\lid_col : Column\lproperty_name : Column\lstart_date : Column\l|}", shape="record"];
+"6" [label="{SystemLogTable|timestamp : Column\l|}", shape="record"];
+"7" [label="{TimeSeriesTable|device_type : Column\levent_type : Column\levt_timestamp : Column\lformat : Column\lid_col : Column\llogical_interface : Column\lupdated_timestamp : Column\l|}", shape="record"];
+"0" -> "1" [arrowhead="empty", arrowtail="none"];
+"3" -> "1" [arrowhead="empty", arrowtail="none"];
+"4" -> "1" [arrowhead="empty", arrowtail="none"];
+"5" -> "1" [arrowhead="empty", arrowtail="none"];
+"6" -> "1" [arrowhead="empty", arrowtail="none"];
+"7" -> "1" [arrowhead="empty", arrowtail="none"];
+}
