@@ -1027,10 +1027,13 @@ class InvokeWMLModelBase(BaseTransformer):
             raise RuntimeError("WML API Key invalid")
 
         # get space
-        json_d = self.client.spaces._get_resources(
-            wml_credentials["url"] + "/v2/spaces", "spaces", {"limit": 1}
-        )
-        self.space_id = json_d["resources"][0]["metadata"]["id"]
+        if 'space_id' in wml_credentials:
+            self.space_id = wml_credentials["space_id"]
+        else:
+            json_d = self.client.spaces._get_resources(
+                wml_credentials["url"] + "/v2/spaces", "spaces", {"limit": 1}
+            )
+            self.space_id = json_d["resources"][0]["metadata"]["id"]
 
         # set space
         self.client.set.default_space(self.space_id)
