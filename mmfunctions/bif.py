@@ -1108,6 +1108,10 @@ class InvokeWMLModelBase(BaseTransformer):
 
             # Regression
             if len(self.output_items) == 1:
+                #logger.info(str(results["predictions"]) + ", " + str(results["predictions"][0]) + ", " + 
+                #    str(results["predictions"][0]["values"]))
+                #logger.info(str(np.array(results["predictions"][0]["values"])))
+
                 df.loc[~df.index.isin(index_nans), self.output_items] = np.array(
                     results["predictions"][0]["values"]
                 ).flatten()
@@ -1119,6 +1123,8 @@ class InvokeWMLModelBase(BaseTransformer):
                 ].astype(int)
                 arr2 = np.array(arr[:, 1].tolist())
                 df.loc[~df.index.isin(index_nans), self.output_items[1]] = arr2.T[0]
+
+            logger.info(str(df[self.output_items]))
 
         else:
             logging.error("error invoking external model")
@@ -1824,3 +1830,55 @@ class CumulativeCount(BaseTransformer):
         )
 
         return (inputs, outputs)
+
+
+class PythonExpressionX(BaseTransformer):
+    """
+    Create a new item from an expression involving other items
+    """
+
+    def __init__(self, expression, output_name):
+        self.output_name = output_name
+        super().__init__()
+        # convert single quotes to double
+        self.expression = self.parse_expression(expression)
+        # registration
+        self.constants = ['expression']
+        self.outputs = ['output_name']
+
+    def execute(self, df):
+        try:
+            c = self._entity_type.get_attributes_dict()
+        except Exception:
+            c = None
+        df = df.copy()
+        df[self.output_name] = None
+        requested = list(self.get_input_items())
+        msg = self.expression + ' .'
+        self.trace_append(msg)
+        msg = 'Function requested items: %s . ' % ','.join(requested)
+        self.trace_append(msg)
+        return super().execute(df)
+
+    def _calc(self, df):
+        entity = df.index[0][0]
+        logger.debug("PythonExpressionX for " + str(entity) + " expr " + self.expression)
+        df[self.output_name] = eval(self.expression)
+        return df
+
+    def get_input_items(self):
+        items = self.get_expression_items(self.expression)
+        return items
+
+    @classmethod
+    def build_ui(cls):
+        # define arguments that behave as function inputs
+        inputs = []
+        inputs.append(UIExpression(name='expression',
+                                   description="Define alert expression using pandas systax. Example: df['inlet_temperature']>50"))
+        # define arguments that behave as function outputs
+        outputs = []
+        outputs.append(UIFunctionOutSingle(name='output_name', datatype=float, description='Output of expression'))
+
+        return (inputs, outputs)
+
