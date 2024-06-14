@@ -983,6 +983,13 @@ class InvokeWMLModelBase(BaseTransformer):
         # retrieve WML credentials as constant
         #    {"apikey": api_key, "url": 'https://' + location + '.ml.cloud.ibm.com'}
         c = None
+        if isinstance(self.wml_auth, str):
+            try:
+                wml_auth = json.loads(self.wml_auth)
+                self.wml_auth = wml_auth
+            except Exception:
+                logger.debug('WML parm is not a JSON document')
+
         if isinstance(self.wml_auth, dict):
             logger.info("WML AUTH " + str(self.wml_auth) + "  is dict")
             wml_credentials = self.wml_auth
