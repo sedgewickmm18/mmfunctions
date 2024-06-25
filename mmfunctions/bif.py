@@ -1922,7 +1922,7 @@ class PythonFunctionX(BaseTransformer):
         except Exception:
             c = None
         df = df.copy()
-        df[self.output_name] = None
+        df[self.output_item] = None
         requested = list(self.get_input_items())
         #msg = self.expression + ' .'
         #self.trace_append(msg)
@@ -1933,7 +1933,7 @@ class PythonFunctionX(BaseTransformer):
     def _calc(self, df):
         entity = df.index[0][0]
         logger.debug("PythonFunctionX for " + str(entity)) # + " expr " + self.expression)
-        #df[self.output_name] = eval(self.expression)
+        #df[self.output_item] = eval(self.expression)
         
         # function may have already been serialized to cos
 
