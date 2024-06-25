@@ -1917,7 +1917,24 @@ class PythonFunctionX(BaseTransformer):
         self.parameters = parameters
 
     def execute(self, df):
+        try:
+            c = self._entity_type.get_attributes_dict()
+        except Exception:
+            c = None
+        df = df.copy()
+        df[self.output_name] = None
+        requested = list(self.get_input_items())
+        #msg = self.expression + ' .'
+        #self.trace_append(msg)
+        msg = 'Function requested items: %s . ' % ','.join(requested)
+        self.trace_append(msg)
+        return super().execute(df)
 
+    def _calc(self, df):
+        entity = df.index[0][0]
+        logger.debug("PythonFunctionX for " + str(entity)) # + " expr " + self.expression)
+        #df[self.output_name] = eval(self.expression)
+        
         # function may have already been serialized to cos
 
         kw = {}
