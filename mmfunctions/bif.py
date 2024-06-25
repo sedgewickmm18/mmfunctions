@@ -1889,3 +1889,83 @@ class PythonExpressionX(BaseTransformer):
 
         return (inputs, outputs)
 
+class PythonFunctionX(BaseTransformer):
+    """
+    Execute a paste-in function. A paste-in function is python function declaration
+    code block. The function must be called 'f' and accept two inputs:
+    df (a pandas DataFrame) and parameters (a dict that you can use
+    to externalize the configuration of the function).
+
+    The function is supposed to return the modified DataFrame it has received as input argument !
+    """
+
+    function_name = 'f'
+
+    def __init__(self, function_code, input_items, output_item, parameters=None):
+
+        self.function_code = function_code
+        self.input_items = input_items
+        self.output_item = output_item
+        super().__init__()
+        if parameters is None:
+            parameters = {}
+
+        function_name = parameters.get('function_name', None)
+        if function_name is not None:
+            self.function_name = function_name
+
+        self.parameters = parameters
+
+    def execute(self, df):
+
+        # function may have already been serialized to cos
+
+        kw = {}
+
+        if not self.function_code.startswith('def '):
+            bucket = self.get_bucket_name()
+            fn = self._entity_type.db.model_store.retrieve_model(self.function_code)
+            kw['source'] = 'cos'
+            kw['filename'] = self.function_code
+            if fn is None:
+                msg = (' Function text does not start with "def ". '
+                       ' Function is assumed to located in COS'
+                       ' Cant locate function %s in cos. Make sure this '
+                       ' function exists in the %s bucket' % (self.function_code, bucket))
+                raise RuntimeError(msg)
+
+        else:
+            fn = self._entity_type.db.make_function(function_name=self.function_name, function_code=self.function_code)
+            kw['source'] = 'paste-in code'
+            kw['filename'] = None
+
+        try:
+            c = self._entity_type.get_attributes_dict()
+        except Exception:
+            c = None
+        kw['input_items'] = self.input_items
+        kw['output_item'] = self.output_item
+        kw['entity_type'] = self._entity_type
+        kw['db'] = self._entity_type.db
+        kw['c'] = c
+        kw['logger'] = logger
+        self.trace_append(msg=self.function_code, log_method=logger.debug, **kw)
+
+        result = fn(df=df, parameters={**kw, **self.parameters})
+
+        return result
+
+    @classmethod
+    def build_ui(cls):
+        # define arguments that behave as function inputs
+        inputs = []
+        inputs.append(UIMultiItem('input_items'))
+        inputs.append(UIText(name='function_code', description='Paste in your function definition'))
+        inputs.append(UISingle(name='parameters', datatype=dict, required=False,
+                               description='optional parameters specified in json format'))
+        # define arguments that behave as function outputs
+        outputs = []
+        outputs.append(UIFunctionOutSingle('output_item', datatype=float))
+
+        return (inputs, outputs)
+
