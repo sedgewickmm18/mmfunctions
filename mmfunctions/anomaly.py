@@ -1860,7 +1860,7 @@ class RobustThreshold(SupervisedLearningTransformer):
         if db is None:
             db = self._get_dms().db
 
-        model_name, robust_model, version = self.load_model(suffix=entity)
+        #model_name, robust_model, version = self.load_model(suffix=entity)
 
         feature = df[self.input_item].values
 
