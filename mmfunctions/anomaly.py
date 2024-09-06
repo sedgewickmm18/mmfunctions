@@ -1878,8 +1878,8 @@ class RobustThreshold(SupervisedLearningTransformer):
         schema = entity_type._db_schema
 
         # interquartile range vs KDE based quantiles
-        thresh = threshold
-        if threshold == 0: thresh = 0.99
+        thresh = self.threshold
+        if thresh == 0: thresh = 0.99
         row = [0,0,0,0]
         try:
             import ibm_db
@@ -1898,14 +1898,14 @@ class RobustThreshold(SupervisedLearningTransformer):
             logger.error('Failed to derived metrics data from DB2 for ' + str(entity))
             row = np.percentile(feature, [100 - 100*thresh, 25, 75, 100*thresh])
 
-            #robust_model = KDEMaxMin(version=version)
-            robust_model = [threshold] + row
-            #try:
-                #robust_model.fit(feature, self.threshold)
-                #db.model_store.store_model(model_name, robust_model)
-            #except Exception as e:
-                #logger.error('Model store failed with ' + str(e))
-                #robust_model = None
+        #robust_model = KDEMaxMin(version=version)
+        robust_model = [self.threshold] + row
+        #try:
+            #robust_model.fit(feature, self.threshold)
+            #db.model_store.store_model(model_name, robust_model)
+        #except Exception as e:
+            #logger.error('Model store failed with ' + str(e))
+            #robust_model = None
 
         # robust_model = list of (threshold parm, percentile 0.01, Q1, Q3, percentile 0.99)
         # IQR ?
