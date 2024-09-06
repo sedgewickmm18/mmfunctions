@@ -1868,6 +1868,7 @@ class RobustThreshold(SupervisedLearningTransformer):
 
         # make sure we have enough data to train the pipeline
         # if not we have to retrieve data from the database
+        start_ts = 0
         logger.info('Retrieving ' + str(self.input_item) + ' data from ' + str(start_ts) + ' to ')
 
         entity_type = self.get_entity_type()
