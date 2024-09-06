@@ -1863,25 +1863,63 @@ class RobustThreshold(SupervisedLearningTransformer):
 
         feature = df[self.input_item].values
 
-        if robust_model is None and self.auto_train:
-            robust_model = KDEMaxMin(version=version)
-            try:
-                robust_model.fit(feature, self.threshold)
-                db.model_store.store_model(model_name, robust_model)
-            except Exception as e:
-                logger.error('Model store failed with ' + str(e))
-                robust_model = None
+        #if robust_model is None and self.auto_train:
 
-        if robust_model is not None:
-            self.Min[entity] = robust_model.Min
-            self.Max[entity] = robust_model.Max
+        # make sure we have enough data to train the pipeline
+        # if not we have to retrieve data from the database
+        logger.info('Retrieving ' + str(self.input_item) + ' data from ' + str(start_ts) + ' to ')
 
-            df[self.output_item] = robust_model.predict(feature, self.threshold)
-        else:
-            df[self.output_item] = 0
+        entity_type = self.get_entity_type()
+        source_metadata = self.dms.data_items.get(self.input_item)
+        input_metric_table_name = source_metadata.get(md.DATA_ITEM_SOURCETABLE_KEY)
+        schema = entity_type._db_schema
+
+        # interquartile range vs KDE based quantiles
+        thresh = threshold
+        if threshold == 0: thresh = 0.99
+        row = [0,0,0,0]
+        try:
+            import ibm_db
+            sql_statement = "SELECT PERCENTILE_CONT(%s) WITHIN GROUP(ORDER BY VALUE_N)," % (1-thresh) + \
+                "PERCENTILE_CONT(0.25) WITHIN GROUP(ORDER BY VALUE_N)," + \
+                "PERCENTILE_CONT(0.75) WITHIN GROUP(ORDER BY VALUE_N)," + \
+                "PERCENTILE_CONT(%s) WITHIN GROUP(ORDER BY VALUE_N) " % (thresh) +  \
+                "FROM %s.%s " % (schema, input_metric_table_name) + \
+                "WHERE ENTITY_ID = \'%s\'" % (entity_name)
+            stmt = ibm_db.prepare(db.native_connection, sql_statement)
+            ibm_db.execute(stmt)
+            row = ibm_db.fetch_tuple(stmt)
+            ibm_db.free_result(stmt)
+        except Exception as e:
+            # compute percentiles from current dataframe instead
+            logger.error('Failed to derived metrics data from DB2 for ' + str(entity))
+            row = np.percentile(feature, [100 - 100*thresh, 25, 75, 100*thresh])
+
+            #robust_model = KDEMaxMin(version=version)
+            robust_model = [threshold] + row
+            #try:
+                #robust_model.fit(feature, self.threshold)
+                #db.model_store.store_model(model_name, robust_model)
+            #except Exception as e:
+                #logger.error('Model store failed with ' + str(e))
+                #robust_model = None
+
+        # robust_model = list of (threshold parm, percentile 0.01, Q1, Q3, percentile 0.99)
+        # IQR ?
+        if robust_model[0] == 0:
+            # Q1 - 1.5 * (Q3 - Q1)
+            self.Min[entity] = 2.5 * robust_model[2] - 1.5 * robust_model[3]
+            # Q3 + 1.5 * (Q3 - Q1)
+            self.Max[entity] = 2.5 * robust_model[3] - 1.5 * robust_model[2]
+        else: 
+            self.Min[entity] = robust_model[1]
+            self.Max[entity] = robust_model[4]
+
+        #df[self.output_item] = robust_model.predict(feature, self.threshold)
+        df[self.output_item] = np.where((feature < self.Min[entity]) +
+                (feature > self.Max[entity]), 1, 0)
 
         return df.droplevel(0)
-
 
     @classmethod
     def build_ui(cls):
@@ -1890,7 +1928,7 @@ class RobustThreshold(SupervisedLearningTransformer):
         inputs.append(UISingleItem(name="input_item", datatype=float, description="Data item to analyze"))
 
         inputs.append(UISingle(name="threshold", datatype=int,
-                               description="Threshold to determine outliers by quantile. Typically set to 0.95", ))
+                               description="Threshold to determine outliers by quantile. Typically set to 0.95. If set to zero we use the interquartile range to sort out outliers.", ))
 
         # define arguments that behave as function outputs
         outputs = []
