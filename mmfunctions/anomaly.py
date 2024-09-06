@@ -1853,6 +1853,7 @@ class RobustThreshold(SupervisedLearningTransformer):
         # per entity - copy for later inplace operations
         #entity = df.index.levels[0][0]
         entity = df.index[0][0]
+        logger.info('Robust threshold for ' + str(entity) + ' column ' + self.input_item)
 
         # obtain db handler
         db = self._entity_type.db
