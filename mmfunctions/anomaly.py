@@ -1899,7 +1899,7 @@ class RobustThreshold(SupervisedLearningTransformer):
             row = np.percentile(feature, [100 - 100*thresh, 25, 75, 100*thresh])
 
         #robust_model = KDEMaxMin(version=version)
-        robust_model = [self.threshold] + row
+        robust_model = row
         #try:
             #robust_model.fit(feature, self.threshold)
             #db.model_store.store_model(model_name, robust_model)
@@ -1907,16 +1907,17 @@ class RobustThreshold(SupervisedLearningTransformer):
             #logger.error('Model store failed with ' + str(e))
             #robust_model = None
 
-        # robust_model = list of (threshold parm, percentile 0.01, Q1, Q3, percentile 0.99)
+        # robust_model = list of (percentile 0.01, Q1, Q3, percentile 0.99)
         # IQR ?
-        if robust_model[0] == 0:
+        #if robust_model[0] == 0:
+        if self.threshold == 0:
             # Q1 - 1.5 * (Q3 - Q1)
-            self.Min[entity] = 2.5 * robust_model[2] - 1.5 * robust_model[3]
+            self.Min[entity] = 2.5 * robust_model[1] - 1.5 * robust_model[2]
             # Q3 + 1.5 * (Q3 - Q1)
-            self.Max[entity] = 2.5 * robust_model[3] - 1.5 * robust_model[2]
+            self.Max[entity] = 2.5 * robust_model[2] - 1.5 * robust_model[1]
         else: 
-            self.Min[entity] = robust_model[1]
-            self.Max[entity] = robust_model[4]
+            self.Min[entity] = robust_model[0]
+            self.Max[entity] = robust_model[3]
 
         #df[self.output_item] = robust_model.predict(feature, self.threshold)
         df[self.output_item] = np.where((feature < self.Min[entity]) +
