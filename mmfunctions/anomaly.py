@@ -61,6 +61,7 @@ from iotfunctions.base import (BaseTransformer, BaseRegressor, BaseEstimatorFunc
 from iotfunctions.bif import (AlertHighValue)
 from iotfunctions.ui import (UISingle, UIMulti, UIMultiItem, UIFunctionOutSingle, UISingleItem, UIFunctionOutMulti)
 from iotfunctions.dbtables import (FileModelStore, DBModelStore)
+from iotfunctions import metadata as md
 
 # VAE
 import torch
