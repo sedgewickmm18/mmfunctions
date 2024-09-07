@@ -1827,12 +1827,13 @@ class KDEMaxMin:
 
 class RobustThreshold(SupervisedLearningTransformer):
 
-    def __init__(self, input_item, threshold, output_item):
-        super().__init__(features=[input_item], targets=[output_item])
+    def __init__(self, input_item, threshold, output_item, mad):
+        super().__init__(features=[input_item], targets=[outlier, mad])
 
         self.input_item = input_item
         self.threshold = threshold
-        self.output_item = output_item
+        self.outlier = outlier
+        self.mad = mad 
         self.auto_train = True
         self.Min = dict()
         self.Max = dict()
@@ -1846,7 +1847,7 @@ class RobustThreshold(SupervisedLearningTransformer):
     def execute(self, df):
         # set output columns to zero
         logger.debug('Called ' + self.whoami + ' with columns: ' + str(df.columns))
-        df[self.output_item] = 0
+        df[self.outlier] = 0
         return super().execute(df)
 
 
@@ -1879,12 +1880,13 @@ class RobustThreshold(SupervisedLearningTransformer):
 
         # interquartile range vs KDE based quantiles
         thresh = self.threshold
-        if thresh == 0: thresh = 0.99
+        if thresh <= 0 or thresh >= 1: thresh = 0.99
         row = [0,0,0,0]
         try:
             import ibm_db
             sql_statement = "SELECT PERCENTILE_CONT(%s) WITHIN GROUP(ORDER BY VALUE_N)," % (1-thresh) + \
                 "PERCENTILE_CONT(0.25) WITHIN GROUP(ORDER BY VALUE_N)," + \
+                "PERCENTILE_CONT(0.50) WITHIN GROUP(ORDER BY VALUE_N)," + \
                 "PERCENTILE_CONT(0.75) WITHIN GROUP(ORDER BY VALUE_N)," + \
                 "PERCENTILE_CONT(%s) WITHIN GROUP(ORDER BY VALUE_N) " % (thresh) +  \
                 "FROM %s.%s " % (schema, input_metric_table_name) + \
@@ -1907,21 +1909,28 @@ class RobustThreshold(SupervisedLearningTransformer):
             #logger.error('Model store failed with ' + str(e))
             #robust_model = None
 
-        # robust_model = list of (percentile 0.01, Q1, Q3, percentile 0.99)
+        # robust_model = list of (percentile 0.01, Q1, median, Q3, percentile 0.99)
         # IQR ?
         #if robust_model[0] == 0:
-        if self.threshold == 0:
+        if self.threshold <= 0 or self.threshold >=1:
             # Q1 - 1.5 * (Q3 - Q1)
-            self.Min[entity] = 2.5 * robust_model[1] - 1.5 * robust_model[2]
+            self.Min[entity] = 2.5 * robust_model[1] - 1.5 * robust_model[3]
             # Q3 + 1.5 * (Q3 - Q1)
-            self.Max[entity] = 2.5 * robust_model[2] - 1.5 * robust_model[1]
+            self.Max[entity] = 2.5 * robust_model[3] - 1.5 * robust_model[1]
         else: 
             self.Min[entity] = robust_model[0]
-            self.Max[entity] = robust_model[3]
+            self.Max[entity] = robust_model[4]
 
-        #df[self.output_item] = robust_model.predict(feature, self.threshold)
-        df[self.output_item] = np.where((feature < self.Min[entity]) +
+        #df[self.outlier] = robust_model.predict(feature, self.threshold)
+        df[self.outlier] = np.where((feature < self.Min[entity]) +
                 (feature > self.Max[entity]), 1, 0)
+
+        # replace outliers with the median
+        mad_arr = np.where((feature < self.Min[entity]) +
+                    (feature > self.Max[entity]), robust_model[2], feature)
+
+        mad = np.median(np.absolute(feature - robust_model[2]) 
+        df[self.mad] = np.abs(feature - mad)
 
         return df.droplevel(0)
 
@@ -1932,12 +1941,14 @@ class RobustThreshold(SupervisedLearningTransformer):
         inputs.append(UISingleItem(name="input_item", datatype=float, description="Data item to analyze"))
 
         inputs.append(UISingle(name="threshold", datatype=int,
-                               description="Threshold to determine outliers by quantile. Typically set to 0.95. If set to zero we use the interquartile range to sort out outliers.", ))
+                               description="Threshold to determine outliers by quantile. Typically set to 0.95. If set to values outside of (0,1) we use the interquartile range formula to sort out outliers.", ))
 
         # define arguments that behave as function outputs
         outputs = []
-        outputs.append(UIFunctionOutSingle(name="output_item", datatype=bool,
+        outputs.append(UIFunctionOutSingle(name="outlier", datatype=bool,
                                            description="Boolean outlier condition"))
+        outputs.append(UIFunctionOutSingle(name="mad", datatype=float,
+                                           description="Median absolute deviation"))
         return (inputs, outputs)
 
 
