@@ -1841,7 +1841,7 @@ class RobustThreshold(SupervisedLearningTransformer):
         self.whoami = 'RobustThreshold'
 
         logger.info(self.whoami + ' from ' + self.input_item + ' quantile threshold ' +  str(self.threshold) +
-                    ' exceeding boolean ' + self.output_item)
+                    ' exceeding boolean ' + self.outlier + ', ' + self.mad)
 
 
     def execute(self, df):
