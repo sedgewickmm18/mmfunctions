@@ -1929,7 +1929,7 @@ class RobustThreshold(SupervisedLearningTransformer):
         mad_arr = np.where((feature < self.Min[entity]) +
                     (feature > self.Max[entity]), robust_model[2], feature)
 
-        mad = np.median(np.absolute(feature - robust_model[2]) 
+        mad = np.median(np.absolute(feature - robust_model[2]))
         df[self.mad] = np.abs(feature - mad)
 
         return df.droplevel(0)
