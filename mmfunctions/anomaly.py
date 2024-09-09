@@ -1890,7 +1890,7 @@ class RobustThreshold(SupervisedLearningTransformer):
                 "PERCENTILE_CONT(0.75) WITHIN GROUP(ORDER BY VALUE_N)," + \
                 "PERCENTILE_CONT(%s) WITHIN GROUP(ORDER BY VALUE_N) " % (thresh) +  \
                 "FROM %s.%s " % (schema, input_metric_table_name) + \
-                "WHERE ENTITY_ID = \'%s\'" % (entity_name)
+                "WHERE ENTITY_ID = \'%s\' AND KEY = \'%s\'" % (entity_name, self.input_item)
             stmt = ibm_db.prepare(db.native_connection, sql_statement)
             ibm_db.execute(stmt)
             row = ibm_db.fetch_tuple(stmt)
