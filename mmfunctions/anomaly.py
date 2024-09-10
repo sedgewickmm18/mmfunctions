@@ -1880,7 +1880,7 @@ class RobustThreshold(SupervisedLearningTransformer):
         # interquartile range vs KDE based quantiles
         thresh = self.threshold
         if thresh <= 0 or thresh >= 1: thresh = 0.99
-        row = [0,0,0,0]
+        row = [0,0,0,0,0]
         try:
             '''
             import ibm_db
@@ -1938,25 +1938,25 @@ class RobustThreshold(SupervisedLearningTransformer):
             #logger.error('Model store failed with ' + str(e))
             #robust_model = None
 
-        # robust_model = list of (percentile 0.01, Q1, median, Q3, percentile 0.99)
+        # row = list of (percentile 0.01, Q1, median, Q3, percentile 0.99)
         # IQR ?
-        #if robust_model[0] == 0:
+        #if row[0] == 0:
         if self.threshold <= 0 or self.threshold >=1:
             # Q1 - 1.5 * (Q3 - Q1)
-            _min = 2.5 * robust_model[1] - 1.5 * robust_model[3]
+            _min = 2.5 * row[1] - 1.5 * row[3]
             # Q3 + 1.5 * (Q3 - Q1)
-            _max = 2.5 * robust_model[3] - 1.5 * robust_model[1]
+            _max = 2.5 * row[3] - 1.5 * row[1]
         else: 
-            _min = robust_model[0]
-            _max = robust_model[4]
+            _min = row[0]
+            _max = row[4]
 
         #df[self.outlier] = np.where((feature < _min) + (feature > _max), 1, 0)
         df[self.outlier] = np.where((feature >= _min) & (feature <= _max), 0, 1)
 
         # replace outliers with the median
-        mad_arr = np.where((feature >= _min) & (feature <= _max), feature, robust_model[2])
+        mad_arr = np.where((feature >= _min) & (feature <= _max), feature, row[2])
 
-        mad = np.median(np.absolute(mad_arr - robust_model[2]))
+        mad = np.median(np.absolute(mad_arr - row[2]))
         df[self.mad] = np.abs(feature - mad)
 
         return df.droplevel(0)
