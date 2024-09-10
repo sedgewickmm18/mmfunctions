@@ -47,6 +47,8 @@ from sklearn.preprocessing import (StandardScaler, RobustScaler, MinMaxScaler,
                                    minmax_scale, PolynomialFeatures)
 from sklearn.utils import check_array
 
+from sqlalchemy.sql import text, select, column, func
+
 # for Matrix Profile
 import iotfunctions
 import stumpy
