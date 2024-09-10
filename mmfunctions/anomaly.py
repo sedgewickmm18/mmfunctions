@@ -1925,7 +1925,7 @@ class RobustThreshold(SupervisedLearningTransformer):
             result = db.connection.execute(query).fetchall()
         except Exception as e:
             # compute percentiles from current dataframe instead
-            logger.error('Failed to derived metrics data from DB2 for ' + str(entity) + ' Error ' + str(e))
+            logger.error('Failed to derived metrics data from DB2 for ' + str(entity_name) + ' Error ' + str(e))
             row = np.percentile(feature, [100 - 100*thresh, 25, 50, 75, 100*thresh])
 
         #robust_model = KDEMaxMin(version=version)
@@ -1942,20 +1942,18 @@ class RobustThreshold(SupervisedLearningTransformer):
         #if robust_model[0] == 0:
         if self.threshold <= 0 or self.threshold >=1:
             # Q1 - 1.5 * (Q3 - Q1)
-            self.Min[entity] = 2.5 * robust_model[1] - 1.5 * robust_model[3]
+            _min = 2.5 * robust_model[1] - 1.5 * robust_model[3]
             # Q3 + 1.5 * (Q3 - Q1)
-            self.Max[entity] = 2.5 * robust_model[3] - 1.5 * robust_model[1]
+            _max = 2.5 * robust_model[3] - 1.5 * robust_model[1]
         else: 
-            self.Min[entity] = robust_model[0]
-            self.Max[entity] = robust_model[4]
+            _min = robust_model[0]
+            _max = robust_model[4]
 
         #df[self.outlier] = robust_model.predict(feature, self.threshold)
-        df[self.outlier] = np.where((feature < self.Min[entity]) +
-                (feature > self.Max[entity]), 1, 0)
+        df[self.outlier] = np.where((feature < _min) + (feature > _max), 1, 0)
 
         # replace outliers with the median
-        mad_arr = np.where((feature < self.Min[entity]) +
-                    (feature > self.Max[entity]), robust_model[2], feature)
+        mad_arr = np.where((feature < _min) + (feature > _max), robust_model[2], feature)
 
         mad = np.median(np.absolute(feature - robust_model[2]))
         df[self.mad] = np.abs(feature - mad)
