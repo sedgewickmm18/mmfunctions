@@ -1856,19 +1856,15 @@ class RobustThreshold(SupervisedLearningTransformer):
     def _calc(self, df):
         # per entity - copy for later inplace operations
         #entity = df.index.levels[0][0]
-        entity = df.index[0][0]
-        logger.info('Robust threshold for ' + str(entity) + ' column ' + self.input_item)
+        entity_name = df.index[0][0]
+        logger.info('Robust threshold for ' + str(entity_name) + ' column ' + self.input_item)
 
         # obtain db handler
         db = self._entity_type.db
         if db is None:
             db = self._get_dms().db
 
-        #model_name, robust_model, version = self.load_model(suffix=entity)
-
         feature = df[self.input_item].values
-
-        #if robust_model is None and self.auto_train:
 
         # make sure we have enough data to train the pipeline
         # if not we have to retrieve data from the database
