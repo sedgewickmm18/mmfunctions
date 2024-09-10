@@ -1922,7 +1922,9 @@ class RobustThreshold(SupervisedLearningTransformer):
                     ]).filter(table.c.entity_id == entity_name).filter(table.c.KEY == self.input_item)
 
             # Execute the query and print the result
-            row = np.array(db.connection.execute(query).fetchall())
+            row_ = db.connection.execute(query).fetchall()
+            row = np.array(map(int, row_.split(" ")))
+            print(row_, row)
         except Exception as e:
             # compute percentiles from current dataframe instead
             logger.error('Failed to derived metrics data from DB2 for ' + str(entity_name) + ' Error ' + str(e))
