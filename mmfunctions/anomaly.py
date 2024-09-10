@@ -1930,6 +1930,7 @@ class RobustThreshold(SupervisedLearningTransformer):
 
         #robust_model = KDEMaxMin(version=version)
         robust_model = row
+        logger.info('RobustThreshold: percentiles ' + ', '.join(map(str,row)))
         #try:
             #robust_model.fit(feature, self.threshold)
             #db.model_store.store_model(model_name, robust_model)
@@ -1949,13 +1950,13 @@ class RobustThreshold(SupervisedLearningTransformer):
             _min = robust_model[0]
             _max = robust_model[4]
 
-        #df[self.outlier] = robust_model.predict(feature, self.threshold)
-        df[self.outlier] = np.where((feature < _min) + (feature > _max), 1, 0)
+        #df[self.outlier] = np.where((feature < _min) + (feature > _max), 1, 0)
+        df[self.outlier] = np.where((feature >= _min) & (feature <= _max), 0, 1)
 
         # replace outliers with the median
-        mad_arr = np.where((feature < _min) + (feature > _max), robust_model[2], feature)
+        mad_arr = np.where((feature >= _min) & (feature <= _max), feature, robust_model[2])
 
-        mad = np.median(np.absolute(feature - robust_model[2]))
+        mad = np.median(np.absolute(mad_arr - robust_model[2]))
         df[self.mad] = np.abs(feature - mad)
 
         return df.droplevel(0)
