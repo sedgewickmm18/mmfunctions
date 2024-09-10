@@ -1906,22 +1906,22 @@ class RobustThreshold(SupervisedLearningTransformer):
 
             if source_metadata.get(md.DATA_ITEM_TYPE_KEY).upper() != 'DERIVED_METRIC':
                 query = select([
-                    func.percentile_cont(1-thresh).within_group(table.c[self.input_item]),
-                    func.percentile_cont(0.25).within_group(table.c[self.input_item]),
-                    func.percentile_cont(0.5).within_group(table.c[self.input_item]),
-                    func.percentile_cont(0.75).within_group(table.c[self.input_item]),
-                    func.percentile_cont(thresh).within_group(table.c[self.input_item])
-                    ]).filter(table.c.entity_id == entity_name)
+                    func.percentile_cont(1-thresh).within_group(input_metric_table_name.c[self.input_item]),
+                    func.percentile_cont(0.25).within_group(input_metric_table_name.c[self.input_item]),
+                    func.percentile_cont(0.5).within_group(input_metric_table_name.c[self.input_item]),
+                    func.percentile_cont(0.75).within_group(input_metric_table_name.c[self.input_item]),
+                    func.percentile_cont(thresh).within_group(input_metric_table_name.c[self.input_item])
+                    ]).filter(input_metric_table_name.c.entity_id == entity_name)
 
             else:   # 'METRIC'
 
                 query = select([
-                    func.percentile_cont(1-thresh).within_group(table.c.value_n),
-                    func.percentile_cont(0.25).within_group(table.c.value_n),
-                    func.percentile_cont(0.5).within_group(table.c.value_n),
-                    func.percentile_cont(0.75).within_group(table.c.value_n),
-                    func.percentile_cont(thresh).within_group(table.c.value_n)
-                    ]).filter(table.c.entity_id == entity_name).filter(table.c.KEY == self.input_item)
+                    func.percentile_cont(1-thresh).within_group(input_metric_table_name.c.value_n),
+                    func.percentile_cont(0.25).within_group(input_metric_table_name.c.value_n),
+                    func.percentile_cont(0.5).within_group(input_metric_table_name.c.value_n),
+                    func.percentile_cont(0.75).within_group(input_metric_table_name.c.value_n),
+                    func.percentile_cont(thresh).within_group(input_metric_table_name.c.value_n)
+                    ]).filter(input_metric_table_name.c.entity_id == entity_name).filter(input_metric_table_name.c.KEY == self.input_item)
 
             # Execute the query and print the result
             result = db.connection.execute(query).fetchall()
