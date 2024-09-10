@@ -1923,7 +1923,7 @@ class RobustThreshold(SupervisedLearningTransformer):
 
             # Execute the query and print the result
             row_ = db.connection.execute(query).fetchall()
-            row = np.array(row[0])
+            row = np.array(row_[0])
             print(row_, row)
         except Exception as e:
             # compute percentiles from current dataframe instead
