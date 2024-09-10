@@ -1922,21 +1922,14 @@ class RobustThreshold(SupervisedLearningTransformer):
                     ]).filter(table.c.entity_id == entity_name).filter(table.c.KEY == self.input_item)
 
             # Execute the query and print the result
-            row = db.connection.execute(query).fetchall()
+            row = np.array(db.connection.execute(query).fetchall())
         except Exception as e:
             # compute percentiles from current dataframe instead
             logger.error('Failed to derived metrics data from DB2 for ' + str(entity_name) + ' Error ' + str(e))
             row = np.percentile(feature, [100 - 100*thresh, 25, 50, 75, 100*thresh])
 
         #robust_model = KDEMaxMin(version=version)
-        robust_model = row
-        logger.info('RobustThreshold: percentiles ' + ', '.join(map(str,row)))
-        #try:
-            #robust_model.fit(feature, self.threshold)
-            #db.model_store.store_model(model_name, robust_model)
-        #except Exception as e:
-            #logger.error('Model store failed with ' + str(e))
-            #robust_model = None
+        logger.info('RobustThreshold: ' + str(len(row)) + ', percentiles ' + ', '.join(map(str,row)))
 
         # row = list of (percentile 0.01, Q1, median, Q3, percentile 0.99)
         # IQR ?
