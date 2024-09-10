@@ -1904,7 +1904,7 @@ class RobustThreshold(SupervisedLearningTransformer):
             logger.info('DATA item type is ' + str(source_metadata.get(md.DATA_ITEM_TYPE_KEY)))
             db.start_session()
 
-            table = db.get_table(input_metric_table_name, db.tenant_id + "_MAM")
+            table = db.get_table(input_metric_table_name, schema=schema) #, (db.tenant_id).upper() + "_MAM")
 
             if source_metadata.get(md.DATA_ITEM_TYPE_KEY).upper() != 'DERIVED_METRIC':
                 query = select([
