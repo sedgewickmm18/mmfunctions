@@ -1871,12 +1871,13 @@ class RobustThreshold(SupervisedLearningTransformer):
         # make sure we have enough data to train the pipeline
         # if not we have to retrieve data from the database
         start_ts = 0
-        logger.info('Retrieving ' + str(self.input_item) + ' data from ' + str(start_ts) + ' to ')
 
         entity_type = self.get_entity_type()
         source_metadata = self.dms.data_items.get(self.input_item)
         input_metric_table_name = source_metadata.get(md.DATA_ITEM_SOURCETABLE_KEY)
         schema = entity_type._db_schema
+
+        logger.info('Retrieving ' + str(self.input_item) + ' data from ' + str(input_metric_table_name))
 
         # interquartile range vs KDE based quantiles
         thresh = self.threshold
@@ -1900,20 +1901,30 @@ class RobustThreshold(SupervisedLearningTransformer):
             # make use of SQL alchemy
             db.start_session()
 
-            query = select([
-                func.percentile_cont(1-thresh).within_group(table.c.value_n),
-                func.percentile_cont(0.25).within_group(table.c.value_n),
-                func.percentile_cont(0.5).within_group(table.c.value_n),
-                func.percentile_cont(0.75).within_group(table.c.value_n),
-                func.percentile_cont(thresh).within_group(table.c.value_n)
-               ]).filter(table.c.entity_id == entity_name).filter(table.c.KEY == self.input_item)
+            if source_metadata.get(md.DATA_ITEM_TYPE_KEY).upper() == 'DERIVED_METRIC':
+
+                query = select([
+                    func.percentile_cont(1-thresh).within_group(table.c.value_n),
+                    func.percentile_cont(0.25).within_group(table.c.value_n),
+                    func.percentile_cont(0.5).within_group(table.c.value_n),
+                    func.percentile_cont(0.75).within_group(table.c.value_n),
+                    func.percentile_cont(thresh).within_group(table.c.value_n)
+                    ]).filter(table.c.entity_id == entity_name).filter(table.c.KEY == self.input_item)
+            else:   # 'METRIC'
+                query = select([
+                    func.percentile_cont(1-thresh).within_group(table.c[self.input_item]),
+                    func.percentile_cont(0.25).within_group(table.c[self.input_item]),
+                    func.percentile_cont(0.5).within_group(table.c[self.input_item]),
+                    func.percentile_cont(0.75).within_group(table.c[self.input_item]),
+                    func.percentile_cont(thresh).within_group(table.c[self.input_item])
+                    ]).filter(table.c.entity_id == entity_name)
 
             # Execute the query and print the result
             result = db.connection.execute(query).fetchall()
         except Exception as e:
             # compute percentiles from current dataframe instead
             logger.error('Failed to derived metrics data from DB2 for ' + str(entity))
-            row = np.percentile(feature, [100 - 100*thresh, 25, 75, 100*thresh])
+            row = np.percentile(feature, [100 - 100*thresh, 25, 50, 75, 100*thresh])
 
         #robust_model = KDEMaxMin(version=version)
         robust_model = row
