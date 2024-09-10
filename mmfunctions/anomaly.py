@@ -1883,6 +1883,7 @@ class RobustThreshold(SupervisedLearningTransformer):
         if thresh <= 0 or thresh >= 1: thresh = 0.99
         row = [0,0,0,0]
         try:
+            '''
             import ibm_db
             sql_statement = "SELECT PERCENTILE_CONT(%s) WITHIN GROUP(ORDER BY VALUE_N)," % (1-thresh) + \
                 "PERCENTILE_CONT(0.25) WITHIN GROUP(ORDER BY VALUE_N)," + \
@@ -1895,6 +1896,20 @@ class RobustThreshold(SupervisedLearningTransformer):
             ibm_db.execute(stmt)
             row = ibm_db.fetch_tuple(stmt)
             ibm_db.free_result(stmt)
+            '''
+            # make use of SQL alchemy
+            db.start_session()
+
+            query = select([
+                func.percentile_cont(1-thresh).within_group(table.c.value_n),
+                func.percentile_cont(0.25).within_group(table.c.value_n),
+                func.percentile_cont(0.5).within_group(table.c.value_n),
+                func.percentile_cont(0.75).within_group(table.c.value_n),
+                func.percentile_cont(thresh).within_group(table.c.value_n)
+               ]).filter(table.c.entity_id == entity_name).filter(table.c.KEY == self.input_item)
+
+            # Execute the query and print the result
+            result = db.connection.execute(query).fetchall()
         except Exception as e:
             # compute percentiles from current dataframe instead
             logger.error('Failed to derived metrics data from DB2 for ' + str(entity))
