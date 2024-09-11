@@ -1949,7 +1949,7 @@ class RobustThreshold(SupervisedLearningTransformer):
         # replace outliers with the median
         features_wo_outliers = np.where((feature >= iqr_min) & (feature <= iqr_max), feature, row[2])
 
-        mad = 1.426 * np.median(np.absolute(features_wo_outliers - row[2]))
+        mad = 1.4826 * np.median(np.absolute(features_wo_outliers - row[2]))
 
         mad_min = np.median(features_wo_outliers) - 2*mad
         mad_max = np.median(features_wo_outliers) + 2*mad
