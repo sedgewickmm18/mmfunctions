@@ -1830,32 +1830,29 @@ class KDEMaxMin:
 class RobustThreshold(SupervisedLearningTransformer):
 
     def __init__(self, input_item, threshold, outlier, mad):
-        super().__init__(features=[input_item], targets=[outlier, mad])
+        super().__init__(features=[input_item], targets=[outlier, anomaly])
 
         self.input_item = input_item
         self.threshold = threshold
         self.outlier = outlier
-        self.mad = mad 
-        self.auto_train = True
-        self.Min = dict()
-        self.Max = dict()
+        self.anomaly = anomaly 
 
         self.whoami = 'RobustThreshold'
 
         logger.info(self.whoami + ' from ' + self.input_item + ' quantile threshold ' +  str(self.threshold) +
-                    ' exceeding boolean ' + self.outlier + ', ' + self.mad)
+                    ' outlier flag in ' + self.outlier + ', anomaly flag in ' + self.anomaly)
 
 
     def execute(self, df):
         # set output columns to zero
         logger.debug('Called ' + self.whoami + ' with columns: ' + str(df.columns))
-        df[self.outlier] = 0
+        df[self.outlier] = false
+        df[self.anomaly] = false
         return super().execute(df)
 
 
     def _calc(self, df):
         # per entity - copy for later inplace operations
-        #entity = df.index.levels[0][0]
         entity_name = df.index[0][0]
         logger.info('Robust threshold for ' + str(entity_name) + ' column ' + self.input_item)
 
@@ -1882,20 +1879,6 @@ class RobustThreshold(SupervisedLearningTransformer):
         if thresh <= 0 or thresh >= 1: thresh = 0.99
         row = [0,0,0,0,0]
         try:
-            '''
-            import ibm_db
-            sql_statement = "SELECT PERCENTILE_CONT(%s) WITHIN GROUP(ORDER BY VALUE_N)," % (1-thresh) + \
-                "PERCENTILE_CONT(0.25) WITHIN GROUP(ORDER BY VALUE_N)," + \
-                "PERCENTILE_CONT(0.50) WITHIN GROUP(ORDER BY VALUE_N)," + \
-                "PERCENTILE_CONT(0.75) WITHIN GROUP(ORDER BY VALUE_N)," + \
-                "PERCENTILE_CONT(%s) WITHIN GROUP(ORDER BY VALUE_N) " % (thresh) +  \
-                "FROM %s.%s " % (schema, input_metric_table_name) + \
-                "WHERE ENTITY_ID = \'%s\' AND KEY = \'%s\'" % (entity_name, self.input_item)
-            stmt = ibm_db.prepare(db.native_connection, sql_statement)
-            ibm_db.execute(stmt)
-            row = ibm_db.fetch_tuple(stmt)
-            ibm_db.free_result(stmt)
-            '''
             # make use of SQL alchemy
             logger.info('DATA item type is ' + str(source_metadata.get(md.DATA_ITEM_TYPE_KEY)))
             db.start_session()
@@ -1954,8 +1937,8 @@ class RobustThreshold(SupervisedLearningTransformer):
         mad_min = np.median(features_wo_outliers) - 2*mad
         mad_max = np.median(features_wo_outliers) + 2*mad
 
-        df[self.mad] = np.where((feature >= iqr_min) & (feature <= iqr_max) &
-                                (feature >= mad_min) & (feature <= mad_max), 0, 1)
+        df[self.anomaly] = np.where((feature >= iqr_min) & (feature <= iqr_max) &
+                                    (feature >= mad_min) & (feature <= mad_max), 0, 1)
 
         logger.info('RobustThreshold: MAD min ' + str(mad_min) + ', MAD max ' + str(mad_max) +
                         ', IQR min ' + str(iqr_min) + ', IQR max ' + str(iqr_max))
@@ -1974,9 +1957,9 @@ class RobustThreshold(SupervisedLearningTransformer):
         # define arguments that behave as function outputs
         outputs = []
         outputs.append(UIFunctionOutSingle(name="outlier", datatype=bool,
-                                           description="Boolean outlier condition"))
-        outputs.append(UIFunctionOutSingle(name="mad", datatype=float,
-                                           description="Median absolute deviation"))
+                                           description="Outlier flag based on interquartile range or quantiles"))
+        outputs.append(UIFunctionOutSingle(name="mad", datatype=bool,
+                                           description="Anomaly flag based on median absolute deviation"))
         return (inputs, outputs)
 
 
