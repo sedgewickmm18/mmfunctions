@@ -1958,7 +1958,7 @@ class RobustThreshold(SupervisedLearningTransformer):
         outputs = []
         outputs.append(UIFunctionOutSingle(name="outlier", datatype=bool,
                                            description="Outlier flag based on interquartile range or quantiles"))
-        outputs.append(UIFunctionOutSingle(name="mad", datatype=bool,
+        outputs.append(UIFunctionOutSingle(name="anomaly", datatype=bool,
                                            description="Anomaly flag based on median absolute deviation"))
         return (inputs, outputs)
 
