@@ -1930,7 +1930,6 @@ class RobustThreshold(SupervisedLearningTransformer):
             logger.error('Failed to derived metrics data from DB2 for ' + str(entity_name) + ' Error ' + str(e))
             row = np.percentile(feature, [100 - 100*thresh, 25, 50, 75, 100*thresh])
 
-        #robust_model = KDEMaxMin(version=version)
         logger.info('RobustThreshold: ' + str(len(row)) + ', percentiles ' + ', '.join(map(str,row)))
 
         # row = list of (percentile 0.01, Q1, median, Q3, percentile 0.99)
@@ -1957,6 +1956,9 @@ class RobustThreshold(SupervisedLearningTransformer):
 
         df[self.mad] = np.where((feature >= iqr_min) & (feature <= iqr_max) &
                                 (feature >= mad_min) & (feature <= mad_max), 0, 1)
+
+        logger.info('RobustThreshold: MAD min ' + str(mad_min) + ', MAD max ' + str(mad_max) +
+                        ', IQR min ' + str(iqr_min) + ', IQR max ' + str(iqr_max))
 
         return df.droplevel(0)
 
