@@ -1846,8 +1846,8 @@ class RobustThreshold(SupervisedLearningTransformer):
     def execute(self, df):
         # set output columns to zero
         logger.debug('Called ' + self.whoami + ' with columns: ' + str(df.columns))
-        df[self.outlier] = false
-        df[self.anomaly] = false
+        df[self.outlier] = False
+        df[self.anomaly] = False
         return super().execute(df)
 
 
