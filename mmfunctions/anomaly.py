@@ -1938,21 +1938,25 @@ class RobustThreshold(SupervisedLearningTransformer):
         #if row[0] == 0:
         if self.threshold <= 0 or self.threshold >=1:
             # Q1 - 1.5 * (Q3 - Q1)
-            _min = 2.5 * row[1] - 1.5 * row[3]
+            iqr_min = 2.5 * row[1] - 1.5 * row[3]
             # Q3 + 1.5 * (Q3 - Q1)
-            _max = 2.5 * row[3] - 1.5 * row[1]
+            iqr_max = 2.5 * row[3] - 1.5 * row[1]
         else: 
-            _min = row[0]
-            _max = row[4]
+            iqr_min = row[0]
+            iqr_max = row[4]
 
-        #df[self.outlier] = np.where((feature < _min) + (feature > _max), 1, 0)
-        df[self.outlier] = np.where((feature >= _min) & (feature <= _max), 0, 1)
+        df[self.outlier] = np.where((feature >= iqr_min) & (feature <= iqr_max), 0, 1)
 
         # replace outliers with the median
-        mad_arr = np.where((feature >= _min) & (feature <= _max), feature, row[2])
+        features_wo_outliers = np.where((feature >= iqr_min) & (feature <= iqr_max), feature, row[2])
 
-        mad = np.median(np.absolute(mad_arr - row[2]))
-        df[self.mad] = np.abs(feature - mad)
+        mad = 1.426 * np.median(np.absolute(features_wo_outliers - row[2]))
+
+        mad_min = np.median(features_wo_outliers) - 2*mad
+        mad_max = np.median(features_wo_outliers) + 2*mad
+
+        df[self.mad] = np.where((feature >= iqr_min) & (feature <= iqr_max) &
+                                (feature >= mad_min) & (feature <= mad_max), 0, 1)
 
         return df.droplevel(0)
 
