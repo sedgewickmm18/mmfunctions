@@ -1829,7 +1829,7 @@ class KDEMaxMin:
 
 class RobustThreshold(SupervisedLearningTransformer):
 
-    def __init__(self, input_item, threshold, outlier, mad):
+    def __init__(self, input_item, threshold, outlier, anomaly):
         super().__init__(features=[input_item], targets=[outlier, anomaly])
 
         self.input_item = input_item
