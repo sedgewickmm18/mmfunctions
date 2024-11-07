@@ -59,7 +59,7 @@ class TSFMZeroShotScorer(InvokeWMLModel):
     Call time series foundation model
     """
     def __init__(self, input_items, output_items=None, context=512, horizon=96, watsonx_auth=None):
-        logger.debug(str(input_items) + ', ' + str(output_items))
+        logger.debug(str(input_items) + ', ' + str(output_items) + ', ' + str(context) + ', ' + str(horizon))
 
         super().__init__(input_items, watsonx_auth, output_items)
 
@@ -107,7 +107,9 @@ class TSFMZeroShotScorer(InvokeWMLModel):
         len = self.context + self.horizon
 
         if self.model is not None:
+
             logger.debug('Forecast ' + str(df.shape[0]/self.horizon) + ' times')
+
             for i in range(self.context, df.shape[0], self.horizon):
                 inputtensor_ = torch.from_numpy(df[i-self.context:i][self.input_items].values)
                 #logger.debug('shape   input ' + str(inputtensor_.shape))
