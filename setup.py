@@ -5,6 +5,13 @@ import subprocess
 
 from setuptools import setup, find_packages
 
+def package_files(directory):
+    paths = []
+    for (path, directories, filenames) in os.walk(directory):
+        for filename in filenames:
+            paths.append(os.path.join('..', path, filename))
+    return paths
+
 with open('requirements.txt') as f:
     requirements = f.read().splitlines()
     f.close()
@@ -24,6 +31,8 @@ with open('README.md', encoding='utf-8') as f:
 from pathlib import Path
 os.chdir(Path(__file__).parent.absolute())
 
+extra_files = package_files('tsfm_public')
+
 setup(
     name='mmfunctions',
     version=__version__,
@@ -33,9 +42,10 @@ setup(
     long_description=long_description,
     long_description_content_type='text/markdown',
     url='https://github.com/sedgewickmm18/mmfunctions',
-    packages=['mmfunctions', 'telemanom'],
+    packages=['mmfunctions', 'telemanom', 'tsfm_public'],
     package_dir={'mmfunctions':'mmfunctions',
                  'telemanom':'telemanom'},
+    package_data={'': extra_files},
     #packages=find_packages(
     #    include=['mmfunctions', 'telemanom'],
     #    exclude=['custom', 'samples', 'runs', 'pipelines', 'tf-levenberg-marquardt']
@@ -45,6 +55,6 @@ setup(
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
     ],
-    python_requires='>=3.7',
+    python_requires='>=3.9',
     install_requires=requirements
 )
