@@ -113,6 +113,7 @@ class TSFMZeroShotScorer(InvokeWMLModel):
         if self.model is not None:
 
             logger.debug('Forecast ' + str(df.shape[0]/self.horizon) + ' times')
+            df[self.output_items] = 0
 
             #for i in range(self.context, df.shape[0], self.horizon):
             for i in range(df.shape[0] - len, 0 , -self.horizon):
