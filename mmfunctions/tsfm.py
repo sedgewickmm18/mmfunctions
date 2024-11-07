@@ -129,7 +129,7 @@ class TSFMZeroShotScorer(InvokeWMLModel):
                 #   and update the dataframe with it
                 #df.loc[df.tail(self.horizon).index, self.output_items] = outputtensor[0].detach().numpy()
                 try:
-                    df.loc[df[i:i + self.horizon].index, self.output_items] = outputtensor[0].detach().numpy()
+                    df.loc[df[i:i + self.horizon].index, self.output_items] = outputtensor[0].detach().numpy().astype(float)
                 except:
                     logger.debug('Issue with ' + str(i) + ':' + str(i+self.horizon))
                     pass
