@@ -115,7 +115,7 @@ class TSFMZeroShotScorer(InvokeWMLModel):
             logger.debug('Forecast ' + str(df.shape[0]/self.horizon) + ' times')
 
             for i in range(self.context, df.shape[0], self.horizon):
-                inputtensor_ = torch.from_numpy(df[i-self.context:i][self.input_items].values.astype(np.float))
+                inputtensor_ = torch.from_numpy(df[i-self.context:i][self.input_items].values).to(torch.float32)
                 #logger.debug('shape   input ' + str(inputtensor_.shape))
                 # add dimension
                 #inputtensor = inputtensor_[None,:self.context,:]              # only the historic context
