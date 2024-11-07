@@ -89,7 +89,7 @@ class TSFMZeroShotScorer(InvokeWMLModel):
             #context_length = 512
             #forecast_length = 96
             #install_and_activate_granite_tsfm()
-            self.model = TinyTimeMixerForPrediction.from_pretrained("ibm/TTM", revision=TTM_MODEL_REVISION)
+            self.model = TinyTimeMixerForPrediction.from_pretrained("ibm/TTM", cache_dir='/tmp', revision=TTM_MODEL_REVISION)
         except Exception as e:
             logger.error("Failed to load local model with error " + str(e))
             return False
