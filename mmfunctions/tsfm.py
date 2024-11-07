@@ -39,6 +39,8 @@ from iotfunctions.ui import (UISingle, UIMultiItem, UIFunctionOutSingle, UISingl
                  UIText, UIParameters)
 from iotfunctions.util import adjust_probabilities, reset_df_index, asList, UNIQUE_EXTENSION_LABEL
 
+from tsfm_public.models.tinytimemixer import TinyTimeMixerForPrediction
+
 logger = logging.getLogger(__name__)
 PACKAGE_URL = 'git+https://github.com/sedgewickmm18/mmfunctions.git@'
 
@@ -50,39 +52,6 @@ onnx_logger.setLevel(logging.ERROR)
 
 
 def install_and_activate_granite_tsfm():
-    #db.install_package("git+https://github.com/sedgewickmm18/granite-tsfm")
-    #db.import_target("tsfm_public.models","tinytimemixer", "TinyTimeMixerForPrediction")
-
-    '''
-    url = "git+https://github.com/sedgewickmm18/granite-tsfm"
-    try:
-        sequence = ['pip', 'install', '--no-cache-dir', '--upgrade', url]
-        completedProcess = subprocess.run(sequence, stderr=subprocess.STDOUT, stdout=subprocess.PIPE,
-                                                  universal_newlines=True)
-    except Exception as e:
-        #raise ImportError('pip install for url %s failed: \n%s', url, str(e))
-        logger.error('Could not download from ' + url)
-        return False
-
-    if completedProcess.returncode == 0:
-
-    if True:
-        importlib.invalidate_caches()
-        logger.debug('pip install for url %s was successful: \n %s', url, completedProcess.stdout)
-
-    else:
-        #raise ImportError('pip install for url %s failed: \n %s.', url, completedProcess.stdout)
-        logger.error('Could not install ' + url + ', ' + str(completedProcess.stdout))
-        return False
-    '''
-    
-    importlib.invalidate_caches()
-    try:
-        exec('from tsfm_public.models.tinytimemixer import TinyTimeMixerForPrediction')
-    except Exception as e:
-        logger.error('Could not import TinyTimeMixers')
-        return False
-
     return True
 
 class TSFMZeroShotScorer(InvokeWMLModel):
