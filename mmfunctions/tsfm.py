@@ -265,7 +265,7 @@ class ProphetForecaster(DataExpanderTransformer):
         outputs=[]
         # we might need more like 'yhat', 'trend', 'yhat_lower', 'yhat_upper', 'trend_lower', 'trend_upper' ...
         outputs.append(UISingle(name='y_hat', datatype=float, description='Forecasted occupancy'))
-        outputs.append(UISingle(name='y_date', datatype=float, description='Date for forecasted occupancy'))
+        outputs.append(UISingle(name='y_date', datatype=dt.datetime, description='Date for forecasted occupancy'))
 
         return inputs, outputs
 
