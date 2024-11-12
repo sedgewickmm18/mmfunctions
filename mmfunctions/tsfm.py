@@ -172,6 +172,7 @@ class ProphetForecaster(DataExpanderTransformer):
         self.input_items = input_items
         self.y_hat= y_hat
         self.y_date= y_date
+        self.output_items = [y_hat, y_date]  # for DataExpander
         '''
         self.horizon = horizon
         if horizon <= 0:
@@ -207,7 +208,7 @@ class ProphetForecaster(DataExpanderTransformer):
         # Create missing columns before doing group-apply
         df_copy = df.copy()
 
-        column_list = [self.y_hat]  # list will get longer
+        column_list = [self.y_hat, self.y_date]  # list will get longer
         missing_cols = [x for x in column_list if x not in df_copy.columns]
         for m in missing_cols:
             df_copy[m] = 0
@@ -237,8 +238,10 @@ class ProphetForecaster(DataExpanderTransformer):
             df_new = self.expand_dataset(df_copy, (np.unique(df_copy.index.get_level_values(0).values).shape[0] + 1) * 180)
 
             # drop NaN for input items and create output items
-            df_new[self.input_items] = df_new[self.input_items].fillna(0)
-            missing_cols = [x for x in (self.output_items) if x not in df_new.columns]
+            #df_new[self.input_items] = df_new[self.input_items].fillna(0)
+
+            column_list = [self.y_hat, self.y_date]  # list will get longer
+            missing_cols = [x for x in column_list if x not in df_copy.columns]
             for m in missing_cols:
                 df_new[m] = None
 
