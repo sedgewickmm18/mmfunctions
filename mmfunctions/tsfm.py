@@ -171,6 +171,7 @@ class ProphetForecaster(DataExpanderTransformer):
         '''
         self.can_train = True
         self.whoami = 'ProphetForecaster'
+        self.name = 'ProphetForecaster'
 
 
     def execute(self, df):
