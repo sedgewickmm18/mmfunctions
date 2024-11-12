@@ -16,6 +16,7 @@ import datetime as dt
 import logging
 import re
 import time
+import json 
 import warnings
 import ast
 import os
@@ -29,6 +30,12 @@ import pandas as pd
 from sqlalchemy import String
 
 import torch
+
+import holidays
+import datetime as dt
+from datetime import timedelta
+from prophet import Prophet
+from prophet.serialize import model_to_json, model_from_json
 
 from iotfunctions.base import (BaseTransformer, BaseEvent, BaseSCDLookup, BaseSCDLookupWithDefault, BaseMetadataProvider,
                    BasePreload, BaseDatabaseLookup, BaseDataSource, BaseDBActivityMerge, BaseSimpleAggregator,
@@ -161,6 +168,7 @@ class TSFMZeroShotScorer(InvokeWMLModel):
 class ProphetForecaster(DataExpanderTransformer):
 
     def __init__(self, input_items, y_hat=None, y_date=None):
+        super().__init__(input_items)
         self.input_items = input_items
         self.y_hat= y_hat
         self.y_date= y_date
@@ -169,7 +177,11 @@ class ProphetForecaster(DataExpanderTransformer):
         if horizon <= 0:
             self.horizon = 10
         '''
+        # allow for expansion of the dataframe
+        self.has_access_to_db = True
+        self.allowed_to_expand = True
         self.can_train = True
+
         self.whoami = 'ProphetForecaster'
         self.name = 'ProphetForecaster'
 
@@ -179,6 +191,11 @@ class ProphetForecaster(DataExpanderTransformer):
 
         # obtain db handler
         db = self.get_db()
+
+        if not hasattr(self, 'dms'): 
+            # indicate that we must not attempt to load more data
+            self.has_access_to_db = False
+            logger.warning('Started without database access')
 
         # check data type
         #if df[self.input_item].dtype != np.float64:
@@ -198,6 +215,42 @@ class ProphetForecaster(DataExpanderTransformer):
         # delegate to _calc
         logger.debug('Execute ' + self.whoami + ' enter per entity execution')
 
+        # check whether we have models available or need to train first
+        entities = np.unique(df_copy.index.get_level_values(0).to_numpy())
+        must_train = False
+        for entity in entities:
+            model_name = self.generate_model_name([], self.y_hat, prefix='Prophet', suffix=entity)
+            try:
+                prophet_model_bytes = db.model_store.retrieve_model(model_name, deserialize=False)
+                prophet_model_json = prophet_model_bytes.decode('utf-8')
+            except Exception as e:
+                logger.info('Must train first')
+                must_train = True
+                break
+
+        # get more data if we must train, haven't loaded data yet and ..
+        # we have access to our database and are allowed to go to it
+        if must_train and self.original_frame is None and self.has_access_to_db and self.allowed_to_expand:
+            logger.info('Expand dataset')
+
+            # TODO compute the lookback parameter, 6 months of data
+            df_new = self.expand_dataset(df_copy, (np.unique(df_copy.index.get_level_values(0).values).shape[0] + 1) * 180)
+
+            # drop NaN for input items and create output items
+            df_new[self.input_items] = df_new[self.input_items].fillna(0)
+            missing_cols = [x for x in (self.output_items) if x not in df_new.columns]
+            for m in missing_cols:
+                df_new[m] = None
+
+            # drive by-entity scoring with the expanded dataset - TODO check size again
+            if df_new is not None:
+                group_base = [pd.Grouper(axis=0, level=0)]
+                df_new = df_new.groupby(group_base).apply(self._calc)
+        else:
+            logger.debug('must_train: ' + str(must_train) + ', original_frame: ' + str(self.original_frame) + \
+                ', has_access_to_db: ' + str(self.has_access_to_db) + ', allowed_to_expand: ' + str(self.allowed_to_expand))
+
+        # if we cannot extend the dataset we train on what we have 
         # group over entities
         group_base = [pd.Grouper(axis=0, level=0)]
 
@@ -209,6 +262,7 @@ class ProphetForecaster(DataExpanderTransformer):
 
 
     def _calc(self, df):
+        logger.info('_calc')
         entity = df.index[0][0]
 
         # obtain db handler
@@ -223,11 +277,17 @@ class ProphetForecaster(DataExpanderTransformer):
         prophet_model = None
 
         try:
-            prophet_model_json = db.model_store.retrieve_model(model_name, deserialize=False)
-            logger.debug('load model %s' % str(prophet_model_json))
+            prophet_model_bytes = db.model_store.retrieve_model(model_name, deserialize=False)
+            prophet_model_json = prophet_model_bytes.decode('utf-8')
+            logger.debug('load model %s' % str(prophet_model_json)[0:40])
         except Exception as e:
-            logger.error('Model retrieval for %s failed with %s', model_name, str(e))
-            return df
+            logger.debug('could not load model %s' % str(model_name))
+            # ToDo exception handling
+            #logger.error('Model retrieval for %s failed with %s', model_name, str(e))
+            #return df
+
+        if prophet_model_json is None:
+            prophet_model_json = self.train_model(df, model_name)
 
         try:
             prophet_model = model_from_json(prophet_model_json)
@@ -248,6 +308,40 @@ class ProphetForecaster(DataExpanderTransformer):
         df[self.y_hat] = prediction['yhat'].values
         df[self.y_date] = future_dates.values
         return df
+
+    def train_model(self, df, model_name):
+
+        logger.info('Train model')
+
+        # obtain db handler
+        db = self.get_db()
+
+        daysforTraining = round(len(df)*0.75)
+        time_var = df.index.names[0]
+        df_train = df.iloc[:daysforTraining].reset_index().rename(columns={time_var: "ds", self.input_items[0]: "y"})
+        df_test = df.iloc[daysforTraining:].reset_index().rename(columns={time_var: "ds", self.input_items[0]: "y"})
+
+        # Take holidays into account
+        holiday = pd.DataFrame([])
+
+        for date, name in sorted(holidays.Taiwan(years=[2023,2024]).items()):
+            holiday = pd.concat([holiday,pd.DataFrame.from_records([{'ds': date, 'holiday': name}])])
+            holiday['ds'] = pd.to_datetime(holiday['ds'], format='%Y-%m-%d', errors='ignore')
+
+        model_with_holidays = Prophet(holidays=holiday)
+        model_with_holidays.add_country_holidays(country_name='TW')
+        model_with_holidays.fit(df_train)
+
+        forecast_holidays = model_with_holidays.predict(df_test)
+
+        # serialize model
+        model_json = model_to_json(model_with_holidays)
+        #print(model_json)
+
+        model_bytes = model_json.encode('utf-8')
+        db.model_store.store_model(model_name, model_bytes, serialize=False)
+
+        return model_json
 
     @classmethod
     def build_ui(cls):
