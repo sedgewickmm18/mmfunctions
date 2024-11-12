@@ -157,3 +157,114 @@ class TSFMZeroShotScorer(InvokeWMLModel):
         #outputs.append(UISingle(name='output_items', datatype=float))
         return inputs, outputs
 
+
+class ProphetForecaster(DataExpanderTransformer):
+
+    def __init__(self, input_items, y_hat=None, y_date=None):
+        self.input_items = input_items
+        self.y_hat= y_hat
+        self.y_date= y_date
+        '''
+        self.horizon = horizon
+        if horizon <= 0:
+            self.horizon = 10
+        '''
+        self.can_train = True
+        self.whoami = 'ProphetForecaster'
+
+
+    def execute(self, df):
+        logger.debug('Execute ' + self.whoami)
+
+        # obtain db handler
+        db = self.get_db()
+
+        # check data type
+        #if df[self.input_item].dtype != np.float64:
+        for feature in self.input_items:
+            if not pd.api.types.is_numeric_dtype(df[feature].dtype):
+                logger.error('Training forecaster on non-numeric feature:' + str(feature))
+                self.can_train = False
+
+        # Create missing columns before doing group-apply
+        df_copy = df.copy()
+
+        column_list = [self.y_hat]  # list will get longer
+        missing_cols = [x for x in column_list if x not in df_copy.columns]
+        for m in missing_cols:
+            df_copy[m] = 0
+
+        # delegate to _calc
+        logger.debug('Execute ' + self.whoami + ' enter per entity execution')
+
+        # group over entities
+        group_base = [pd.Grouper(axis=0, level=0)]
+
+        df_copy = df_copy.groupby(group_base).apply(self._calc)
+
+        logger.debug('Scoring done')
+
+        return df_copy
+
+
+    def _calc(self, df):
+        entity = df.index[0][0]
+
+        # obtain db handler
+        db = self.get_db()
+
+        # get rid of entity id as part of the index
+        df = df.droplevel(0)
+
+        # get model
+        model_name = self.generate_model_name([], self.y_hat, prefix='Prophet', suffix=entity)
+        prophet_model_json = None
+        prophet_model = None
+
+        try:
+            prophet_model_json = db.model_store.retrieve_model(model_name, deserialize=False)
+            logger.debug('load model %s' % str(prophet_model_json))
+        except Exception as e:
+            logger.error('Model retrieval for %s failed with %s', model_name, str(e))
+            return df
+
+        try:
+            prophet_model = model_from_json(prophet_model_json)
+        except Exception as e:
+            logger.error('Deserializing prophet model failed with ' + str(e)) 
+            return df
+
+        # pass input features - only needed for inline training
+
+        # for now just take the number of rows - assume daily frequency for now
+        # future_dates column name 'ds' as Prophet expects it
+        future_dates = pd.date_range(start=df.tail(1).index[0], periods=df.shape[0], freq='D').to_frame(index=False, name='ds')
+        #logger.debug('Future values start/end/length ' + str(future_dates[0]) + ', ' + str(future_dates[-1]) + ', ' + str(future_dates.shape[0]))
+        logger.debug('Future values ' + str(future_dates.describe))
+
+        prediction=prophet_model.predict(future_dates)
+
+        df[self.y_hat] = prediction['yhat'].values
+        df[self.y_date] = future_dates.values
+        return df
+
+    @classmethod
+    def build_ui(cls):
+
+        # define arguments that behave as function inputs, output contains the time shifted forecasts
+        inputs = []
+
+        inputs.append(UIMultiItem(name='input_items', datatype=float, required=True))
+        #inputs.append(
+        #    UISingle(name='history', datatype=int, required=False, description='History length for training'))
+        #inputs.append(
+        #    UISingle(name='horizon', datatype=int, required=False, description='Forecasting horizon length'))
+
+        # define arguments that behave as function outputs
+        outputs=[]
+        # we might need more like 'yhat', 'trend', 'yhat_lower', 'yhat_upper', 'trend_lower', 'trend_upper' ...
+        outputs.append(UISingle(name='y_hat', datatype=float, description='Forecasted occupancy'))
+        outputs.append(UISingle(name='y_date', datatype=float, description='Date for forecasted occupancy'))
+
+        return inputs, outputs
+
