@@ -304,6 +304,15 @@ class ProphetForecaster(DataExpanderTransformer):
             logger.error('Deserializing prophet model failed with ' + str(e)) 
             return df
 
+        holiday_mean = 0
+        holiday_std = 0
+        try:
+            model_js = json.loads(prophet_model_json)
+            holiday_mean = model_js['holiday_mean']
+            holiday_std = model_js['holiday_std']
+        except Exception as e:
+            pass
+
         # pass input features - only needed for inline training
 
         # for now just take the number of rows - assume daily frequency for now
@@ -313,6 +322,21 @@ class ProphetForecaster(DataExpanderTransformer):
         logger.debug('Future values ' + str(future_dates.describe))
 
         prediction=prophet_model.predict(future_dates)
+
+        # Take holidays into account
+        if self.country_code is not None:    
+            holiday = pd.DataFrame([])
+
+            for date, name in sorted(holidays.country_holidays(self.country_code, years=[2023,2024,2025]).items()):
+                holiday = pd.concat([holiday,pd.DataFrame.from_records([{'ds': date, 'holiday': name}])])
+                holiday['ds'] = pd.to_datetime(holiday['ds'], format='%Y-%m-%d', errors='ignore')
+
+            # replace holiday forecasts with the mean
+            holiday_index = future_dates['ds'].isin(holiday['ds']).values
+
+            prediction[holiday_index]['yhat'] = holiday_mean
+            prediction[holiday_index]['yhat_lower'] = holiday_mean - 3*holiday_std
+            prediction[holiday_index]['yhat_upper'] = holiday_mean + 3*holiday_std
 
         df[self.y_hat] = prediction['yhat'].values
         df[self.yhat_lower] = prediction['yhat_lower'].values
@@ -333,6 +357,9 @@ class ProphetForecaster(DataExpanderTransformer):
         df_test = df.iloc[daysforTraining:].reset_index().rename(columns={time_var: "ds", self.input_items[0]: "y"})
 
         prophet_model = None
+        holiday = None
+        holiday_mean = 0
+        holiday_std = 0
 
         # Take holidays into account
         if self.country_code is not None:    
@@ -344,13 +371,27 @@ class ProphetForecaster(DataExpanderTransformer):
 
             prophet_model = Prophet(holidays=holiday)
             prophet_model.add_country_holidays(country_name=self.country_code)
-            prophet_model.fit(df_train)
+        else:
+            prophet_model = Prophet()
 
-        forecast_holidays = model_with_holidays.predict(df_test)
+        prophet_model.fit(df_train)
+        
+        if holiday is not None:
+            holiday_index = df_train['ds'].isin(list(holiday['ds']))
+            holiday_mean = df_train[holiday_index]['y'].mean()
+            holiday_std = df_train[holiday_index]['y'].std()
+
+        forecast_holidays = prophet_model.predict(df_test)  # sanity test
 
         # serialize model
-        model_json = model_to_json(model_with_holidays)
-        #print(model_json)
+        model_json = model_to_json(prophet_model)
+
+        # turn model json string into json to add element
+        logger.debug('add holiday mean,std %s, %s', holiday_mean, holiday_std)
+        model_js = json.loads(model_json)
+        model_js['holiday_mean'] = holiday_mean
+        model_js['holiday_std'] = holiday_std
+        model_json = json.dumps(model_js)
 
         model_bytes = model_json.encode('utf-8')
         db.model_store.store_model(model_name, model_bytes, serialize=False)
