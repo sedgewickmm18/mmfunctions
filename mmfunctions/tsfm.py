@@ -167,17 +167,23 @@ class TSFMZeroShotScorer(InvokeWMLModel):
 
 class ProphetForecaster(DataExpanderTransformer):
 
-    def __init__(self, input_items, y_hat=None, y_date=None):
+    def __init__(self, input_items, country_code=None, y_hat=None, yhat_lower=None, yhat_upper=None, y_date=None):
         super().__init__(input_items)
         self.input_items = input_items
+        self.country_code = country_code  # TODO make sure it's a country code
         self.y_hat= y_hat
-        self.y_date= y_date
-        self.output_items = [y_hat, y_date]  # for DataExpander
-        '''
-        self.horizon = horizon
-        if horizon <= 0:
-            self.horizon = 10
-        '''
+        self.yhat_lower = yhat_lower
+        self.yhat_upper = yhat_upper
+        self.y_date = y_date
+        self.output_items = [y_hat, yhat_lower, yhat_upper, y_date]  # for DataExpander
+
+        try:
+            holidays.country_holidays(country_code, years=2024)
+        except Exception as e:
+            self.country_code = None
+            logger.info('Invalid country code')
+            pass
+
         # allow for expansion of the dataframe
         self.has_access_to_db = True
         self.allowed_to_expand = True
@@ -309,6 +315,8 @@ class ProphetForecaster(DataExpanderTransformer):
         prediction=prophet_model.predict(future_dates)
 
         df[self.y_hat] = prediction['yhat'].values
+        df[self.yhat_lower] = prediction['yhat_lower'].values
+        df[self.yhat_upper] = prediction['yhat_upper'].values
         df[self.y_date] = future_dates.values
         return df
 
@@ -324,16 +332,19 @@ class ProphetForecaster(DataExpanderTransformer):
         df_train = df.iloc[:daysforTraining].reset_index().rename(columns={time_var: "ds", self.input_items[0]: "y"})
         df_test = df.iloc[daysforTraining:].reset_index().rename(columns={time_var: "ds", self.input_items[0]: "y"})
 
+        prophet_model = None
+
         # Take holidays into account
-        holiday = pd.DataFrame([])
+        if self.country_code is not None:    
+            holiday = pd.DataFrame([])
 
-        for date, name in sorted(holidays.Taiwan(years=[2023,2024]).items()):
-            holiday = pd.concat([holiday,pd.DataFrame.from_records([{'ds': date, 'holiday': name}])])
-            holiday['ds'] = pd.to_datetime(holiday['ds'], format='%Y-%m-%d', errors='ignore')
+            for date, name in sorted(holidays.country_holidays(self.country_code, years=[2023,2024,2025]).items()):
+                holiday = pd.concat([holiday,pd.DataFrame.from_records([{'ds': date, 'holiday': name}])])
+                holiday['ds'] = pd.to_datetime(holiday['ds'], format='%Y-%m-%d', errors='ignore')
 
-        model_with_holidays = Prophet(holidays=holiday)
-        model_with_holidays.add_country_holidays(country_name='TW')
-        model_with_holidays.fit(df_train)
+            prophet_model = Prophet(holidays=holiday)
+            prophet_model.add_country_holidays(country_name=self.country_code)
+            prophet_model.fit(df_train)
 
         forecast_holidays = model_with_holidays.predict(df_test)
 
@@ -352,7 +363,10 @@ class ProphetForecaster(DataExpanderTransformer):
         # define arguments that behave as function inputs, output contains the time shifted forecasts
         inputs = []
 
-        inputs.append(UIMultiItem(name='input_items', datatype=float, required=True))
+        inputs.append(UIMultiItem(name='input_items', datatype=float, required=True, 
+                        description='Data to forecast'))
+        inputs.append(UISingle(name='country_code', datatype=str, required=False,
+                        description='Country code to determine holiday'))
         #inputs.append(
         #    UISingle(name='history', datatype=int, required=False, description='History length for training'))
         #inputs.append(
@@ -362,6 +376,8 @@ class ProphetForecaster(DataExpanderTransformer):
         outputs=[]
         # we might need more like 'yhat', 'trend', 'yhat_lower', 'yhat_upper', 'trend_lower', 'trend_upper' ...
         outputs.append(UISingle(name='y_hat', datatype=float, description='Forecasted occupancy'))
+        outputs.append(UISingle(name='yhat_lower', datatype=float, description='Forecasted occupancy lower bound'))
+        outputs.append(UISingle(name='yhat_upper', datatype=float, description='Forecasted occupancy upper bound'))
         outputs.append(UISingle(name='y_date', datatype=dt.datetime, description='Date for forecasted occupancy'))
 
         return inputs, outputs
