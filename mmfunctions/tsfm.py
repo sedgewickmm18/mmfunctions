@@ -160,7 +160,7 @@ class TSFMZeroShotScorer(InvokeWMLModel):
 
     # ask for more data if we do not have enough data for context and horizon
     def check_size(self, size_df):
-        print(size_df)
+        logger.info('size_df' + str(type(size_df)) + ', ' + str(size_df))
         return min(size_df) < self.context + self.horizon
 
     # TODO implement local model lookup and initialization later
