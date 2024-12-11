@@ -57,6 +57,79 @@ numba_logger.setLevel(logging.INFO)
 onnx_logger = logging.getLogger('onnxscript')
 onnx_logger.setLevel(logging.ERROR)
 
+#
+# Transformation Invariant Loss function with Distance EQuilibrium
+#  https://arxiv.org/abs/2210.15050
+#  https://github.com/HyunWookL/TILDE-Q
+# as metric for forecasting accuracy
+#  TODO: we need a suitable threshold to differentiate "good" and "bad" forecasts
+#
+
+def amp_loss(outputs, targets):
+    #outputs = B, T, 1 --> B, 1, T
+    B,_, T = outputs.shape
+    fft_size = 1 << (2 * T - 1).bit_length()
+    out_fourier = torch.fft.fft(outputs, fft_size, dim = -1)
+    tgt_fourier = torch.fft.fft(targets, fft_size, dim = -1)
+
+    out_norm = torch.norm(outputs, dim = -1, keepdim = True)
+    tgt_norm = torch.norm(targets, dim = -1, keepdim = True)
+
+    #calculate normalized auto correlation
+    auto_corr = torch.fft.ifft(tgt_fourier * tgt_fourier.conj(), dim = -1).real
+    auto_corr = torch.cat([auto_corr[...,-(T-1):], auto_corr[...,:T]], dim = -1)
+    nac_tgt = auto_corr / (tgt_norm * tgt_norm)
+
+    # calculate cross correlation
+    cross_corr = torch.fft.ifft(tgt_fourier * out_fourier.conj(), dim = -1).real
+    cross_corr = torch.cat([cross_corr[...,-(T-1):], cross_corr[...,:T]], dim = -1)
+    nac_out = cross_corr / (tgt_norm * out_norm)
+    
+    loss = torch.mean(torch.abs(nac_tgt - nac_out))
+    return loss
+
+
+def ashift_loss(outputs, targets):
+    B, _, T = outputs.shape
+    return T * torch.mean(torch.abs(1 / T - torch.softmax(outputs - targets, dim = -1)))
+
+def phase_loss(outputs, targets):
+    B, _, T = outputs.shape
+    out_fourier = torch.fft.fft(outputs, dim = -1)
+    tgt_fourier = torch.fft.fft(targets, dim = -1)
+    tgt_fourier_sq = (tgt_fourier.real ** 2 + tgt_fourier.imag ** 2)
+    mask = (tgt_fourier_sq > (T)).float()
+    topk_indices = tgt_fourier_sq.topk(k = int(T**0.5), dim = -1).indices
+    mask = mask.scatter_(-1, topk_indices, 1.)
+    mask[...,0] = 1.
+    mask = torch.where(mask > 0, 1., 0.)
+    mask = mask.bool()
+    not_mask = (~mask).float()
+    not_mask /= torch.mean(not_mask)
+    out_fourier_sq = (torch.abs(out_fourier.real) + torch.abs(out_fourier.imag))
+    zero_error = torch.abs(out_fourier) * not_mask
+    zero_error = torch.where(torch.isnan(zero_error), torch.zeros_like(zero_error), zero_error)
+    mask = mask.float()
+    mask /= torch.mean(mask)
+    ae = torch.abs(out_fourier - tgt_fourier) * mask
+    ae = torch.where(torch.isnan(ae), torch.zeros_like(ae), ae)
+    phase_loss = (torch.mean(zero_error) + torch.mean(ae)) / (T ** .5)
+    return phase_loss
+
+def tildeq_loss(outputs, targets, alpha = .5, gamma = .0, beta = .5):
+    outputs = outputs.permute(0,2,1)
+    targets = targets.permute(0,2,1)
+    assert not torch.isnan(outputs).any(), "Nan value detected!"
+    assert not torch.isinf(outputs).any(), "Inf value detected!"
+    B,_, T = outputs.shape
+    l_ashift = ashift_loss(outputs, targets)
+    l_amp = amp_loss(outputs, targets)
+    l_phase = phase_loss(outputs, targets)
+    loss = alpha * l_ashift + (1 - alpha) * l_phase + gamma * l_amp
+
+    assert loss == loss, "Loss Nan!"
+    return loss, l_ashift, l_amp, l_phase   #, torch.nn.MSELoss(output, targets)
+
 
 def install_and_activate_granite_tsfm():
     return True
@@ -122,23 +195,24 @@ class TSFMZeroShotScorer(InvokeWMLModel):
             logger.debug('Forecast ' + str(df.shape[0]/self.horizon) + ' times')
             df[self.output_items] = 0
 
-            #for i in range(self.context, df.shape[0], self.horizon):
+            # loop in forecasting horizon steps from the end of the dataframe to its beginning and
+            #  forecast from the context
             for i in range(df.shape[0] - len, 0 , -self.horizon):
-                #inputtensor_ = torch.from_numpy(df[i-self.context:i][self.input_items].values).to(torch.float32)
                 inputtensor_ = torch.from_numpy(df[i:i+self.context][self.input_items].values).to(torch.float32)
 
                 #logger.debug('shape   input ' + str(inputtensor_.shape))
-                # add dimension
-                #inputtensor = inputtensor_[None,:self.context,:]              # only the historic context
+                # add dimension to satisfy the model
                 inputtensor = inputtensor_[None,:,:]              # only the historic context
+
                 #logger.debug('shape   input ' + str(inputtensor.shape))
                 outputtensor = self.model(inputtensor)['prediction_outputs']  # get the forecasting horizon back
                 #logger.debug('shapes   input ' + str(inputtensor.shape) + ' , output ' + str(outputtensor.shape))
-                #   and update the dataframe with it
-                #df.loc[df.tail(self.horizon).index, self.output_items] = outputtensor[0].detach().numpy()
+
+                #   and update the dataframe with the forecast
                 try:
                     df.loc[df[i:i + self.horizon].index, self.output_items] = outputtensor[0].detach().numpy().astype(float)
                 except:
+                    # indexing issue shouldn't happen
                     logger.debug('Issue with ' + str(i) + ':' + str(i+self.horizon))
                     pass
 
@@ -214,7 +288,7 @@ class ProphetForecaster(DataExpanderTransformer):
         # Create missing columns before doing group-apply
         df_copy = df.copy()
 
-        column_list = [self.y_hat, self.y_date]  # list will get longer
+        column_list = self.output_items
         missing_cols = [x for x in column_list if x not in df_copy.columns]
         for m in missing_cols:
             df_copy[m] = 0
@@ -237,30 +311,36 @@ class ProphetForecaster(DataExpanderTransformer):
 
         # get more data if we must train, haven't loaded data yet and ..
         # we have access to our database and are allowed to go to it
-        if must_train and self.original_frame is None and self.has_access_to_db and self.allowed_to_expand:
-            logger.info('Expand dataset')
+        logger.debug('must_train: ' + str(must_train) + ', original_frame: ' + str(self.original_frame) + \
+                ', has_access_to_db: ' + str(self.has_access_to_db) + ', allowed_to_expand: ' + str(self.allowed_to_expand))
+        if must_train:
+            logger.debug('Must train first')
+            df_new = None
+            if self.original_frame is None and self.has_access_to_db and self.allowed_to_expand:
+                logger.info('Expand dataset')
 
-            # TODO compute the lookback parameter, 6 months of data
-            df_new = self.expand_dataset(df_copy, (np.unique(df_copy.index.get_level_values(0).values).shape[0] + 1) * 180)
+                # TODO compute the lookback parameter, 6 months of data
+                df_new = self.expand_dataset(df_copy,
+                     (np.unique(df_copy.index.get_level_values(0).values).shape[0] + 1) * 180)
 
-            # drop NaN for input items and create output items
-            #df_new[self.input_items] = df_new[self.input_items].fillna(0)
+                # drop NaN for input items and create output items
+                #df_new[self.input_items] = df_new[self.input_items].fillna(0)
 
-            column_list = [self.y_hat, self.y_date]  # list will get longer
-            missing_cols = [x for x in column_list if x not in df_copy.columns]
-            for m in missing_cols:
-                df_new[m] = None
+                column_list = [self.y_hat, self.y_date]  # list will get longer
+                column_list = self.output_items
+                missing_cols = [x for x in column_list if x not in df_copy.columns]
+                for m in missing_cols:
+                    df_new[m] = None
 
-            # drive by-entity scoring with the expanded dataset - TODO check size again
+            else: # use present data as training data
+                df_new = df_copy
+
+            # drive by-entity training with the expanded dataset
             if df_new is not None:
                 group_base = [pd.Grouper(axis=0, level=0)]
-                df_new = df_new.groupby(group_base).apply(self._calc)
-        else:
-            logger.debug('must_train: ' + str(must_train) + ', original_frame: ' + str(self.original_frame) + \
-                ', has_access_to_db: ' + str(self.has_access_to_db) + ', allowed_to_expand: ' + str(self.allowed_to_expand))
+                df_new = df_new.groupby(group_base).apply(self._train)
 
-        # if we cannot extend the dataset we train on what we have 
-        # group over entities
+        # now we're in a position to score
         group_base = [pd.Grouper(axis=0, level=0)]
 
         df_copy = df_copy.groupby(group_base).apply(self._calc)
@@ -269,6 +349,43 @@ class ProphetForecaster(DataExpanderTransformer):
 
         return df_copy
 
+    def _train(self, df):
+        logger.info('_train')
+        entity = df.index[0][0]
+
+        # obtain db handler
+        db = self.get_db()
+
+        # get rid of entity id as part of the index
+        df = df.droplevel(0)
+
+        # get model
+        model_name = self.generate_model_name([], self.y_hat, prefix='Prophet', suffix=entity)
+        prophet_model_json = None
+        prophet_model = None
+
+        try:
+            prophet_model_bytes = db.model_store.retrieve_model(model_name, deserialize=False)
+            prophet_model_json = prophet_model_bytes.decode('utf-8')
+            logger.debug('load model %s' % str(prophet_model_json)[0:40])
+        except Exception as e:
+            logger.debug('could not load model %s' % str(model_name))
+            # ToDo exception handling
+            #logger.error('Model retrieval for %s failed with %s', model_name, str(e))
+            #return df
+
+        if prophet_model_json is None:
+            prophet_model_json = self.train_model(df, model_name)
+            # get back the original frame
+
+        '''
+        try:
+            prophet_model = model_from_json(prophet_model_json)
+        except Exception as e:
+            logger.error('Deserializing prophet model failed with ' + str(e)) 
+            return df
+        '''
+        return df  # we don't really care
 
     def _calc(self, df):
         logger.info('_calc')
@@ -296,7 +413,10 @@ class ProphetForecaster(DataExpanderTransformer):
             #return df
 
         if prophet_model_json is None:
-            prophet_model_json = self.train_model(df, model_name)
+            #prophet_model_json = self.train_model(df, model_name)
+            # get back the original frame
+            logger.error('No model available despite training')
+            return df
 
         try:
             prophet_model = model_from_json(prophet_model_json)
@@ -351,7 +471,7 @@ class ProphetForecaster(DataExpanderTransformer):
         # obtain db handler
         db = self.get_db()
 
-        daysforTraining = round(len(df)*0.75)
+        daysforTraining = round(len(df)*0.95)  # take always everything
         time_var = df.index.names[0]
         df_train = df.iloc[:daysforTraining].reset_index().rename(columns={time_var: "ds", self.input_items[0]: "y"})
         df_test = df.iloc[daysforTraining:].reset_index().rename(columns={time_var: "ds", self.input_items[0]: "y"})
