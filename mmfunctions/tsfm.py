@@ -218,7 +218,7 @@ class TSFMZeroShotScorer(InvokeWMLModel):
                     logger.debug('Issue with ' + str(i) + ':' + str(i+self.horizon))
                     pass
 
-        logger.info('TSFM ', df.describe())
+        logger.info('TSFM returning ' + str(df.describe()))
         return df
 
     @classmethod
